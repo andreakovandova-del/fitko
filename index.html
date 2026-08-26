@@ -1995,10 +1995,11 @@ const Store = {
   // mutace: fn(state); publish = bezpečná hranice → nová verze artifactu (reload!)
   // Bez publish se změna označí jako nesynchronizovaná (pendingPublish) a doladí
   // se při příštím startu appky nebo na další bezpečné hranici.
-  mutate(fn, { publish = false, rerender = true } = {}) {
+  mutate(fn, { publish = false, rerender = true, markDirty = true } = {}) {
     const result = fn(this.state);
     this.state.updatedAt = new Date().toISOString();
-    this.state.pendingPublish = !publish;
+    if (publish) this.state.pendingPublish = false;
+    else if (markDirty) this.state.pendingPublish = true;
     saveLocal(this.state);
     if (publish) publishState(this.state); // async; při úspěchu se stránka reloadne
     if (rerender && this.onChange) this.onChange();
@@ -4030,14 +4031,7 @@ function boot() {
   Store.init(loadPersistedState());
   Store.onChange = render;
 
-  Store.mutate((s) => dailyMaintenance(s), { rerender: false, publish: false });
-
-  // nesynchronizované změny z minula → doladit do artifactu (mimo rozjetý trénink)
-  if (Store.state.pendingPublish && Store.state.onboarded && !Store.state.activeWorkout) {
-    setTimeout(() => {
-      if (Store.state.pendingPublish) Store.mutate(() => {}, { publish: true, rerender: false });
-    }, 1500);
-  }
+  Store.mutate((s) => dailyMaintenance(s), { rerender: false, publish: false, markDirty: false });
 
   render();
 }
