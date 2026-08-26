@@ -282,13 +282,30 @@ hr.rule { border: none; border-top: 1px solid var(--line); margin: 4px 0; }
   border-radius: 999px;
   border: 1px solid var(--line);
   background: var(--surface-2);
-  color: var(--muted);
+  color: var(--text);
   padding: 6px 12px;
   font-size: 13px;
   font-weight: 600;
 }
 
 .chip.active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.chip.active::before { content: "✓"; font-size: 11px; }
+
+/* radio kroužek pro výběr z možností — vybrané vs. volné je vidět na první pohled */
+.radio {
+  flex: none;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--faint);
+  display: inline-block;
+  background: transparent;
+}
+.radio.on {
+  border-color: var(--accent);
+  background: radial-gradient(circle, var(--accent) 0 4.5px, transparent 5px);
+}
+
+.screen-sub { color: var(--muted); font-size: 13.5px; margin-top: -8px; }
 
 .badge {
   display: inline-flex;
@@ -443,9 +460,9 @@ input.set-input {
   flex: none;
   width: 42px; height: 42px;
   border-radius: 10px;
-  border: 1px solid var(--line);
+  border: 1.5px solid var(--accent);
   background: var(--surface-2);
-  color: var(--faint);
+  color: var(--accent);
   font-size: 19px;
   display: inline-flex; align-items: center; justify-content: center;
 }
@@ -1978,6 +1995,7 @@ function defaultState() {
     offers: {},
     offersDismissed: {},
     minicutEndDate: null,
+    introDismissed: false,
   };
 }
 
@@ -2791,7 +2809,7 @@ const LIFT_IDS = ['bench', 'squat', 'deadlift', 'ohp', 'bb_row', 'pullup'];
 const draft = {
   step: 0,
   profile: { weightKg: 85, heightCm: 186, age: 21, goalWeightKg: 95, priority: 'balanced' },
-  lifts: Object.fromEntries(LIFT_IDS.map((id) => [id, { known: false, weightKg: '', reps: '' }])),
+  lifts: Object.fromEntries(LIFT_IDS.map((id) => [id, { weightKg: '', reps: '' }])),
   waistCm: '',
 };
 
@@ -2853,7 +2871,7 @@ function stepLifts() {
   return h('div', { class: 'stack', style: 'gap:12px;flex:1' },
     h('h2', {}, 'Co teď zvedáš?'),
     h('p', { class: 'muted small' },
-      'Poslední pracovní série u základních cviků — váha × opakování. Když nevíš, nech „nevím“: první trénink váhu najdeme spolu.'),
+      'Poslední pracovní série — váha × opakování. Co nevíš, nech prázdné: váhu najdeme spolu na prvním tréninku.'),
     ...LIFT_IDS.map((id) => liftRow(id)),
     nav(),
   );
@@ -2868,25 +2886,19 @@ function liftRow(id) {
       h('div', { style: 'font-weight:600;font-size:14.5px' }, def.name),
       isPullup ? h('div', { class: 'muted', style: 'font-size:12px' }, 'přídavná zátěž (0 = vlastní tělo)') : null,
     ),
-    lift.known
-      ? h('div', { class: 'row', style: 'gap:6px' },
-          h('input', {
-            class: 'num set-input', type: 'number', inputmode: 'decimal', placeholder: 'kg',
-            value: lift.weightKg, style: 'width:70px',
-            onInput: (e) => { lift.weightKg = e.target.value; },
-          }),
-          h('span', { class: 'muted' }, '×'),
-          h('input', {
-            class: 'num set-input', type: 'number', inputmode: 'numeric', placeholder: 'op.',
-            value: lift.reps, style: 'width:56px',
-            onInput: (e) => { lift.reps = e.target.value; },
-          }),
-        )
-      : null,
-    h('button', {
-      class: `chip${lift.known ? '' : ' active'}`,
-      onClick: () => { lift.known = !lift.known; rerender(); },
-    }, lift.known ? 'znám' : 'nevím'),
+    h('div', { class: 'row', style: 'gap:6px' },
+      h('input', {
+        class: 'num set-input', type: 'number', inputmode: 'decimal', placeholder: 'kg',
+        value: lift.weightKg, style: 'width:70px',
+        onInput: (e) => { lift.weightKg = e.target.value; },
+      }),
+      h('span', { class: 'muted' }, '×'),
+      h('input', {
+        class: 'num set-input', type: 'number', inputmode: 'numeric', placeholder: 'op.',
+        value: lift.reps, style: 'width:56px',
+        onInput: (e) => { lift.reps = e.target.value; },
+      }),
+    ),
   );
 }
 
@@ -2910,16 +2922,22 @@ function stepPriority() {
   return h('div', { class: 'stack', style: 'gap:12px;flex:1' },
     h('h2', {}, 'Až se cíle porvou — co vyhrává?'),
     h('p', { class: 'muted small' }, '95 kg a břišáky jdou proti sobě. Priorita řídí tempo výživy; kdykoli ji změníš v nastavení.'),
-    ...PRIORITIES.map((p) => h('button', {
-      class: 'card', style: `text-align:left;display:block;width:100%${draft.profile.priority === p.id ? ';border-color:var(--accent)' : ''}`,
-      onClick: () => { draft.profile.priority = p.id; rerender(); },
-    },
-      h('div', { class: 'row between' },
-        h('span', { style: 'font-weight:700' }, p.title),
-        p.recommended ? h('span', { class: 'badge accent' }, 'doporučeno') : null,
-      ),
-      h('div', { class: 'muted small', style: 'margin-top:3px' }, p.desc),
-    )),
+    ...PRIORITIES.map((p) => {
+      const selected = draft.profile.priority === p.id;
+      return h('button', {
+        class: 'card', style: `text-align:left;display:flex;gap:12px;align-items:flex-start;width:100%${selected ? ';border-color:var(--accent)' : ''}`,
+        onClick: () => { draft.profile.priority = p.id; rerender(); },
+      },
+        h('span', { class: `radio${selected ? ' on' : ''}`, style: 'margin-top:2px' }),
+        h('div', { class: 'grow' },
+          h('div', { class: 'row between' },
+            h('span', { style: 'font-weight:700' }, p.title),
+            p.recommended ? h('span', { class: 'badge accent' }, 'doporučeno') : null,
+          ),
+          h('div', { class: 'muted small', style: 'margin-top:3px' }, p.desc),
+        ),
+      );
+    }),
     nav(),
   );
 }
@@ -2944,7 +2962,7 @@ function stepHonest() {
       onNext: () => {
         const lifts = {};
         for (const [id, lift] of Object.entries(draft.lifts)) {
-          if (lift.known && lift.reps !== '' && lift.weightKg !== '') {
+          if (lift.reps !== '' && lift.weightKg !== '') {
             lifts[id] = { weightKg: +lift.weightKg, reps: +lift.reps };
           }
         }
@@ -2984,6 +3002,7 @@ function renderToday(root) {
       h('div', { class: 'muted small' }, fmtDateFull(todayISO())),
     ),
     heroCard(state),
+    introCard(state),
     ...offerCards(state),
     nutritionNotice(state),
     checkinCard(state),
@@ -3034,6 +3053,22 @@ function weekDots(state) {
     dots.push(h('span', { class: `dot${done ? ' done' : ''}${isToday ? ' today' : ''}` }));
   }
   return h('div', { class: 'weekdots' }, dots);
+}
+
+// Jednorázový průvodce — zmizí po „Rozumím".
+function introCard(state) {
+  if (state.introDismissed) return null;
+  const step = (n, text) => h('div', { class: 'row', style: 'align-items:flex-start;gap:8px' },
+    h('span', { class: 'num', style: 'color:var(--accent);font-weight:600' }, `${n}.`),
+    h('span', { class: 'small' }, text),
+  );
+  return h('div', { class: 'card stack' },
+    h('div', { class: 'label' }, 'Jak Fitko funguje'),
+    step(1, 'Ťukni na Začít trénink — u každé série ti appka řekne váhu i opakování.'),
+    step(2, 'Po každé sérii potvrď oranžové ✓. Víc appka nechce.'),
+    step(3, 'Ráno se zvaž a 1× týdně změř pas — kalorie i plán se pak ladí samy.'),
+    h('button', { class: 'btn', onClick: () => Store.mutate((s) => { s.introDismissed = true; }) }, 'Rozumím'),
+  );
 }
 
 // ---------- nabídky enginu ----------
@@ -3131,6 +3166,7 @@ function checkinCard(state) {
       h('div', { class: 'label' }, 'Ranní check-in'),
       h('span', { class: 'muted', style: 'font-size:12px' }, '1 = mizérie · 5 = top'),
     ),
+    h('p', { class: 'muted', style: 'font-size:12.5px' }, 'Tři ťuknutí — podle nich appka pozná únavu a včas ti uleví.'),
     ...CHECKIN_ROWS.map((row) => h('div', { class: 'stack', style: 'gap:5px' },
       h('span', { class: 'small muted' }, row.label),
       h('div', { class: 'scale-row' },
@@ -3164,6 +3200,7 @@ function bodyCard(state, summary) {
       h('div', { class: 'label' }, 'Tělo a jídlo'),
       t ? h('span', { class: `badge ${t.phase === 'minicut' ? 'warn' : 'accent'}` }, t.phase === 'minicut' ? 'mini-cut' : 'lean bulk') : null,
     ),
+    h('p', { class: 'muted', style: 'font-size:12.5px' }, 'Ráno se zvaž a zapiš — kalorie si appka ladí sama podle trendu.'),
     h('div', { class: 'row between' },
       h('div', { class: 'small muted' }, 'Dnes: cíl jídla'),
       t ? h('div', { class: 'num small', style: 'font-weight:600' }, `${t.kcal} kcal · ${t.proteinG} g bílkovin`) : null,
@@ -3252,6 +3289,10 @@ function renderWorkout(root) {
         h('span', { class: 'muted small num' }, `${elapsedMin} min`),
       ),
     ),
+    state.sessions.length < 3
+      ? h('p', { class: 'muted', style: 'font-size:12.5px' },
+          'Čísla jsou předvyplněná — po odcvičené sérii je jen potvrď oranžovým ✓ (nebo uprav). RIR = kolik opakování ti zbylo v rezervě.')
+      : null,
     ...workout.entries.map((entry, i) => exerciseCard(state, workout, entry, i)),
     h('button', {
       class: 'btn primary big',
@@ -3509,6 +3550,7 @@ function renderProgress(root) {
     h('div', { class: 'topbar' },
       h('h1', { class: 'display' }, 'Progres'),
     ),
+    h('p', { class: 'screen-sub' }, 'Blížíš se k cíli? Tady je poctivá odpověď.'),
     statTiles(summary),
     weightCard(state, summary),
     honestyCard(state, summary),
@@ -3749,6 +3791,7 @@ function renderSettings(root) {
 
   root.append(h('div', { class: 'screen' },
     h('div', { class: 'topbar' }, h('h1', { class: 'display' }, 'Nastavení')),
+    h('p', { class: 'screen-sub' }, 'Cíl, výživa, deload a záloha dat.'),
     profileCard(state),
     nutritionCard(state),
     deloadCard(state),
@@ -3842,7 +3885,7 @@ function deloadCard(state) {
       h('span', { class: 'num small' }, state.deload.active ? `zbývá ${state.deload.sessionsLeft}` : `${weeks} týdnů`),
     ),
     h('p', { class: 'muted', style: 'font-size:12.5px' },
-      'Deload se nabízí sám podle výkonu a check-inů (pojistka po 10 týdnech). Cítíš-li se rozbitý, spusť ho ručně.'),
+      'Nabízí se sám podle výkonu a check-inů. Cítíš se rozbitý? Spusť ho ručně.'),
     state.deload.active ? null : h('button', {
       class: 'btn',
       onClick: () => {
