@@ -1,0 +1,51 @@
+<meta charset="utf-8">
+<title>Fitko</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root {
+  --bg: #14171c; --surface: #1b1f26; --line: #303845;
+  --text: #edeef0; --muted: #98a0ad; --accent: #ff6237; --accent-ink: #200c06;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #f1f2f4; --surface: #fbfcfd; --line: #d7dbe2;
+    --text: #1c1f26; --muted: #5b616d; --accent: #d63d1d; --accent-ink: #ffffff;
+  }
+}
+:root[data-theme="light"] {
+  --bg: #f1f2f4; --surface: #fbfcfd; --line: #d7dbe2;
+  --text: #1c1f26; --muted: #5b616d; --accent: #d63d1d; --accent-ink: #ffffff;
+}
+* { box-sizing: border-box; margin: 0; }
+body {
+  background: var(--bg); color: var(--text);
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  min-height: 100svh; display: flex; align-items: center; justify-content: center; padding: 24px;
+}
+.card {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+  max-width: 420px; width: 100%; padding: 26px 22px; position: relative; overflow: hidden;
+  display: flex; flex-direction: column; gap: 14px;
+}
+.card::after {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 9px;
+  background: repeating-linear-gradient(135deg, var(--accent) 0 7px, transparent 7px 14px);
+}
+h1 { font-size: 38px; letter-spacing: 0.02em; text-transform: uppercase; font-family: 'Arial Narrow', 'Helvetica Neue', sans-serif; font-weight: 900; line-height: 1.05; }
+p { color: var(--muted); font-size: 15px; line-height: 1.5; }
+a.btn {
+  display: block; text-align: center; background: var(--accent); color: var(--accent-ink);
+  text-decoration: none; font-weight: 700; font-size: 17px; padding: 15px 16px; border-radius: 10px;
+}
+code {
+  display: block; background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
+  padding: 10px 12px; font-size: 13px; word-break: break-all; user-select: all;
+}
+</style>
+<div class="card">
+  <h1>Fitko se přestěhovalo</h1>
+  <p>Appka teď běží na vlastní adrese — bez oken okolo, celoobrazovkově a offline. Otevři ji, projdi krátký onboarding a přidej si ji na plochu telefonu (Sdílet → „Přidat na plochu“).</p>
+  <a class="btn" href="https://andreakovandova-del.github.io/fitko/" target="_blank" rel="noopener">Otevřít Fitko</a>
+  <code>https://andreakovandova-del.github.io/fitko/</code>
+  <p>Tady na staré adrese vznikl jen úvodní profil, žádné tréninky — nic se neztratilo. Tuhle stránku můžeš zavřít a zapomenout na ni.</p>
+</div>
