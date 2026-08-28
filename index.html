@@ -1771,6 +1771,52 @@ function gainQuality({ weighIns = [], waistSeries = [] }) {
 }
 
 /**
+ * Poctivý plán k cílové váze — VŽDY spočítaný z aktuálních čísel uživatele
+ * (žádné natvrdo psané scénáře). Tempa: lean bulk dle priority (science.md §7),
+ * růst svalů dle tréninkového věku, cut −0,5 % BW/týden.
+ * @returns { mode: 'gain'|'cut'|'there', months, etaIso, absEtaIso,
+ *            muscleLo, muscleHi, fatLo, fatHi, needsCut }
+ */
+function honestPlan({ startWeightKg, goalWeightKg, priority = 'balanced', trainingAgeMonths = 0, fromIso }) {
+  const delta = goalWeightKg - startWeightKg;
+  if (Math.abs(delta) <= 0.5) {
+    return { mode: 'there', months: 0, etaIso: fromIso, absEtaIso: fromIso, muscleLo: 0, muscleHi: 0, fatLo: 0, fatHi: 0, needsCut: false };
+  }
+
+  if (delta < 0) {
+    const ratePerMonth = 0.005 * startWeightKg * 4.345; // −0,5 % BW/týden
+    const months = Math.max(1, Math.ceil(-delta / ratePerMonth));
+    const etaIso = addDays(fromIso, Math.round(months * 30.44));
+    return { mode: 'cut', months, etaIso, absEtaIso: etaIso, muscleLo: 0, muscleHi: 0, fatLo: +(-delta).toFixed(1), fatHi: +(-delta).toFixed(1), needsCut: false };
+  }
+
+  const pctWk = { mass: 0.325, balanced: 0.275, lean: 0.2 }[priority] ?? 0.275;
+  let w = startWeightKg;
+  let months = 0;
+  let muscleLo = 0;
+  let muscleHi = 0;
+  while (w < goalWeightKg && months < 60) {
+    const [lo, hi] = muscleGainBandKgMo(trainingAgeMonths + months);
+    muscleLo += lo;
+    muscleHi += hi;
+    w += (pctWk / 100) * w * 4.345;
+    months++;
+  }
+  muscleLo = Math.min(muscleLo, delta);
+  muscleHi = Math.min(muscleHi, delta);
+  const fatLo = Math.max(0, delta - muscleHi);
+  const fatHi = Math.max(0, delta - muscleLo);
+  const needsCut = fatHi > 2;
+  const etaIso = addDays(fromIso, Math.round(months * 30.44));
+  const absEtaIso = needsCut ? addDays(etaIso, 56) : etaIso; // + ~8 týdnů mini-cutu
+  return {
+    mode: 'gain', months, etaIso, absEtaIso,
+    muscleLo: +muscleLo.toFixed(1), muscleHi: +muscleHi.toFixed(1),
+    fatLo: +fatLo.toFixed(1), fatHi: +fatHi.toFixed(1), needsCut,
+  };
+}
+
+/**
  * Poctivý odhad složení přírůstku: kolik z aktuálního tempa může být sval.
  * @returns { rateKgMo, muscleBandKgMo, muscleShareNote: 'realistic'|'part_fat'|'mostly_fat'|null }
  */
@@ -1863,13 +1909,6 @@ function streakWeeks(weeklyLog = []) {
   return streak;
 }
 
-// Fázové milníky z kalibrace projekce (science.md §Kalibrace) — dlouhodobá mapa cesty.
-const PHASE_MILESTONES = [
-  { id: 'feb27', label: '~91 kg', detail: 'únor 2027 — konec 1. lean bulku', targetDate: '2027-02-28' },
-  { id: 'minicut27', label: 'Mini-cut', detail: 'jaro 2027 — 6–8 týdnů, břišáky zpět', targetDate: '2027-04-30' },
-  { id: 'end27', label: '~94 kg', detail: 'konec 2027 — druhý lean bulk', targetDate: '2027-12-31' },
-  { id: 'goal', label: '95 kg + břišáky', detail: 'orientačně 2028 — poctivý horizont', targetDate: '2028-12-31' },
-];
 
 
 // ===== src/engine/onboarding.js =====
@@ -1932,18 +1971,6 @@ function buildInitialExerciseStates(reportedLifts = {}) {
   return states;
 }
 
-// Poctivé intro pro poslední obrazovku onboardingu (čísla ze science.md §Kalibrace).
-function honestIntro(profile = DEFAULT_PROFILE) {
-  return {
-    goal: `${profile.goalWeightKg} kg + viditelné břišáky`,
-    realityFeb27: '90–91 kg (z toho ~2,5–3,3 kg svalů)',
-    realityEnd27: '93,5–94,5 kg po mini-cutu na jaře',
-    fullGoalEta: '2028',
-    message:
-      'Obojí najednou za 6 měsíců fyziologie nedovolí. Tahle appka ti nebude lhát: '
-      + 'ukazuje projekci z tvých skutečných dat a subcíle podle reálného tempa.',
-  };
-}
 
 
 // ===== src/app/ui.js =====
@@ -1988,6 +2015,12 @@ function fmtDateFull(iso) {
   if (!iso) return '';
   const d = new Date(`${iso}T12:00:00`);
   return `${CZ_DAYS[d.getDay()]} ${d.getDate()}. ${CZ_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+function fmtMonthYear(iso) {
+  if (!iso) return '';
+  const d = new Date(`${iso}T12:00:00`);
+  return `${CZ_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 }
 
 function fmtKg(kg, unitless = false) {
@@ -3032,7 +3065,6 @@ function lineChart(cfg) {
 
 
 
-
 const LIFT_IDS = ['bench', 'squat', 'deadlift', 'ohp', 'bb_row', 'pullup'];
 
 const draft = {
@@ -3169,7 +3201,7 @@ function stepWaist() {
 }
 
 const PRIORITIES = [
-  { id: 'mass', title: 'Hmota především', desc: '+0,30–0,35 % váhy týdně. Nejrychlejší cesta k 95, počítej s trochou tuku navíc.' },
+  { id: 'mass', title: 'Hmota především', desc: '+0,30–0,35 % váhy týdně. Nejrychlejší cesta na cílovou váhu, počítej s trochou tuku navíc.' },
   { id: 'balanced', title: 'Vyvážené', desc: '+0,25–0,30 % týdně. Doporučené tempo — většina přírůstku jde do svalů.', recommended: true },
   { id: 'lean', title: 'Řez především', desc: '+0,15–0,25 % týdně. Pomalejší váha, nejčistší gain, břišáky nejdřív.' },
 ];
@@ -3177,7 +3209,7 @@ const PRIORITIES = [
 function stepPriority() {
   return h('div', { class: 'stack', style: 'gap:12px;flex:1' },
     h('h2', {}, 'Až se cíle porvou — co vyhrává?'),
-    h('p', { class: 'muted small' }, '95 kg a břišáky jdou proti sobě. Priorita řídí tempo výživy; kdykoli ji změníš v nastavení.'),
+    h('p', { class: 'muted small' }, `Váha ${draft.profile.goalWeightKg} kg a břišáky můžou jít proti sobě. Priorita řídí tempo výživy; kdykoli ji změníš v nastavení.`),
     ...PRIORITIES.map((p) => {
       const selected = draft.profile.priority === p.id;
       return h('button', {
@@ -3199,17 +3231,37 @@ function stepPriority() {
 }
 
 function stepHonest() {
-  const intro = honestIntro({ ...draft.profile });
+  const p = draft.profile;
+  // vše se počítá živě z hodnot, které uživatel právě zadal
+  const plan = honestPlan({
+    startWeightKg: p.weightKg, goalWeightKg: p.goalWeightKg,
+    priority: p.priority, trainingAgeMonths: 0, fromIso: todayISO(),
+  });
+  const kgr = (a, b) => `~${String(a).replace('.', ',')}–${String(b).replace('.', ',')} kg`;
+  let message;
+  const rows = [];
+  if (plan.mode === 'there') {
+    message = 'Na cílové váze už jsi — teď rozhoduje pas a zrcadlo. Appka ti nebude lhát: pojede z tvých skutečných dat.';
+  } else if (plan.mode === 'cut') {
+    message = 'Jdeš dolů. Appka ti nebude lhát: tempo −0,5 % váhy týdně udrží svaly a odhalí břišáky.';
+    rows.push(honestRow(`${p.goalWeightKg} kg na váze`, `~${fmtMonthYear(plan.etaIso)}`));
+    rows.push(honestRow('Viditelné břišáky', 'řez je odhalí — hlídej pas'));
+  } else {
+    message = plan.months <= 7
+      ? 'Cíl je v poctivém dosahu. Appka ti přesto nebude lhát — povede tě tempem, které dává svaly, ne tuk.'
+      : 'Poctivě: tohle není projekt na pár týdnů. Appka ti nebude lhát — projekce pojede z tvých dat a subcíle podle skutečného tempa.';
+    rows.push(honestRow(`${p.goalWeightKg} kg na váze`, `~${fmtMonthYear(plan.etaIso)}`));
+    rows.push(honestRow('Z toho svaly', kgr(plan.muscleLo, plan.muscleHi)));
+    rows.push(honestRow('Viditelné břišáky', plan.needsCut ? `po mini-cutu, ~${fmtMonthYear(plan.absEtaIso)}` : 'můžou přijít spolu s váhou'));
+  }
   return h('div', { class: 'stack', style: 'gap:14px;flex:1' },
     h('div', { class: 'label' }, 'Cíl'),
-    h('div', { class: 'display hero' }, intro.goal),
+    h('div', { class: 'display hero' }, `${p.goalWeightKg} kg + viditelné břišáky`),
     h('div', { class: 'card stack' },
-      h('div', { class: 'label warn-text' }, 'Poctivě'),
-      h('p', { class: 'small' }, intro.message),
-      h('hr', { class: 'rule' }),
-      honestRow('Únor 2027', intro.realityFeb27),
-      honestRow('Konec 2027', intro.realityEnd27),
-      honestRow('95 kg + břišáky', `reálně ${intro.fullGoalEta}`),
+      h('div', { class: 'label warn-text' }, 'Poctivě — spočítáno z tvých čísel'),
+      h('p', { class: 'small' }, message),
+      rows.length ? h('hr', { class: 'rule' }) : null,
+      ...rows,
     ),
     h('p', { class: 'muted small' },
       'Program: 5× týdně Push / Pull / Legs / Upper / Lower, dvojitá progrese, reaktivní deloady, výživa řízená trendem váhy. Každé pravidlo má zdroj.'),
@@ -4054,6 +4106,44 @@ function waistCard(state, summary) {
   );
 }
 
+// Fázové milníky se počítají živě z profilu a AKTUÁLNÍ váhy —
+// změna cíle v Nastavení je okamžitě přepíše.
+function phaseRows(state, avg7) {
+  const p = state.profile;
+  const plan = honestPlan({
+    startWeightKg: avg7 ?? p.weightKg,
+    goalWeightKg: p.goalWeightKg,
+    priority: p.priority,
+    trainingAgeMonths: trainingAgeMonthsNow(state),
+    fromIso: todayISO(),
+  });
+  const row = (label, detail, hit) => h('div', { class: `milestone${hit ? ' hit' : ''}` },
+    h('span', { class: 'm-flag' }, hit ? '✓' : '·'),
+    h('div', { class: 'grow' },
+      h('div', { style: 'font-weight:600;font-size:14.5px' }, label),
+      h('div', { class: 'muted', style: 'font-size:12.5px' }, detail),
+    ),
+  );
+  if (plan.mode === 'there') {
+    return [row(`${p.goalWeightKg} kg`, 'cílová váha dosažena — teď rozhoduje pas a zrcadlo', true)];
+  }
+  if (plan.mode === 'cut') {
+    return [
+      row(`${p.goalWeightKg} kg`, `~${fmtMonthYear(plan.etaIso)} při −0,5 % týdně`, false),
+      row('Břišáky', 'řez je odhaluje — hlídej trend pasu', false),
+    ];
+  }
+  const out = [
+    row(`${p.goalWeightKg} kg na váze`, `~${fmtMonthYear(plan.etaIso)} při poctivém tempu`, avg7 != null && avg7 >= p.goalWeightKg),
+  ];
+  if (plan.needsCut) {
+    out.push(row('Mini-cut', `po cestě ~${String(plan.fatLo).replace('.', ',')}–${String(plan.fatHi).replace('.', ',')} kg tuku — 6–8 týdnů řezu`, false));
+  }
+  out.push(row(`${p.goalWeightKg} kg + břišáky`,
+    plan.needsCut ? `reálně ~${fmtMonthYear(plan.absEtaIso)}` : 'může přijít spolu s cílovou váhou', false));
+  return out;
+}
+
 // ---------- milníky ----------
 
 function milestonesCard(state, summary) {
@@ -4071,18 +4161,7 @@ function milestonesCard(state, summary) {
         h('div', { style: `width:${Math.min(100, Math.max(3, Math.round((1 - (wm.targetKg - avg7)) * 100)))}%` })),
     ) : null,
     h('hr', { class: 'rule' }),
-    ...PHASE_MILESTONES.map((m) => {
-      const hit = avg7 != null && (
-        (m.id === 'feb27' && avg7 >= 90.5) || (m.id === 'end27' && avg7 >= 93.5) || (m.id === 'goal' && avg7 >= state.profile.goalWeightKg)
-      );
-      return h('div', { class: `milestone${hit ? ' hit' : ''}` },
-        h('span', { class: 'm-flag' }, hit ? '✓' : '·'),
-        h('div', { class: 'grow' },
-          h('div', { style: 'font-weight:600;font-size:14.5px' }, m.label),
-          h('div', { class: 'muted', style: 'font-size:12.5px' }, m.detail),
-        ),
-      );
-    }),
+    ...phaseRows(state, avg7),
     state.prLog.length ? h('hr', { class: 'rule' }) : null,
     ...state.prLog.slice(-3).reverse().map((pr) => h('div', { class: 'row between' },
       h('span', { class: 'small' }, `PR — ${EXERCISES[pr.exerciseId].name}`),
