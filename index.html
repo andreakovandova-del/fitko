@@ -144,7 +144,7 @@ body {
   color: var(--text);
   font-family: var(--font-ui);
   font-size: 16px;
-  line-height: 1.45;
+  line-height: 1.55;
   min-height: 100svh;
 }
 
@@ -238,14 +238,14 @@ input.num { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
 
 /* ---------- layout ---------- */
 
-.screen { padding: 20px 16px 24px; display: flex; flex-direction: column; gap: 14px; flex: 1; }
+/* horní odsazení respektuje výřez/hodiny iPhonu (standalone režim) */
+.screen { padding: calc(18px + env(safe-area-inset-top, 0px)) 16px 24px; display: flex; flex-direction: column; gap: 16px; flex: 1; }
 
 .topbar {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
-  padding-top: max(6px, env(safe-area-inset-top, 0px));
 }
 
 .topbar h1 { font-size: 26px; }
@@ -256,13 +256,13 @@ input.num { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
   background: var(--card-grad);
   border: 1px solid var(--line);
   border-radius: var(--r-card);
-  padding: 15px 16px;
+  padding: 16px;
   box-shadow: var(--card-shadow);
 }
 
 .card + .card { margin-top: 0; }
 
-.stack { display: flex; flex-direction: column; gap: 10px; }
+.stack { display: flex; flex-direction: column; gap: 12px; }
 .row { display: flex; align-items: center; gap: 10px; }
 .row.between { justify-content: space-between; }
 .grow { flex: 1; }
@@ -462,7 +462,7 @@ hr.rule { border: none; border-top: 1px solid var(--line); margin: 4px 0; }
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 13px 14px 11px;
+  padding: 14px 14px 12px;
 }
 
 .ex-head .ex-title { font-weight: 700; font-size: 16.5px; }
@@ -470,10 +470,10 @@ hr.rule { border: none; border-top: 1px solid var(--line); margin: 4px 0; }
 
 .set-block {
   border-top: 1px solid var(--line);
-  padding: 8px 12px;
+  padding: 10px 12px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 7px;
 }
 
 .set-block.done {
@@ -658,7 +658,7 @@ input.set-input {
 
 /* ---------- onboarding ---------- */
 
-.onb { flex: 1; display: flex; flex-direction: column; gap: 16px; padding: 24px 20px; }
+.onb { flex: 1; display: flex; flex-direction: column; gap: 18px; padding: calc(22px + env(safe-area-inset-top, 0px)) 20px 24px; }
 .onb h2 { font-size: 21px; }
 .onb .display.hero { font-size: 46px; }
 
@@ -1345,6 +1345,55 @@ function nextStateAfterSession(exDef, state, performance, prescription = null) {
   };
 }
 
+/**
+ * Autoregulace UVNITŘ tréninku (PROGRAM §Progrese): po zapsané pracovní sérii
+ * uprav cíle zbývajících sérií cviku podle skutečné rezervy.
+ *  - velká rezerva (RIR ≥ horní cíl + 2) → další série těžší (přírůstek; když
+ *    10% pravidlo skok nepovolí, +2 opakování),
+ *  - pod cílovou rezervou (RIR < spodní cíl) → další série drží zátěž a cíl
+ *    opakování klesne na to, co reálně šlo.
+ * Mutuje targets nezapsaných work řádků; vrací 'up' | 'down' | null.
+ */
+function adjustRemainingTargets(exDef, rows) {
+  const [lo] = exDef.repRange;
+  const [rirLo, rirHi] = exDef.rir;
+  const workRows = rows.filter((r) => r.kind === 'work');
+  let lastIdx = -1;
+  for (let i = 0; i < workRows.length; i++) if (workRows[i].logged) lastIdx = i;
+  const logged = lastIdx >= 0 ? workRows[lastIdx].logged : null;
+  if (!logged || logged.rir == null) return null;
+  const remaining = workRows.slice(lastIdx + 1).filter((r) => !r.logged);
+  if (!remaining.length) return null;
+
+  // chip „4" v UI znamená 4 a víc — práh proto stropujeme na 4
+  if (logged.rir >= Math.min(rirHi + 2, 4)) {
+    const inc = effectiveIncrement(exDef, logged.weightKg);
+    if (inc != null && logged.weightKg > 0) {
+      const step = loadStep(exDef);
+      for (const r of remaining) {
+        r.target.weightKg = roundToStep(logged.weightKg + inc, step);
+        r.adjusted = 'up';
+      }
+    } else {
+      for (const r of remaining) {
+        r.target.reps = (r.target.reps ?? lo) + 2;
+        r.adjusted = 'up';
+      }
+    }
+    return 'up';
+  }
+
+  if (logged.rir < rirLo) {
+    for (const r of remaining) {
+      r.target.reps = Math.max(lo, Math.min(r.target.reps ?? lo, logged.reps));
+      r.adjusted = 'down';
+    }
+    return 'down';
+  }
+
+  return null;
+}
+
 // Dropset předpis pro poslední sérii izolace: −20–25 % po pracovní sérii (PROGRAM §Dropsety).
 function dropsetPrescription(exDef, loadKg) {
   if (!exDef.dropset || loadKg == null) return null;
@@ -1899,6 +1948,16 @@ function fmtKg(kg, unitless = false) {
   if (kg == null) return '—';
   const s = Number.isInteger(kg) ? String(kg) : kg.toFixed(1).replace('.', ',');
   return unitless ? s : `${s} kg`;
+}
+
+// iOS česká klávesnice píše čárku — parsujeme obojí, zobrazujeme čárku.
+function parseNum(v) {
+  const n = parseFloat(String(v ?? '').trim().replace(',', '.'));
+  return Number.isNaN(n) ? null : n;
+}
+
+function fmtInput(n) {
+  return n == null || n === '' ? '' : String(n).replace('.', ',');
 }
 
 function fmtSigned(n, digits = 0) {
@@ -2968,7 +3027,7 @@ function numField(label, value, onInput, { placeholder = '', suffix = '' } = {})
     h('span', { class: 'label' }, label),
     h('div', { class: 'row' },
       h('input', {
-        class: 'num', type: 'number', inputmode: 'decimal', value, placeholder,
+        class: 'num', type: 'text', inputmode: 'decimal', value, placeholder,
         onInput: (e) => onInput(e.target.value),
       }),
       suffix ? h('span', { class: 'muted small' }, suffix) : null,
@@ -2982,10 +3041,10 @@ function stepProfile() {
     h('h2', {}, 'Tvoje čísla'),
     h('p', { class: 'muted small' }, 'Předvyplněno ze zadání — uprav, jestli něco nesedí.'),
     h('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:12px' },
-      numField('Váha', p.weightKg, (v) => { p.weightKg = +v; }, { suffix: 'kg' }),
-      numField('Výška', p.heightCm, (v) => { p.heightCm = +v; }, { suffix: 'cm' }),
-      numField('Věk', p.age, (v) => { p.age = +v; }, { suffix: 'let' }),
-      numField('Cílová váha', p.goalWeightKg, (v) => { p.goalWeightKg = +v; }, { suffix: 'kg' }),
+      numField('Váha', p.weightKg, (v) => { p.weightKg = parseNum(v); }, { suffix: 'kg' }),
+      numField('Výška', p.heightCm, (v) => { p.heightCm = parseNum(v); }, { suffix: 'cm' }),
+      numField('Věk', p.age, (v) => { p.age = parseNum(v); }, { suffix: 'let' }),
+      numField('Cílová váha', p.goalWeightKg, (v) => { p.goalWeightKg = parseNum(v); }, { suffix: 'kg' }),
     ),
     nav({ canNext: p.weightKg > 40 && p.heightCm > 120 && p.age >= 15 && p.goalWeightKg > p.weightKg - 20 }),
   );
@@ -3012,7 +3071,7 @@ function liftRow(id) {
     ),
     h('div', { class: 'row', style: 'gap:6px' },
       h('input', {
-        class: 'num set-input', type: 'number', inputmode: 'decimal', placeholder: 'kg',
+        class: 'num set-input', type: 'text', inputmode: 'decimal', placeholder: 'kg',
         value: lift.weightKg, style: 'width:70px',
         onInput: (e) => { lift.weightKg = e.target.value; },
       }),
@@ -3086,14 +3145,16 @@ function stepHonest() {
       onNext: () => {
         const lifts = {};
         for (const [id, lift] of Object.entries(draft.lifts)) {
-          if (lift.reps !== '' && lift.weightKg !== '') {
-            lifts[id] = { weightKg: +lift.weightKg, reps: +lift.reps };
+          const w = parseNum(lift.weightKg);
+          const r = parseInt(lift.reps, 10);
+          if (w != null && !Number.isNaN(r) && r > 0) {
+            lifts[id] = { weightKg: w, reps: r };
           }
         }
         Store.mutate((s) => completeOnboarding(s, {
           profile: draft.profile,
           lifts,
-          waistCm: draft.waistCm ? +draft.waistCm : null,
+          waistCm: parseNum(draft.waistCm),
         }), { publish: true });
         toast('Plán je připravený.');
       },
@@ -3304,6 +3365,30 @@ function checkinCard(state) {
         }, String(v))),
       ),
     )),
+    h('hr', { class: 'rule' }),
+    whoopRow(),
+  );
+}
+
+// WHOOP zkratka: jedno číslo (Recovery %) vyplní celý check-in.
+function whoopRow() {
+  let input;
+  return h('div', { class: 'row' },
+    h('div', { class: 'grow' },
+      h('div', { class: 'small', style: 'font-weight:600' }, 'Máš WHOOP?'),
+      h('div', { class: 'muted', style: 'font-size:12px' }, 'Zadej ranní Recovery % — vyplní check-in za tebe.'),
+    ),
+    input = h('input', { class: 'num set-input', type: 'text', inputmode: 'numeric', placeholder: '%', style: 'width:64px' }),
+    h('button', {
+      class: 'btn small',
+      onClick: () => {
+        const pct = parseNum(input.value);
+        if (pct == null || pct < 0 || pct > 100) { toast('Recovery je 0–100 %.'); return; }
+        const m = Math.min(5, Math.max(1, Math.ceil(pct / 20)));
+        Store.mutate((s) => upsertCheckin(s, { sleep: m, soreness: m, motivation: m, whoopPct: Math.round(pct) }));
+        toast(`Recovery ${Math.round(pct)} % → připravenost ${m}/5.`);
+      },
+    }, 'Uložit'),
   );
 }
 
@@ -3344,7 +3429,7 @@ function bodyCard(state, summary) {
     h('hr', { class: 'rule' }),
     h('div', { class: 'row' },
       weightInput = h('input', {
-        class: 'num', type: 'number', inputmode: 'decimal',
+        class: 'num', type: 'text', inputmode: 'decimal',
         placeholder: weighedToday ? `dnes ${fmtKg(weighedToday.kg, true)}` : 'ranní váha (kg)',
       }),
       h('button', {
@@ -3359,7 +3444,7 @@ function bodyCard(state, summary) {
     ),
     waistDue ? h('div', { class: 'row' },
       waistInput = h('input', {
-        class: 'num', type: 'number', inputmode: 'decimal',
+        class: 'num', type: 'text', inputmode: 'decimal',
         placeholder: lastWaist ? `pas — naposledy ${String(lastWaist.cm).replace('.', ',')} cm` : 'pas u pupku (cm) — 1× týdně',
       }),
       h('button', {
@@ -3542,13 +3627,14 @@ function setRow(workout, entry, entryIndex, row, rowIndex, ghostSets, nextKey) {
     ? `min. ${fmtKg(ghostSets[workIndex].weightKg, true)}×${ghostSets[workIndex].reps}${ghostSets[workIndex].rir != null ? `@${ghostSets[workIndex].rir}` : ''}`
     : null;
 
+  // type=text + inputmode: iOS klávesnice píše desetinnou čárku a number-pole by ji zahodilo
   const weightInput = h('input', {
-    class: 'set-input', type: 'number', inputmode: 'decimal', placeholder: 'kg',
-    value: row.logged ? row.logged.weightKg : (target.weightKg ?? ''),
+    class: 'set-input', type: 'text', inputmode: 'decimal', placeholder: 'kg',
+    value: fmtInput(row.logged ? row.logged.weightKg : (target.weightKg ?? '')),
     disabled: done,
   });
   const repsInput = h('input', {
-    class: 'set-input', type: 'number', inputmode: 'numeric', placeholder: row.kind === 'drop' ? 'do selh.' : 'op.',
+    class: 'set-input', type: 'text', inputmode: 'numeric', placeholder: row.kind === 'drop' ? 'do selh.' : 'op.',
     value: row.logged ? row.logged.reps : (target.reps ?? ''),
     disabled: done,
   });
@@ -3577,17 +3663,25 @@ function setRow(workout, entry, entryIndex, row, rowIndex, ghostSets, nextKey) {
       Store.mutate((s) => { s.activeWorkout.entries[entryIndex].rows[rowIndex].logged = null; });
       return;
     }
-    const weightKg = parseFloat(String(weightInput.value).replace(',', '.'));
+    const weightKg = parseNum(weightInput.value);
     const reps = parseInt(repsInput.value, 10);
     if (Number.isNaN(reps) || reps <= 0) { toast('Doplň opakování.'); return; }
-    if ((Number.isNaN(weightKg) || weightKg < 0) && def.incrementRule !== 'bodyweight') { toast('Doplň váhu.'); return; }
+    if ((weightKg == null || weightKg < 0) && def.incrementRule !== 'bodyweight') { toast('Doplň váhu.'); return; }
+    let adjusted = null;
     Store.mutate((s) => {
-      s.activeWorkout.entries[entryIndex].rows[rowIndex].logged = {
-        weightKg: Number.isNaN(weightKg) ? 0 : weightKg,
+      const rows = s.activeWorkout.entries[entryIndex].rows;
+      rows[rowIndex].logged = {
+        weightKg: weightKg == null ? 0 : weightKg,
         reps,
         ...(row.kind === 'work' && rir != null ? { rir } : {}),
       };
+      // autoregulace uvnitř tréninku: po pracovní sérii přepočítej zbytek cviku
+      if (row.kind === 'work' && !s.activeWorkout.deload) {
+        adjusted = adjustRemainingTargets(EXERCISES[s.activeWorkout.entries[entryIndex].exerciseId], rows);
+      }
     });
+    if (adjusted === 'up') toast('Měl jsi rezervu — další série jde nahoru.');
+    if (adjusted === 'down') toast('Bylo to na hraně — další série má nižší cíl.');
     if (row.kind !== 'warmup') {
       RestTimer.start(restSecondsFor(entry.exerciseId), nextUpLabel(Store.state.activeWorkout));
     } else {
@@ -3595,7 +3689,9 @@ function setRow(workout, entry, entryIndex, row, rowIndex, ghostSets, nextKey) {
     }
   };
 
-  const ghostText = row.kind === 'drop' ? '−22 % · do selhání' : ghost ?? (row.kind === 'warmup' ? 'lehce, bez RIR' : 'první záznam');
+  const adjNote = row.adjusted === 'up' ? '↑ upraveno — máš na víc'
+    : row.adjusted === 'down' ? '↓ upraveno — šetři síly' : null;
+  const ghostText = adjNote ?? (row.kind === 'drop' ? '−22 % · do selhání' : ghost ?? (row.kind === 'warmup' ? 'lehce, bez RIR' : 'první záznam'));
 
   const isNext = !done && nextKey === `${entryIndex}:${rowIndex}`;
   return h('div', { class: `set-block${done ? ' done' : ''}${row.kind === 'warmup' ? ' warmup' : ''}${isNext ? ' next' : ''}` },
@@ -3606,8 +3702,8 @@ function setRow(workout, entry, entryIndex, row, rowIndex, ghostSets, nextKey) {
       ),
       weightInput,
       done ? null : h('div', { class: 'stepper' },
-        h('button', { 'aria-label': 'víc kg', onClick: () => { weightInput.value = String((parseFloat(String(weightInput.value).replace(',', '.')) || 0) + step); } }, '+'),
-        h('button', { 'aria-label': 'míň kg', onClick: () => { weightInput.value = String(Math.max(0, (parseFloat(String(weightInput.value).replace(',', '.')) || 0) - step)); } }, '−'),
+        h('button', { 'aria-label': 'víc kg', onClick: () => { weightInput.value = fmtInput((parseNum(weightInput.value) ?? 0) + step); } }, '+'),
+        h('button', { 'aria-label': 'míň kg', onClick: () => { weightInput.value = fmtInput(Math.max(0, (parseNum(weightInput.value) ?? 0) - step)); } }, '−'),
       ),
       repsInput,
       done ? null : h('div', { class: 'stepper' },
@@ -3961,12 +4057,12 @@ function profileCard(state) {
     ),
     h('div', { class: 'row' },
       h('span', { class: 'small muted grow' }, 'Cílová váha'),
-      goalInput = h('input', { class: 'num set-input', type: 'number', inputmode: 'decimal', value: p.goalWeightKg, style: 'width:76px' }),
+      goalInput = h('input', { class: 'num set-input', type: 'text', inputmode: 'decimal', value: fmtInput(p.goalWeightKg), style: 'width:76px' }),
       h('button', {
         class: 'btn small',
         onClick: () => {
-          const v = parseFloat(goalInput.value.replace(',', '.'));
-          if (!v || v < 50 || v > 180) { toast('Tohle jako cíl nedává smysl.'); return; }
+          const v = parseNum(goalInput.value);
+          if (v == null || v < 50 || v > 180) { toast('Tohle jako cíl nedává smysl.'); return; }
           Store.mutate((s) => { s.profile.goalWeightKg = v; }, { publish: true });
         },
       }, 'Uložit'),
