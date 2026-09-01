@@ -879,7 +879,7 @@ input.set-input {
 <script>
 (() => {
 'use strict';
-const BUILD_ID = "2026-09-01 21:34";
+const BUILD_ID = "2026-09-01 21:40";
 // ===== src/engine/util.js =====
 // Sdílené utility enginu — čisté funkce, žádné závislosti.
 
@@ -2669,7 +2669,9 @@ const Store = {
     saveLocal(this.state, { force });
     // Automatická záloha na GitHub: na hranicích (konec tréninku, onboarding…) hned,
     // jinak se shlukne a odešle po pár vteřinách klidu.
-    if (publish) { publishState(this.state); flushCloudBackup(this.state); }
+    // Na stejné hranici vzniká i lokální snímek — po dokončeném tréninku tak
+    // existuje čerstvá záloha, ne až při příštím spuštění appky.
+    if (publish) { backupState(this.state); publishState(this.state); flushCloudBackup(this.state); }
     else scheduleCloudBackup(this.state);
     if (rerender && this.onChange) this.onChange();
     return result;
