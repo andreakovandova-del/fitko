@@ -845,7 +845,7 @@ input.set-input {
 <script>
 (() => {
 'use strict';
-const BUILD_ID = "2026-09-01 19:46";
+const BUILD_ID = "2026-09-01 19:51";
 // ===== src/engine/util.js =====
 // Sdílené utility enginu — čisté funkce, žádné závislosti.
 
@@ -2733,14 +2733,15 @@ function buildEntry(state, exerciseId, sets, dropsetLast, swappedFrom = null) {
   return { exerciseId, swappedFrom, prescription, rows };
 }
 
-function buildWorkout(state) {
-  const day = nextUnitDay(state);
+function buildWorkout(state, { unit = null, date = null } = {}) {
+  const day = unit ? WEEK_TEMPLATE.find((d) => d.unit === unit) ?? nextUnitDay(state) : nextUnitDay(state);
   const entries = unitExerciseList(state, day)
     .map((item) => buildEntry(state, item.exerciseId, item.sets, item.dropsetLast));
   return {
     unit: day.unit,
     unitName: day.name,
-    date: todayISO(),
+    date: date ?? todayISO(),
+    backfill: !!date && date !== todayISO(),
     startedAt: Date.now(),
     deload: state.deload.active,
     entries,
@@ -2786,6 +2787,9 @@ function completeWorkout(state) {
     entries,
   };
   state.sessions.push(session);
+  // chronologicky — zpětně dopsaný trénink se musí zařadit podle data,
+  // jinak by ho engine bral jako nejnovější výkon
+  state.sessions.sort((a, b) => a.date.localeCompare(b.date));
 
   const prs = [];
   for (const entry of entries) {
@@ -4198,6 +4202,7 @@ function renderWorkout(root) {
         h('div', { class: 'row', style: 'gap:8px' },
           h('span', { class: 'label' }, workout.deload ? 'Deload trénink' : 'Trénink'),
           workout.deload ? h('span', { class: 'badge warn' }, '−50 % sérií · RIR 3+') : null,
+          workout.backfill ? h('span', { class: 'badge accent' }, `zpětně · ${fmtDateFull(workout.date)}`) : null,
         ),
         h('div', { class: 'display unit-name' }, workout.unitName),
       ),
@@ -4684,10 +4689,17 @@ function reviewCard(state) {
 
 // Historie tréninků — ťuknutím se otevře plná rekapitulace.
 function historyCard(state) {
-  const sessions = [...state.sessions].slice(-8).reverse();
-  if (!sessions.length) return null;
+  const sessions = [...state.sessions]
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(-8)
+    .reverse();
   return h('div', { class: 'card stack' },
-    h('div', { class: 'label' }, 'Odcvičené tréninky'),
+    h('div', { class: 'row between' },
+      h('div', { class: 'label' }, 'Odcvičené tréninky'),
+      h('button', { class: 'btn small', onClick: () => backfillModal(state) }, '+ Dřívější'),
+    ),
+    sessions.length ? null : h('p', { class: 'muted small' },
+      'Zatím nic. Trénink, který jsi odcvičil dřív (nebo o který jsi přišel), dopíšeš tlačítkem výš.'),
     ...sessions.map((session) => {
       const r = sessionRecap(state, session);
       return h('button', {
@@ -4703,6 +4715,50 @@ function historyCard(state) {
         h('span', { class: 'muted', style: 'font-size:18px' }, '›'),
       );
     }),
+  );
+}
+
+// Zpětný zápis tréninku: vybereš jednotku a den, pak se otevře normální
+// obrazovka tréninku — jen se uloží pod zvoleným datem.
+function backfillModal(state) {
+  let dateInput;
+  let unit = 'push';
+  const { close } = openModal(
+    h('h3', {}, 'Zapsat dřívější trénink'),
+    h('p', { class: 'muted small' }, 'Vyber, co jsi cvičil a kdy. Pak sérii po sérii zapíšeš stejně jako v tréninku.'),
+    h('div', { class: 'stack', style: 'gap:6px' },
+      h('span', { class: 'label' }, 'Co'),
+      h('div', { class: 'row', style: 'flex-wrap:wrap;gap:6px' },
+        ...WEEK_TEMPLATE.map((d) => {
+          const chip = h('button', {
+            class: `chip${d.unit === unit ? ' active' : ''}`,
+            onClick: () => {
+              unit = d.unit;
+              chip.parentElement.querySelectorAll('.chip').forEach((c) => c.classList.remove('active'));
+              chip.classList.add('active');
+            },
+          }, d.name);
+          return chip;
+        }),
+      ),
+    ),
+    h('div', { class: 'stack', style: 'gap:6px' },
+      h('span', { class: 'label' }, 'Kdy'),
+      dateInput = h('input', { type: 'date', value: todayISO(), max: todayISO() }),
+    ),
+    h('button', {
+      class: 'btn primary big',
+      onClick: () => {
+        const date = dateInput.value || todayISO();
+        if (date > todayISO()) { toast('Datum je v budoucnu.'); return; }
+        if (state.sessions.some((s) => s.date === date && s.unit === unit)) {
+          toast('Tenhle trénink už na to datum máš.');
+          return;
+        }
+        close();
+        Store.mutate((s) => { s.activeWorkout = buildWorkout(s, { unit, date }); });
+      },
+    }, 'Otevřít zápis'),
   );
 }
 
