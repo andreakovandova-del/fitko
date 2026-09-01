@@ -845,7 +845,7 @@ input.set-input {
 <script>
 (() => {
 'use strict';
-const BUILD_ID = "2026-09-01 14:08";
+const BUILD_ID = "2026-09-01 19:37";
 // ===== src/engine/util.js =====
 // Sdílené utility enginu — čisté funkce, žádné závislosti.
 
@@ -2215,7 +2215,13 @@ let originalHtml = null; // snímek dokumentu před prvním renderem — šablon
 let artifactNs;          // Promise<namespace|null>
 let downloadsNs;
 
-const storageInfo = { localOk: false, artifactOk: null, lastPublish: null, publishError: null };
+const storageInfo = {
+  localOk: false, artifactOk: null, lastPublish: null, publishError: null,
+  hadStoredData: false, damagedFound: false, persisted: null,
+};
+
+// Jakmile jednou uvidíme uložené tréninky, prázdný stav je už NIKDY nesmí přepsat.
+let hadStoredData = false;
 
 function captureDocument() {
   originalHtml = `<!doctype html>\n${document.documentElement.outerHTML}`;
@@ -2255,16 +2261,32 @@ function loadPersistedState() {
 
   let local = null;
   if (storageInfo.localOk) {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) local = JSON.parse(raw);
-    } catch { local = null; }
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      try {
+        local = JSON.parse(raw);
+      } catch {
+        // Poškozený zápis nesmíme přepsat — uschováme ho stranou k případné záchraně.
+        try { localStorage.setItem(`fitko-state-damaged-${Date.now()}`, raw); } catch { /* plno */ }
+        storageInfo.damagedFound = true;
+        local = null;
+      }
+    }
   }
 
-  if (local && embedded) {
-    return (local.updatedAt ?? '') >= (embedded.updatedAt ?? '') ? local : embedded;
-  }
-  return local ?? embedded ?? null;
+  const chosen = local && embedded
+    ? ((local.updatedAt ?? '') >= (embedded.updatedAt ?? '') ? local : embedded)
+    : (local ?? embedded ?? null);
+
+  // Zapamatuj si, že v zařízení JSOU data (i když je zrovna nešlo načíst) —
+  // saveLocal pak odmítne přepsat je prázdným stavem.
+  hadStoredData = !!(chosen?.sessions?.length) || storageInfo.damagedFound
+    || !!(readBackup()?.state?.sessions?.length);
+  storageInfo.hadStoredData = hadStoredData;
+
+  try { navigator.storage?.persisted?.().then((p) => { storageInfo.persisted = p; }); } catch { /* nepodstatné */ }
+
+  return chosen;
 }
 
 /**
@@ -2287,9 +2309,56 @@ function readBackup() {
   } catch { return null; }
 }
 
-function saveLocal(state) {
+function saveLocal(state, { force = false } = {}) {
   if (!storageInfo.localOk) return;
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch { storageInfo.localOk = false; }
+  // TVRDÁ POJISTKA: stav bez odcvičených tréninků nikdy nepřepíše uložená data.
+  // (Selhalo načtení, jiné okno v onboardingu, chyba při startu… data mají přednost.)
+  if (!force && hadStoredData && !state?.sessions?.length) return;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    if (state?.sessions?.length) { hadStoredData = true; storageInfo.hadStoredData = true; }
+  } catch { storageInfo.localOk = false; }
+}
+
+/**
+ * Prohledá úložiště zařízení na VŠECHNY záznamy Fitka (hlavní stav, automatická
+ * záloha, poškozené i staré zápisy) a vrátí, co se z nich dá zachránit.
+ */
+function scanStoredStates() {
+  if (!storageInfo.localOk) return [];
+  const out = [];
+  let keys = [];
+  try { keys = Object.keys(localStorage).filter((k) => k.startsWith('fitko-')); } catch { return []; }
+  for (const key of keys) {
+    let raw = '';
+    try { raw = localStorage.getItem(key) ?? ''; } catch { continue; }
+    if (!raw || raw.length < 40) continue;
+    let state = null;
+    try {
+      const parsed = JSON.parse(raw);
+      state = parsed?.state?.profile ? parsed.state : (parsed?.profile ? parsed : null);
+    } catch { state = null; }
+    out.push({
+      key,
+      sizeKb: Math.round(raw.length / 1024),
+      sessions: state?.sessions?.length ?? 0,
+      lastDate: state?.sessions?.length ? state.sessions[state.sessions.length - 1].date : null,
+      readable: !!state,
+      state,
+    });
+  }
+  return out.sort((a, b) => b.sessions - a.sessions || b.sizeKb - a.sizeKb);
+}
+
+// Vědomé smazání všeho uživatelem — jediná cesta, jak pojistku obejít.
+function wipeAllData() {
+  hadStoredData = false;
+  storageInfo.hadStoredData = false;
+  try {
+    for (const key of Object.keys(localStorage)) {
+      if (key.startsWith('fitko-')) localStorage.removeItem(key);
+    }
+  } catch { /* noop */ }
 }
 
 function escapeForScriptTag(json) {
@@ -2399,12 +2468,12 @@ const Store = {
   // mutace: fn(state); publish = bezpečná hranice → nová verze artifactu (reload!)
   // Bez publish se změna označí jako nesynchronizovaná (pendingPublish) a doladí
   // se při příštím startu appky nebo na další bezpečné hranici.
-  mutate(fn, { publish = false, rerender = true, markDirty = true } = {}) {
+  mutate(fn, { publish = false, rerender = true, markDirty = true, force = false } = {}) {
     const result = fn(this.state);
     this.state.updatedAt = new Date().toISOString();
     if (publish) this.state.pendingPublish = false;
     else if (markDirty) this.state.pendingPublish = true;
-    saveLocal(this.state);
+    saveLocal(this.state, { force });
     if (publish) publishState(this.state); // async; při úspěchu se stránka reloadne
     if (rerender && this.onChange) this.onChange();
     return result;
@@ -4813,6 +4882,7 @@ function dataCard(state) {
       ? h('button', { class: 'btn', onClick: () => Store.mutate(() => {}, { publish: true }) }, 'Uložit změny do appky teď')
       : null,
     backupRow(),
+    h('button', { class: 'btn', onClick: recoveryModal }, 'Prohledat úložiště (záchrana dat)'),
     h('div', { class: 'row' },
       h('button', {
         class: 'btn grow',
@@ -4832,7 +4902,15 @@ function dataCard(state) {
           h('h3', {}, 'Smazat úplně všechno?'),
           h('p', { class: 'muted small' }, 'Historie tréninků, váhy i nastavení. Nejde vzít zpět (leda ze zálohy).'),
           h('div', { class: 'row' },
-            h('button', { class: 'btn danger grow', onClick: () => { Store.init(defaultState()); Store.mutate(() => {}, { publish: true }); close(); } }, 'Smazat vše'),
+            h('button', {
+              class: 'btn danger grow',
+              onClick: () => {
+                wipeAllData();
+                Store.init(defaultState());
+                Store.mutate(() => {}, { publish: true, force: true });
+                close();
+              },
+            }, 'Smazat vše'),
             h('button', { class: 'btn grow', onClick: () => close() }, 'Zpět'),
           ),
         );
@@ -4865,7 +4943,7 @@ function backupRow() {
               class: 'btn primary grow',
               onClick: () => {
                 Store.init(backup.state);
-                Store.mutate(() => {}, { publish: true });
+                Store.mutate(() => {}, { publish: true, force: true });
                 close();
                 toast('Data obnovena ze zálohy.');
               },
@@ -4875,6 +4953,51 @@ function backupRow() {
         );
       },
     }, 'Obnovit'),
+  );
+}
+
+// Záchrana: ukáže všechny nalezené záznamy Fitka v zařízení a nabídne obnovu.
+function recoveryModal() {
+  const found = scanStoredStates();
+  const usable = found.filter((f) => f.readable && f.sessions > 0);
+  openModal(
+    h('h3', {}, 'Co je uložené v tomhle zařízení'),
+    found.length
+      ? h('div', { class: 'stack', style: 'gap:8px' },
+          ...found.map((f) => h('div', { class: 'row between' },
+            h('div', { class: 'grow' },
+              h('div', { class: 'small', style: 'font-weight:600' },
+                f.key === 'fitko-state-v1' ? 'Hlavní data'
+                  : f.key === 'fitko-state-backup-v1' ? 'Automatická záloha'
+                  : f.key.startsWith('fitko-state-damaged') ? 'Poškozený zápis' : f.key),
+              h('div', { class: 'muted', style: 'font-size:12px' },
+                f.readable
+                  ? `${f.sessions} tréninků${f.lastDate ? ` · poslední ${fmtDate(f.lastDate)}` : ''} · ${f.sizeKb} kB`
+                  : `nečitelné · ${f.sizeKb} kB`),
+            ),
+            f.readable && f.sessions > 0
+              ? h('button', {
+                  class: 'btn small',
+                  onClick: () => {
+                    Store.init(f.state);
+                    Store.mutate(() => {}, { publish: true, force: true });
+                    toast(`Obnoveno ${f.sessions} tréninků.`);
+                  },
+                }, 'Obnovit')
+              : null,
+          )),
+          usable.length ? null : h('p', { class: 'muted small' },
+            'Žádný záznam s odcvičenými tréninky. Zkus otevřít appku tam, kde jsi ji používal '
+            + '(ikona na ploše vs. Safari) — každé prostředí má vlastní paměť.'),
+        )
+      : h('p', { class: 'muted small' },
+          'V tomhle prostředí není uloženo nic. Data jsou nejspíš v druhém prostředí — '
+          + 'zkus ikonu na ploše, případně Safari, podle toho, kde jsi trénink zapisoval.'),
+    h('div', { class: 'row between' },
+      h('span', { class: 'small muted' }, 'Trvalé úložiště povoleno'),
+      h('span', { class: `badge ${storageInfo.persisted ? 'ok' : 'warn'}` },
+        storageInfo.persisted === null ? 'zjišťuji…' : storageInfo.persisted ? 'ano' : 'ne'),
+    ),
   );
 }
 
@@ -4899,7 +5022,7 @@ function importModal() {
           try {
             const parsed = parseImportedJSON(area.value);
             Store.init(parsed);
-            Store.mutate(() => {}, { publish: true });
+            Store.mutate(() => {}, { publish: true, force: true });
             close();
             toast('Data obnovena.');
           } catch (err) {
