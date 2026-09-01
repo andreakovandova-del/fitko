@@ -1480,6 +1480,26 @@ function nextStateAfterSession(exDef, state, performance, prescription = null) {
 }
 
 /**
+ * Přepočet cílů cviku Z NULY podle zapsaných sérií.
+ * Nezapsané série se vrátí na původní předpis, zahodí se staré příznaky a teprve
+ * pak se aplikuje predikce + autoregulace. Díky tomu je stav vždy čistou funkcí
+ * toho, co je zapsané — odznačení série tedy korektně vrátí i cíle a štítky.
+ */
+function recomputeEntryTargets(exDef, entry) {
+  const workRows = entry.rows.filter((r) => r.kind === 'work');
+  const base = entry.prescription;
+  workRows.forEach((r, i) => {
+    if (r.logged) return;
+    r.target = {
+      weightKg: base.loadKg,
+      reps: base.targetReps[i] ?? base.targetReps[base.targetReps.length - 1],
+    };
+    delete r.adjusted;
+  });
+  return adjustRemainingTargets(exDef, entry.rows);
+}
+
+/**
  * Autoregulace UVNITŘ tréninku (PROGRAM §Progrese): po zapsané pracovní sérii
  * uprav cíle zbývajících sérií cviku podle skutečné rezervy.
  *  - velká rezerva (RIR ≥ horní cíl + 2) → další série těžší (přírůstek; když
@@ -1540,8 +1560,10 @@ function adjustRemainingTargets(exDef, rows) {
 function dropsetPrescription(exDef, loadKg) {
   if (!exDef.dropset || loadKg == null) return null;
   const step = loadStep(exDef);
-  const dropped = Math.max(floorToStep(loadKg * 0.775, step), step);
-  return { drops: 1, dropLoadKg: Math.min(dropped, loadKg - step), toFailure: true };
+  const dropped = Math.min(Math.max(floorToStep(loadKg * 0.775, step), step), loadKg - step);
+  // U nejlehčích zátěží (např. 5kg deska) by vyšla 0 nebo záporná váha — pak
+  // váhu nenavrhujeme a uživatel ji zapíše sám.
+  return { drops: 1, dropLoadKg: dropped > 0 ? dropped : null, toFailure: true };
 }
 
 
@@ -2833,11 +2855,20 @@ function progressSummary(state) {
  * (po completeWorkout už stav obsahuje nové zátěže), takže je pravdivá i zpětně.
  */
 function sessionRecap(state, session) {
+  // „Příště" dává smysl jen u nejnovějšího tréninku — u starších by ukazovalo
+  // dnešní zátěž, ne tu, která po něm reálně přišla.
+  const isLatest = state.sessions[state.sessions.length - 1]?.id === session.id;
+  const allWorkSets = [];
+
   const entries = session.entries.map((entry) => {
     const def = EXERCISES[entry.exerciseId];
+    if (!def) return null; // cvik, který už v programu není
     const work = entry.sets.filter((s) => !s.isWarmup && !s.isDropset);
     const drops = entry.sets.filter((s) => s.isDropset);
-    const [lo, hi] = def.repRange;
+    allWorkSets.push(...work);
+    const lo = def.repRange[0];
+    // strop = prodloužený rozsah, pokud ho cvik má (jinak by verdikt lhal)
+    const hi = state.exercises[entry.exerciseId]?.rangeHi ?? def.repRange[1];
     const tonnage = work.reduce((a, s) => a + s.weightKg * s.reps, 0);
     const rirs = work.filter((s) => s.rir != null).map((s) => s.rir);
     const avgRir = rirs.length ? +avg(rirs).toFixed(1) : null;
@@ -2848,7 +2879,7 @@ function sessionRecap(state, session) {
     if (work.some((s) => s.reps < lo)) { verdict = 'pod rozsahem'; tone = 'warn'; }
     else if (work.length && work.every((s) => s.reps >= hi)) { verdict = 'na stropu'; tone = 'accent'; }
 
-    const next = session.deload ? null : prescriptionFor(state, entry.exerciseId, work.length);
+    const next = session.deload || !isLatest ? null : prescriptionFor(state, entry.exerciseId, work.length);
     const nextText = next && next.loadKg != null
       ? `${fmtNum(next.loadKg)} kg × ${next.targetReps[0]}`
       : next ? `× ${next.targetReps[0]} (váhu najdeš na místě)` : null;
@@ -2868,18 +2899,21 @@ function sessionRecap(state, session) {
     };
   });
 
-  const workSets = entries.reduce((a, e) => a + e.workSets, 0);
-  const tonnage = entries.reduce((a, e) => a + e.tonnage, 0);
-  const rirAll = entries.filter((e) => e.avgRir != null).map((e) => e.avgRir);
-  const avgRir = rirAll.length ? +avg(rirAll).toFixed(1) : null;
-  const prs = state.prLog.filter((p) => p.date === session.date);
+  const clean = entries.filter(Boolean);
+  const workSets = clean.reduce((a, e) => a + e.workSets, 0);
+  const tonnage = clean.reduce((a, e) => a + e.tonnage, 0);
+  // průměr přes VŠECHNY série, ne průměr průměrů
+  const rirValues = allWorkSets.filter((s) => s.rir != null).map((s) => s.rir);
+  const avgRir = rirValues.length ? +avg(rirValues).toFixed(1) : null;
+  const inSession = new Set(session.entries.map((e) => e.exerciseId));
+  const prs = state.prLog.filter((p) => p.date === session.date && inSession.has(p.exerciseId));
 
   // souhrnný verdikt — jedna věta, kterou si přečteš do 2 sekund
   let headline;
   if (session.deload) headline = 'Deload odcvičen — přesně jak měl vypadat: lehce a bez selhání.';
   else if (prs.length) headline = 'Nové osobní maximum. Tohle byl silný trénink.';
-  else if (entries.some((e) => e.tone === 'accent')) headline = 'Strop rozsahu na některých cvicích — příště se přidává váha.';
-  else if (entries.some((e) => e.tone === 'warn')) headline = 'Část sérií spadla pod rozsah — engine příště uleví, ať se progrese rozjede.';
+  else if (clean.some((e) => e.tone === 'accent')) headline = 'Strop rozsahu na některých cvicích — příště se přidává váha.';
+  else if (clean.some((e) => e.tone === 'warn')) headline = 'Část sérií spadla pod rozsah — engine příště uleví, ať se progrese rozjede.';
   else if (avgRir != null && avgRir >= 3.5) headline = 'Bylo to hodně v rezervě — příště přitlač, ať to má stimul.';
   else headline = 'Solidní práce v cílovém pásmu — přesně takhle se staví progrese.';
 
@@ -2894,8 +2928,14 @@ function sessionRecap(state, session) {
     avgRir,
     prs,
     headline,
-    entries,
+    entries: clean,
   };
+}
+
+// Náhrady, které v tréninku ještě nejsou (dvakrát tentýž cvik by rozbil zápis i předpis).
+function availableSubstitutes(state, exerciseId) {
+  const used = new Set((state.activeWorkout?.entries ?? []).map((e) => e.exerciseId));
+  return (EXERCISES[exerciseId].substitutes ?? []).filter((id) => EXERCISES[id] && !used.has(id));
 }
 
 function fmtNum(n) {
@@ -2972,6 +3012,8 @@ const RestTimer = {
   beeped: false,
   scheduled: [],
   tonesReady: false,
+  resuming: false,
+  visibilityBound: false,
 
   start(seconds, label = '') {
     this.endTime = Date.now() + seconds * 1000;
@@ -3009,9 +3051,16 @@ const RestTimer = {
     this.el = h('div', { class: 'timerbar', role: 'timer' });
     document.body.append(this.el);
     if (!this.interval) this.interval = setInterval(() => this.render(), 500);
-    document.addEventListener('visibilitychange', () => {
-      if (!document.hidden) { this.render(); this.requestWakeLock(); }
-    });
+    // listener jen jednou za život appky a jen když časovač opravdu běží,
+    // jinak by se hromadil a držel displej rozsvícený i mimo trénink
+    if (!this.visibilityBound) {
+      this.visibilityBound = true;
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden || !this.endTime) return;
+        this.render();
+        this.requestWakeLock();
+      });
+    }
   },
 
   render() {
@@ -3053,8 +3102,16 @@ const RestTimer = {
   ensureAudio() {
     try {
       this.audioCtx = this.audioCtx ?? new (window.AudioContext ?? window.webkitAudioContext)();
-      if (this.audioCtx.state === 'suspended') this.audioCtx.resume();
-      return this.audioCtx;
+      const ctx = this.audioCtx;
+      // iOS startuje kontext uspaný; po probuzení tóny naplánujeme znovu,
+      // aby závěrečný signál nezazněl dvakrát (naplánovaný + záložní).
+      if (ctx.state === 'suspended' && !this.resuming) {
+        this.resuming = true;
+        ctx.resume()
+          .then(() => { this.resuming = false; if (this.endTime) this.scheduleTones(); })
+          .catch(() => { this.resuming = false; });
+      }
+      return ctx;
     } catch { return null; }
   },
 
@@ -3938,7 +3995,7 @@ function renderWorkout(root) {
     ),
     state.sessions.length < 3
       ? h('p', { class: 'muted', style: 'font-size:12.5px' },
-          'Čísla jsou předvyplněná — po odcvičené sérii je jen potvrď oranžovým ✓ (nebo uprav). RIR = kolik opakování ti zbylo v rezervě.')
+          'Šedá čísla v polích jsou návrh. Odcvičils to tak? Jen ťukni oranžové ✓. Jinak klikni do pole a napiš svoje. RIR = kolik opakování ti zbylo v rezervě.')
       : null,
     ...workout.entries.map((entry, i) => exerciseCard(state, workout, entry, i, nextKey)),
     h('button', {
@@ -3981,7 +4038,7 @@ function exerciseCard(state, workout, entry, entryIndex, nextKey) {
           actionNote(p) ? h('span', { class: 'accent-text' }, actionNote(p)) : null),
       ),
       h('button', { class: 'icon-btn', 'aria-label': 'Proč tenhle cvik', onClick: () => whyModal(def) }, 'ⓘ'),
-      h('button', { class: 'icon-btn', 'aria-label': 'Vyměnit cvik', onClick: () => swapModal(entryIndex, def) }, '⇄'),
+      h('button', { class: 'icon-btn', 'aria-label': 'Vyměnit cvik', onClick: () => swapModal(state, entryIndex, def) }, '⇄'),
     ),
     calibrating
       ? h('div', { class: 'small', style: 'padding:0 14px 10px;color:var(--accent)' },
@@ -4030,11 +4087,13 @@ function whyModal(def) {
   );
 }
 
-function swapModal(entryIndex, def) {
-  const subs = (def.substitutes ?? []).filter((id) => EXERCISES[id]);
+function swapModal(state, entryIndex, def) {
+  const subs = availableSubstitutes(state, def.id);
   const { close } = openModal(
     h('h3', {}, 'Vyměnit cvik'),
-    h('p', { class: 'muted small' }, 'Obsazené nářadí? Náhrada dědí rozsah; váha se kalibruje znovu.'),
+    h('p', { class: 'muted small' }, subs.length
+      ? 'Obsazené nářadí? Náhrada dědí rozsah; váha se kalibruje znovu.'
+      : 'Pro tenhle cvik teď není volná náhrada — ostatní varianty už v tréninku máš.'),
     ...subs.map((id) => h('button', {
       class: 'btn', style: 'justify-content:flex-start',
       onClick: () => {
@@ -4068,21 +4127,40 @@ function setRow(workout, entry, entryIndex, row, rowIndex, ghostSets, nextKey) {
 
   // Cíl je jen šedý NÁVRH v placeholderu — nemusíš nic mazat, klikneš a píšeš.
   // Prázdné pole při potvrzení znamená „odcvičeno přesně podle návrhu".
+  // Rozepsané hodnoty se průběžně ukládají do row.draft, takže je nesmaže
+  // překreslení obrazovky (potvrzení jiné série, výměna cviku…).
   // type=text + inputmode: iOS klávesnice píše desetinnou čárku a number-pole by ji zahodilo.
+  const draft = row.draft ?? null;
+  const shownWeight = row.logged ? row.logged.weightKg : draft?.weightKg;
+  const shownReps = row.logged ? row.logged.reps : draft?.reps;
+
   const weightInput = h('input', {
     class: 'set-input', type: 'text', inputmode: 'decimal',
     placeholder: target.weightKg != null ? fmtInput(target.weightKg) : 'kg',
-    value: row.logged ? fmtInput(row.logged.weightKg) : '',
+    value: shownWeight != null ? fmtInput(shownWeight) : '',
     disabled: done,
   });
   const repsInput = h('input', {
     class: 'set-input', type: 'text', inputmode: 'numeric',
     placeholder: target.reps != null ? String(target.reps) : (row.kind === 'drop' ? 'selh.' : 'op.'),
-    value: row.logged ? String(row.logged.reps) : '',
+    value: shownReps != null ? String(shownReps) : '',
     disabled: done,
   });
 
-  let rir = row.logged ? (row.logged.rir ?? null) : (row.kind === 'work' && !workout.deload ? def.rir[0] : null);
+  let rir = row.logged ? (row.logged.rir ?? null)
+    : draft?.rir != null ? draft.rir
+    : (row.kind === 'work' && !workout.deload ? def.rir[0] : null);
+
+  const saveDraft = () => Store.mutate((s) => {
+    const r = s.activeWorkout.entries[entryIndex].rows[rowIndex];
+    const w = parseNum(weightInput.value);
+    const rp = repsInput.value.trim();
+    r.draft = { weightKg: w, reps: rp === '' ? null : parseInt(rp, 10), rir };
+  }, { rerender: false });
+
+  weightInput.addEventListener('input', saveDraft);
+  repsInput.addEventListener('input', saveDraft);
+
   const rirChips = row.kind === 'work'
     ? h('div', { class: 'rir-chips', role: 'group', 'aria-label': 'RIR' },
         ...[0, 1, 2, 3, 4].map((v) => {
@@ -4093,6 +4171,7 @@ function setRow(workout, entry, entryIndex, row, rowIndex, ghostSets, nextKey) {
               rir = v;
               chip.parentElement.querySelectorAll('.rir-chip').forEach((c) => c.classList.remove('active'));
               chip.classList.add('active');
+              saveDraft();
             },
           }, String(v));
           return chip;
@@ -4103,7 +4182,15 @@ function setRow(workout, entry, entryIndex, row, rowIndex, ghostSets, nextKey) {
 
   const onCheck = () => {
     if (done) {
-      Store.mutate((s) => { s.activeWorkout.entries[entryIndex].rows[rowIndex].logged = null; });
+      // Odznačení nesmí nic ztratit: zapsané hodnoty se vrátí do polí jako rozepsané
+      // a cíle zbývajících sérií se přepočítají, jako by série nikdy zapsaná nebyla.
+      Store.mutate((s) => {
+        const e = s.activeWorkout.entries[entryIndex];
+        const r = e.rows[rowIndex];
+        r.draft = { weightKg: r.logged.weightKg, reps: r.logged.reps, rir: r.logged.rir ?? null };
+        r.logged = null;
+        recomputeEntryTargets(EXERCISES[e.exerciseId], e);
+      });
       return;
     }
     // prázdné pole = beru návrh z placeholderu
@@ -4114,15 +4201,17 @@ function setRow(workout, entry, entryIndex, row, rowIndex, ghostSets, nextKey) {
     if ((weightKg == null || weightKg < 0) && def.incrementRule !== 'bodyweight') { toast('Doplň váhu.'); return; }
     let adjusted = null;
     Store.mutate((s) => {
-      const rows = s.activeWorkout.entries[entryIndex].rows;
-      rows[rowIndex].logged = {
+      const e = s.activeWorkout.entries[entryIndex];
+      const r = e.rows[rowIndex];
+      r.logged = {
         weightKg: weightKg == null ? 0 : weightKg,
         reps,
         ...(row.kind === 'work' && rir != null ? { rir } : {}),
       };
-      // autoregulace uvnitř tréninku: po pracovní sérii přepočítej zbytek cviku
+      delete r.draft;
+      // predikce + autoregulace: cíle zbytku cviku se počítají vždy načisto
       if (row.kind === 'work' && !s.activeWorkout.deload) {
-        adjusted = adjustRemainingTargets(EXERCISES[s.activeWorkout.entries[entryIndex].exerciseId], rows);
+        adjusted = recomputeEntryTargets(EXERCISES[e.exerciseId], e);
       }
     });
     if (adjusted === 'up') toast('Měl jsi rezervu — další série jde nahoru.');
