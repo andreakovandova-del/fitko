@@ -520,9 +520,13 @@ hr.rule { border: none; border-top: 1px solid var(--line); margin: 4px 0; }
   text-overflow: ellipsis;
 }
 
+/* pole série: cíl je jen placeholder, hodnotu píšeš přímo — bez stepperů */
+.set-fields { display: flex; align-items: center; gap: 7px; flex: none; }
+.set-x { color: var(--faint); font-size: 13px; }
+
 input.set-input {
   flex: none;
-  width: 58px;
+  width: 76px;
   text-align: center;
   padding: 9px 2px;
   background: var(--surface-2);
@@ -533,17 +537,6 @@ input.set-input {
   font-size: 16px;
 }
 
-.stepper { display: inline-flex; flex-direction: column; gap: 2px; flex: none; }
-.stepper button {
-  width: 24px; height: 17px;
-  display: inline-flex; align-items: center; justify-content: center;
-  background: var(--surface-2);
-  border: 1px solid var(--line);
-  border-radius: 5px;
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 1;
-}
 
 .rir-line { display: flex; align-items: center; gap: 8px; }
 .rir-line .label { flex: none; }
@@ -575,6 +568,66 @@ input.set-input {
 }
 .set-block.next .check-btn { background: var(--accent-soft); box-shadow: var(--check-glow); }
 .check-btn.done { background: var(--ok); border-color: var(--ok); color: var(--ok-ink); box-shadow: none; }
+
+/* ---------- týdenní pruh ---------- */
+
+.weekstrip { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
+
+.wd-cell {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-2);
+  padding: 6px 0 5px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+
+.wd-cell .wd-day {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.wd-cell .wd-mark {
+  font-family: var(--font-num);
+  font-size: 13px;
+  line-height: 1.1;
+  color: var(--faint);
+}
+
+.wd-cell.done { background: var(--accent-soft); border-color: var(--accent); }
+.wd-cell.done .wd-day { color: var(--accent-2); }
+.wd-cell.done .wd-mark { color: var(--accent); font-weight: 700; }
+.wd-cell.rest { background: none; border-style: dashed; opacity: 0.6; }
+.wd-cell.missed { opacity: 0.45; }
+.wd-cell.today { box-shadow: 0 0 0 2px var(--accent-soft); border-color: var(--accent); }
+
+/* ---------- rekapitulace a historie ---------- */
+
+.recap-row {
+  border-top: 1px solid var(--line);
+  padding: 10px 0 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.recap-row:first-of-type { border-top: none; }
+
+.history-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 0;
+  border-top: 1px solid var(--line);
+  color: var(--text);
+}
+.history-row:first-of-type { border-top: none; }
+.history-row:active { opacity: 0.6; }
 
 /* ---------- rest timer ---------- */
 
@@ -879,6 +932,7 @@ const EXERCISES = {
     muscles: { primary: ['chest'], secondary: ['triceps', 'front_delts'] },
     repRange: [5, 8], rir: [2, 3], increment: 2.5, incrementRule: 'barbell',
     why: 'Základní horizontální tlak — nejvíc prozkoumaný cvik na prsa, snadná progrese po 2,5 kg.',
+    how: 'Lopatky stažené k sobě a dolů, chodidla pevně na zemi. Osu spouštěj na spodní hrudník, lokty ~45° od těla. Dole se nedopružuj o hrudník.',
     substitutes: ['db_bench'],
   },
   ohp: {
@@ -886,6 +940,7 @@ const EXERCISES = {
     muscles: { primary: ['front_delts'], secondary: ['triceps', 'side_delts'] },
     repRange: [5, 8], rir: [2, 3], increment: 2.5, incrementRule: 'barbell',
     why: 'Základní vertikální tlak — ramena a stabilita trupu, přenáší se do všech tlaků.',
+    how: 'Zpevni břicho i hýždě, žebra dolů. Osa jde těsně kolem nosu, hlava se v půlce protlačí vpřed — nahoře propni a zamkni.',
     substitutes: ['db_press'],
   },
   incline_db: {
@@ -893,6 +948,7 @@ const EXERCISES = {
     muscles: { primary: ['chest'], secondary: ['front_delts', 'triceps'] },
     repRange: [8, 12], rir: [1, 2], increment: 2, incrementRule: 'dumbbell',
     why: 'Doplněk benche z jiného úhlu (horní prsa), jednoručky = delší dráha a symetrie.',
+    how: 'Lavice na 30°. Jednoručky spouštěj ke klíčním kostem, lokty 45°. Dole cítíš protažení prsou, nahoře je nepokládej k sobě.',
     substitutes: ['bench'],
   },
   lat_raise: {
@@ -900,6 +956,7 @@ const EXERCISES = {
     muscles: { primary: ['side_delts'], secondary: [] },
     repRange: [12, 15], rir: [0, 1], increment: 2, incrementRule: 'dumbbell',
     why: 'Střední hlava ramen nedostává přímou práci z tlaků — a dělá šířku ramen.',
+    how: 'Mírný předklon, lokty vedou pohyb nahoru do výšky ramen. Netočíš zápěstím ani nehoupeš trupem — dolů pomalu.',
     substitutes: ['cable_lat_raise'],
   },
   triceps_pushdown: {
@@ -907,6 +964,7 @@ const EXERCISES = {
     muscles: { primary: ['triceps'], secondary: [] },
     repRange: [12, 15], rir: [0, 1], increment: 5, incrementRule: 'stack',
     why: 'Izolace tricepsu s nízkou únavovou cenou — sem patří práce blízko selhání i dropsety.',
+    how: 'Lokty přilepené k tělu, hýbe se jen předloktí. Dole plně propni a na půl vteřiny zastav.',
     substitutes: ['oh_triceps'],
   },
   pullup: {
@@ -914,6 +972,7 @@ const EXERCISES = {
     muscles: { primary: ['back'], secondary: ['biceps'] },
     repRange: [5, 10], rir: [1, 2], increment: 2.5, incrementRule: 'bodyweight',
     why: 'Nejlepší poměr výkon/čas pro šířku zad; progrese opakováními, pak přídavnou zátěží.',
+    how: 'Start z úplného zavěšení, ramena aktivní. Táhni lokty k bokům a hrudník k hrazdě, dolů kontrolovaně.',
     substitutes: ['lat_pulldown'],
   },
   bb_row: {
@@ -921,6 +980,7 @@ const EXERCISES = {
     muscles: { primary: ['back'], secondary: ['biceps', 'rear_delts'] },
     repRange: [6, 10], rir: [2, 3], increment: 2.5, incrementRule: 'barbell',
     why: 'Tloušťka zad a zpevnění celého zadního řetězce; drž RIR 2–3, technika je tu limit.',
+    how: 'Trup ~45°, záda rovná, břicho zpevněné. Táhni osu k pupku, lokty podél těla — netrhej to zády.',
     substitutes: ['chest_row'],
   },
   lat_pulldown: {
@@ -928,6 +988,7 @@ const EXERCISES = {
     muscles: { primary: ['back'], secondary: ['biceps'] },
     repRange: [8, 12], rir: [1, 2], increment: 5, incrementRule: 'stack',
     why: 'Doplňkový objem na šířku zad bez limitu vlastní váhy.',
+    how: 'Hrudník vzhůru, mírný záklon. Táhni lokty dolů k bokům, tyč ke klíčním kostem, nahoře nech lopatky vyjet.',
     substitutes: ['pullup'],
   },
   face_pull: {
@@ -935,6 +996,7 @@ const EXERCISES = {
     muscles: { primary: ['rear_delts'], secondary: [] },
     repRange: [12, 15], rir: [0, 1], increment: 5, incrementRule: 'stack',
     why: 'Zadní delty + zdraví ramen — protiváha všem tlakům.',
+    how: 'Kladka ve výšce obličeje. Táhni lano k čelu a rozevři lokty do stran, na vteřinu stiskni lopatky.',
     substitutes: ['reverse_fly'],
   },
   bb_curl: {
@@ -942,6 +1004,7 @@ const EXERCISES = {
     muscles: { primary: ['biceps'], secondary: [] },
     repRange: [8, 12], rir: [0, 1], increment: 2.5, incrementRule: 'barbell',
     why: 'Biceps roste z tahů jen částečně — přímá práce je potřeba.',
+    how: 'Lokty u těla a nehýbou se dopředu. Nahoře stiskni biceps, dolů pomalu a paže plně propni.',
     substitutes: ['db_curl'],
   },
   squat: {
@@ -949,6 +1012,7 @@ const EXERCISES = {
     muscles: { primary: ['quads'], secondary: ['hams_glutes'] },
     repRange: [5, 8], rir: [2, 3], increment: 2.5, incrementRule: 'barbell',
     why: 'Základ dolní poloviny — kvadricepsy, hýždě a nejvyšší systémový stimul.',
+    how: 'Osa na horní části zad, chodidla na šířku ramen, špičky mírně ven. Kolena tlač ven přes špičky, dolů pod paralelu.',
     substitutes: ['hack_squat', 'leg_press'],
   },
   rdl: {
@@ -956,6 +1020,7 @@ const EXERCISES = {
     muscles: { primary: ['hams_glutes'], secondary: [] }, // vzpřimovače ≠ objem na šířku zad
     repRange: [6, 10], rir: [2, 3], increment: 2.5, incrementRule: 'barbell',
     why: 'Hamstringy přes protažení pod zátěží — nejsilnější hypertrofický podnět pro zadní stehna.',
+    how: 'Kolena lehce pokrčená a fixní, posílej boky vzad. Osa klouže po stehnech, záda rovná — dolů, dokud táhne v hamstringách.',
     substitutes: ['leg_curl'],
   },
   leg_press: {
@@ -963,6 +1028,7 @@ const EXERCISES = {
     muscles: { primary: ['quads'], secondary: ['hams_glutes'] },
     repRange: [8, 12], rir: [1, 2], increment: 5, incrementRule: 'stack',
     why: 'Objem na kvadricepsy bez axiální zátěže — doplňuje dřep, nekonkuruje mu.',
+    how: 'Chodidla na šířku ramen ve středu plošiny, záda i pánev přilepené. Kolena spouštěj k hrudi, nahoře nepropínej naplno.',
     substitutes: ['hack_squat'],
   },
   calf_stand: {
@@ -970,6 +1036,7 @@ const EXERCISES = {
     muscles: { primary: ['calves'], secondary: [] },
     repRange: [10, 15], rir: [0, 1], increment: 5, incrementRule: 'stack',
     why: 'Lýtka potřebují přímou práci a plný rozsah s pauzou dole.',
+    how: 'Plný rozsah: dole nech patu klesnout co nejníž, nahoře vteřinová výdrž na špičce.',
     substitutes: ['calf_seated'],
   },
   cable_crunch: {
@@ -977,6 +1044,7 @@ const EXERCISES = {
     muscles: { primary: ['abs'], secondary: [] },
     repRange: [10, 15], rir: [0, 1], increment: 5, incrementRule: 'stack',
     why: 'Břicho je sval jako každý jiný — progresivní zátěž, ne stovky sklapovaček.',
+    how: 'Klek pod kladkou, lano u hlavy. Kulať páteř a táhni lokty ke kolenům břichem — ne rukama.',
     substitutes: ['hanging_leg_raise'],
   },
   dips: {
@@ -984,6 +1052,7 @@ const EXERCISES = {
     muscles: { primary: ['chest'], secondary: ['triceps', 'front_delts'] },
     repRange: [6, 10], rir: [1, 2], increment: 2.5, incrementRule: 'bodyweight',
     why: 'Druhý zásah prsou a tricepsů v týdnu; progrese přídavnou zátěží.',
+    how: 'Mírný předklon (svisle = víc triceps), lokty vzad. Dolů, dokud ramena nejsou pod lokty; dole nezůstávej viset.',
     substitutes: ['close_bench'],
   },
   cable_row: {
@@ -991,6 +1060,7 @@ const EXERCISES = {
     muscles: { primary: ['back'], secondary: ['biceps', 'rear_delts'] },
     repRange: [8, 12], rir: [1, 2], increment: 5, incrementRule: 'stack',
     why: 'Druhý zásah tloušťky zad bez nároků na spodní záda po přítazích s činkou.',
+    how: 'Hrudník vzhůru, záda rovná. Táhni rukojeť k pupku a stiskni lopatky, dopředu je nech kontrolovaně rozjet.',
     substitutes: ['chest_row'],
   },
   db_press: {
@@ -998,6 +1068,7 @@ const EXERCISES = {
     muscles: { primary: ['front_delts'], secondary: ['triceps', 'side_delts'] },
     repRange: [8, 12], rir: [1, 2], increment: 2, incrementRule: 'dumbbell',
     why: 'Druhý zásah ramen v týdnu, šetrnější varianta tlaku.',
+    how: 'Sedni si opřený, jednoručky ve výšce uší. Tlač nahoru a lehce k sobě, dole nepouštěj pod bradu.',
     substitutes: ['ohp'],
   },
   db_curl: {
@@ -1005,6 +1076,7 @@ const EXERCISES = {
     muscles: { primary: ['biceps'], secondary: [] },
     repRange: [10, 15], rir: [0, 1], increment: 2, incrementRule: 'dumbbell',
     why: 'Druhý zásah bicepsu, supinace navíc oproti velké čince.',
+    how: 'Start v neutrále, při zvedání otoč dlaň vzhůru (supinace). Lokty u těla, dolů pomalu.',
     substitutes: ['bb_curl'],
   },
   oh_triceps: {
@@ -1012,6 +1084,7 @@ const EXERCISES = {
     muscles: { primary: ['triceps'], secondary: [] },
     repRange: [10, 15], rir: [0, 1], increment: 5, incrementRule: 'stack',
     why: 'Dlouhá hlava tricepsu pracuje nejvíc v protažení — doplněk stahování kladky.',
+    how: 'Lano nad hlavou, lokty míří vpřed a nehýbou se. Protáhni triceps za hlavou, nahoře plně propni.',
     substitutes: ['triceps_pushdown'],
   },
   deadlift: {
@@ -1019,6 +1092,7 @@ const EXERCISES = {
     muscles: { primary: ['hams_glutes'], secondary: [] }, // vzpřimovače ≠ objem na šířku zad
     repRange: [5, 8], rir: [2, 3], increment: 5, incrementRule: 'barbell',
     why: 'Celý zadní řetězec + úchop; nikdy do selhání — poslední opakování musí být čisté.',
+    how: 'Osa nad středem chodidla, hrudník vzhůru, záda rovná. Zatlač nohama do země, osa klouže po holeních — každé opakování čistě.',
     substitutes: ['rdl'],
   },
   bss: {
@@ -1026,6 +1100,7 @@ const EXERCISES = {
     muscles: { primary: ['quads'], secondary: ['hams_glutes'] },
     repRange: [8, 12], rir: [1, 2], increment: 2, incrementRule: 'dumbbell',
     why: 'Jednostranná práce nohou — kvadricepsy a hýždě, vyrovnává stranové rozdíly.',
+    how: 'Zadní noha na lavici, přední chodidlo dost daleko vpřed. Klesej svisle, tlač přes patu přední nohy.',
     substitutes: ['hack_squat', 'lunges'],
   },
   leg_curl: {
@@ -1033,6 +1108,7 @@ const EXERCISES = {
     muscles: { primary: ['hams_glutes'], secondary: [] },
     repRange: [10, 15], rir: [0, 1], increment: 5, incrementRule: 'stack',
     why: 'Hamstringy přes ohyb kolene — funkce, kterou mrtvé tahy nepokryjí.',
+    how: 'Boky přilepené k podložce. Nahoře stiskni a na vteřinu zastav, dolů brzdi.',
     substitutes: ['rdl'],
   },
   calf_seated: {
@@ -1040,6 +1116,7 @@ const EXERCISES = {
     muscles: { primary: ['calves'], secondary: [] },
     repRange: [12, 15], rir: [0, 1], increment: 5, incrementRule: 'stack',
     why: 'Soleus pracuje nejvíc s pokrčeným kolenem — doplněk výponů ve stoje.',
+    how: 'Kolena v pravém úhlu, plný rozsah — dole protažení, nahoře výdrž.',
     substitutes: ['calf_stand'],
   },
   hanging_leg_raise: {
@@ -1047,6 +1124,7 @@ const EXERCISES = {
     muscles: { primary: ['abs'], secondary: [] },
     repRange: [8, 15], rir: [0, 1], increment: 2.5, incrementRule: 'bodyweight',
     why: 'Spodní část břicha + úchop; progrese opakováními a zpomalením.',
+    how: 'Ve visu, ramena aktivní. Zvedej nohy podsazením pánve, ne švihem — dolů pomalu.',
     substitutes: ['cable_crunch'],
   },
   // Cviky dostupné jen přes progresi objemu (SLOTY) nebo náhrady:
@@ -1055,6 +1133,7 @@ const EXERCISES = {
     muscles: { primary: ['chest'], secondary: [] },
     repRange: [12, 15], rir: [0, 1], increment: 5, incrementRule: 'stack',
     why: 'Izolace prsou přes protažení — slot pro růst objemu bez další zátěže ramen.',
+    how: 'Kladky ve výšce ramen, lokty lehce pokrčené a fixní. Ruce veď obloukem před tělo a vpředu stiskni.',
     substitutes: ['incline_db'],
   },
   hammer_curl: {
@@ -1062,6 +1141,7 @@ const EXERCISES = {
     muscles: { primary: ['biceps'], secondary: [] },
     repRange: [10, 15], rir: [0, 1], increment: 2, incrementRule: 'dumbbell',
     why: 'Brachialis a předloktí — šířka paže; slot pro růst objemu.',
+    how: 'Neutrální úchop (palce nahoru), lokty u těla. Nahoře stiskni, dolů pomalu.',
     substitutes: ['db_curl'],
   },
   leg_ext: {
@@ -1069,6 +1149,7 @@ const EXERCISES = {
     muscles: { primary: ['quads'], secondary: [] },
     repRange: [12, 15], rir: [0, 1], increment: 5, incrementRule: 'stack',
     why: 'Izolace kvadricepsů bez systémové únavy; slot pro růst objemu.',
+    how: 'Opři se zády, kolena v ose stroje. Nahoře plně propni a zastav, dolů brzdi.',
     substitutes: ['leg_press'],
   },
   db_bench: {
@@ -1076,6 +1157,7 @@ const EXERCISES = {
     muscles: { primary: ['chest'], secondary: ['triceps', 'front_delts'] },
     repRange: [8, 12], rir: [1, 2], increment: 2, incrementRule: 'dumbbell',
     why: 'Náhrada benche, když je lavice obsazená.',
+    how: 'Lopatky stažené, jednoručky ke spodnímu hrudníku, lokty 45°. Dole cítíš protažení.',
     substitutes: ['bench'],
   },
   chest_row: {
@@ -1083,6 +1165,7 @@ const EXERCISES = {
     muscles: { primary: ['back'], secondary: ['biceps', 'rear_delts'] },
     repRange: [8, 12], rir: [1, 2], increment: 5, incrementRule: 'stack',
     why: 'Náhrada přítahů bez nároků na spodní záda.',
+    how: 'Hrudník opřený o opěrku. Táhni lokty vzad k bokům a stiskni lopatky.',
     substitutes: ['bb_row', 'cable_row'],
   },
   hack_squat: {
@@ -1090,6 +1173,7 @@ const EXERCISES = {
     muscles: { primary: ['quads'], secondary: ['hams_glutes'] },
     repRange: [8, 12], rir: [1, 2], increment: 5, incrementRule: 'stack',
     why: 'Náhrada dřepu/bulharů — kvadricepsy s oporou zad.',
+    how: 'Záda a pánev na opěrce, chodidla ve středu plošiny. Dolů pod paralelu, kolena ven.',
     substitutes: ['leg_press'],
   },
   close_bench: {
@@ -1097,6 +1181,7 @@ const EXERCISES = {
     muscles: { primary: ['triceps'], secondary: ['chest', 'front_delts'] },
     repRange: [6, 10], rir: [1, 2], increment: 2.5, incrementRule: 'barbell',
     why: 'Náhrada dipů, když nejsou bradla nebo bolí ramena.',
+    how: 'Úchop na šířku ramen (ne užší), lokty těsně u těla. Osa na spodní hrudník, nahoře propni.',
     substitutes: ['dips'],
   },
   cable_lat_raise: {
@@ -1104,6 +1189,7 @@ const EXERCISES = {
     muscles: { primary: ['side_delts'], secondary: [] },
     repRange: [12, 15], rir: [0, 1], increment: 2.5, incrementRule: 'stack',
     why: 'Náhrada upažování — konstantní napětí i dole.',
+    how: 'Kladka dole za tělem, upažuj s pevným loktem do výšky ramen. Napětí drž celou dobu.',
     substitutes: ['lat_raise'],
   },
   reverse_fly: {
@@ -1111,6 +1197,7 @@ const EXERCISES = {
     muscles: { primary: ['rear_delts'], secondary: [] },
     repRange: [12, 15], rir: [0, 1], increment: 2, incrementRule: 'dumbbell',
     why: 'Náhrada face pulls.',
+    how: 'Předklon s rovnými zády, lokty lehce pokrčené. Rozpaž do stran a stiskni lopatky.',
     substitutes: ['face_pull'],
   },
   lunges: {
@@ -1118,6 +1205,7 @@ const EXERCISES = {
     muscles: { primary: ['quads'], secondary: ['hams_glutes'] },
     repRange: [8, 12], rir: [1, 2], increment: 2, incrementRule: 'dumbbell',
     why: 'Náhrada bulharských dřepů.',
+    how: 'Krok vpřed, koleno zadní nohy k zemi. Trup vzpřímený, tlač přes patu přední nohy.',
     substitutes: ['bss'],
   },
 };
@@ -1407,9 +1495,17 @@ function adjustRemainingTargets(exDef, rows) {
   let lastIdx = -1;
   for (let i = 0; i < workRows.length; i++) if (workRows[i].logged) lastIdx = i;
   const logged = lastIdx >= 0 ? workRows[lastIdx].logged : null;
-  if (!logged || logged.rir == null) return null;
+  if (!logged) return null;
   const remaining = workRows.slice(lastIdx + 1).filter((r) => !r.logged);
   if (!remaining.length) return null;
+
+  // Predikce váhy: zbývající série dědí to, co jsi právě reálně zvedl.
+  // Pokrývá i kalibraci (cíl byl prázdný) a ruční změnu váhy uprostřed cviku.
+  if (logged.weightKg != null) {
+    for (const r of remaining) r.target.weightKg = logged.weightKg;
+  }
+
+  if (logged.rir == null) return null;
 
   // chip „4" v UI znamená 4 a víc — práh proto stropujeme na 4
   if (logged.rir >= Math.min(rirHi + 2, 4)) {
@@ -2084,6 +2180,7 @@ function icon(name) {
 // nikdy uprostřed zápisu série. Záloha: export/import JSON.
 
 const STORAGE_KEY = 'fitko-state-v1';
+const BACKUP_KEY = 'fitko-state-backup-v1';
 const STATE_SCRIPT_RE = /(<script type="application\/json" id="fitko-state">)[\s\S]*?(<\/script>)/;
 
 let originalHtml = null; // snímek dokumentu před prvním renderem — šablona pro publish
@@ -2140,6 +2237,26 @@ function loadPersistedState() {
     return (local.updatedAt ?? '') >= (embedded.updatedAt ?? '') ? local : embedded;
   }
   return local ?? embedded ?? null;
+}
+
+/**
+ * Pojistka: snímek stavu, jak vypadal PŘED tímhle spuštěním appky.
+ * Kdyby cokoli (nová verze, chyba, omylem smazaná data) rozbilo aktuální stav,
+ * odcvičené tréninky jdou vrátit z Nastavení. Ukládá se jen neprázdný stav.
+ */
+function backupState(state) {
+  if (!storageInfo.localOk || !state?.sessions?.length) return;
+  try {
+    localStorage.setItem(BACKUP_KEY, JSON.stringify({ savedAt: new Date().toISOString(), state }));
+  } catch { /* plné úložiště — záloha není kritická */ }
+}
+
+function readBackup() {
+  if (!storageInfo.localOk) return null;
+  try {
+    const parsed = JSON.parse(localStorage.getItem(BACKUP_KEY) ?? 'null');
+    return parsed?.state?.profile && Array.isArray(parsed.state.sessions) ? parsed : null;
+  } catch { return null; }
 }
 
 function saveLocal(state) {
@@ -2236,6 +2353,7 @@ function defaultState() {
     offersDismissed: {},
     minicutEndDate: null,
     introDismissed: false,
+    restScale: 1, // 0.75 kratší · 1 doporučené · 1.25 delší
   };
 }
 
@@ -2338,8 +2456,28 @@ function warmupsFor(exerciseId, loadKg) {
   return [{ weightKg: Math.max(step, roundToStep(loadKg * 0.6, step)), reps: 5 }];
 }
 
-function restSecondsFor(exerciseId) {
-  return REST_SECONDS[EXERCISES[exerciseId].type] ?? 120;
+function restSecondsFor(exerciseId, state = Store.state) {
+  const base = REST_SECONDS[EXERCISES[exerciseId].type] ?? 120;
+  const scale = state?.restScale ?? 1;
+  return Math.round((base * scale) / 15) * 15; // zaokrouhleno na 15 s
+}
+
+function restPlan(state = Store.state) {
+  const scale = state?.restScale ?? 1;
+  return Object.entries(REST_SECONDS).map(([type, base]) => ({
+    type, seconds: Math.round((base * scale) / 15) * 15,
+  }));
+}
+
+function fmtRest(seconds) {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return s === 0 ? `${m}:00` : `${m}:${String(s).padStart(2, '0')}`;
+}
+
+// Pozice v pětidenním cyklu (nezávislá na dni v týdnu) — 1..5.
+function cyclePosition(state) {
+  return (state.sessions.length % WEEK_TEMPLATE.length) + 1;
 }
 
 // ---------- trénink ----------
@@ -2689,6 +2827,81 @@ function progressSummary(state) {
   };
 }
 
+/**
+ * Rekapitulace odcvičeného tréninku — co jsi udělal, jak to dopadlo proti cíli
+ * a co z toho engine vyvodil pro příště. Počítá se z uložené session + stavu
+ * (po completeWorkout už stav obsahuje nové zátěže), takže je pravdivá i zpětně.
+ */
+function sessionRecap(state, session) {
+  const entries = session.entries.map((entry) => {
+    const def = EXERCISES[entry.exerciseId];
+    const work = entry.sets.filter((s) => !s.isWarmup && !s.isDropset);
+    const drops = entry.sets.filter((s) => s.isDropset);
+    const [lo, hi] = def.repRange;
+    const tonnage = work.reduce((a, s) => a + s.weightKg * s.reps, 0);
+    const rirs = work.filter((s) => s.rir != null).map((s) => s.rir);
+    const avgRir = rirs.length ? +avg(rirs).toFixed(1) : null;
+    const best = work.reduce((b, s) => (b == null || e1rm(s.weightKg, s.reps, s.rir) > e1rm(b.weightKg, b.reps, b.rir) ? s : b), null);
+
+    let verdict = 'v rozsahu';
+    let tone = 'ok';
+    if (work.some((s) => s.reps < lo)) { verdict = 'pod rozsahem'; tone = 'warn'; }
+    else if (work.length && work.every((s) => s.reps >= hi)) { verdict = 'na stropu'; tone = 'accent'; }
+
+    const next = session.deload ? null : prescriptionFor(state, entry.exerciseId, work.length);
+    const nextText = next && next.loadKg != null
+      ? `${fmtNum(next.loadKg)} kg × ${next.targetReps[0]}`
+      : next ? `× ${next.targetReps[0]} (váhu najdeš na místě)` : null;
+
+    return {
+      exerciseId: entry.exerciseId,
+      name: def.name,
+      setsText: work.map((s) => `${fmtNum(s.weightKg)}×${s.reps}${s.rir != null ? `@${s.rir}` : ''}`).join(' · '),
+      dropsText: drops.length ? drops.map((s) => `${fmtNum(s.weightKg)}×${s.reps}`).join(' · ') : null,
+      workSets: work.length,
+      tonnage: Math.round(tonnage),
+      avgRir,
+      bestE1rm: best ? Math.round(e1rm(best.weightKg, best.reps, best.rir)) : null,
+      verdict,
+      tone,
+      nextText,
+    };
+  });
+
+  const workSets = entries.reduce((a, e) => a + e.workSets, 0);
+  const tonnage = entries.reduce((a, e) => a + e.tonnage, 0);
+  const rirAll = entries.filter((e) => e.avgRir != null).map((e) => e.avgRir);
+  const avgRir = rirAll.length ? +avg(rirAll).toFixed(1) : null;
+  const prs = state.prLog.filter((p) => p.date === session.date);
+
+  // souhrnný verdikt — jedna věta, kterou si přečteš do 2 sekund
+  let headline;
+  if (session.deload) headline = 'Deload odcvičen — přesně jak měl vypadat: lehce a bez selhání.';
+  else if (prs.length) headline = 'Nové osobní maximum. Tohle byl silný trénink.';
+  else if (entries.some((e) => e.tone === 'accent')) headline = 'Strop rozsahu na některých cvicích — příště se přidává váha.';
+  else if (entries.some((e) => e.tone === 'warn')) headline = 'Část sérií spadla pod rozsah — engine příště uleví, ať se progrese rozjede.';
+  else if (avgRir != null && avgRir >= 3.5) headline = 'Bylo to hodně v rezervě — příště přitlač, ať to má stimul.';
+  else headline = 'Solidní práce v cílovém pásmu — přesně takhle se staví progrese.';
+
+  return {
+    date: session.date,
+    unit: session.unit,
+    unitName: WEEK_TEMPLATE.find((d) => d.unit === session.unit)?.name ?? session.unit,
+    deload: session.deload,
+    durationMin: session.durationMin,
+    workSets,
+    tonnage,
+    avgRir,
+    prs,
+    headline,
+    entries,
+  };
+}
+
+function fmtNum(n) {
+  return String(n).replace('.', ',');
+}
+
 // Týdenní zpráva kouče — šablona nad daty enginu (deterministická, poctivá).
 function weeklyReview(state) {
   const today = todayISO();
@@ -2757,6 +2970,8 @@ const RestTimer = {
   wakeLock: null,
   audioCtx: null,
   beeped: false,
+  scheduled: [],
+  tonesReady: false,
 
   start(seconds, label = '') {
     this.endTime = Date.now() + seconds * 1000;
@@ -2764,18 +2979,21 @@ const RestTimer = {
     this.beeped = false;
     this.ensureUI();
     this.requestWakeLock();
+    this.scheduleTones(); // volá se ze ✓ = z gesta uživatele → audio smí hrát
     this.render();
   },
 
   adjust(deltaSeconds) {
     if (!this.endTime) return;
     this.endTime += deltaSeconds * 1000;
+    this.scheduleTones();
     this.render();
   },
 
   stop() {
     this.endTime = null;
     if (this.interval) { clearInterval(this.interval); this.interval = null; }
+    this.clearScheduled();
     this.el?.remove();
     this.el = null;
     this.releaseWakeLock();
@@ -2832,25 +3050,65 @@ const RestTimer = {
     this.wakeLock = null;
   },
 
-  beep() {
+  ensureAudio() {
     try {
       this.audioCtx = this.audioCtx ?? new (window.AudioContext ?? window.webkitAudioContext)();
-      const ctx = this.audioCtx;
+      if (this.audioCtx.state === 'suspended') this.audioCtx.resume();
+      return this.audioCtx;
+    } catch { return null; }
+  },
+
+  // Jeden tón naplánovaný na přesný čas zvukové karty (nezávislý na tom,
+  // jestli JS mezitím spí — proto odpočet 3–2–1 dojede i při zamčeném telefonu).
+  tone(ctx, at, freq, dur, volume = 0.22) {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.0001, at);
+    gain.gain.exponentialRampToValueAtTime(volume, at + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(at);
+    osc.stop(at + dur + 0.02);
+    this.scheduled.push(osc);
+  },
+
+  scheduleTones() {
+    this.clearScheduled();
+    const ctx = this.ensureAudio();
+    if (!ctx) return;
+    const left = (this.endTime - Date.now()) / 1000;
+    // 3 · 2 · 1 krátce a tiše, na nule dvojitý vyšší tón = „teď“
+    const plan = [
+      [left - 3, 720, 0.11, 0.16],
+      [left - 2, 720, 0.11, 0.16],
+      [left - 1, 720, 0.11, 0.16],
+      [left, 1046, 0.18, 0.26],
+      [left + 0.22, 1318, 0.32, 0.26],
+    ];
+    for (const [t, freq, dur, vol] of plan) {
+      if (t > 0.05) this.tone(ctx, ctx.currentTime + t, freq, dur, vol);
+    }
+    this.tonesReady = ctx.state === 'running';
+  },
+
+  clearScheduled() {
+    for (const osc of this.scheduled) {
+      try { osc.stop(); osc.disconnect(); } catch { /* už doběhl */ }
+    }
+    this.scheduled = [];
+  },
+
+  // Záloha pro případ, že prohlížeč zvuk uspal — zahraje se hned při doběhnutí.
+  beep() {
+    const ctx = this.ensureAudio();
+    if (ctx && !this.tonesReady) {
       const now = ctx.currentTime;
-      for (const [offset, freq] of [[0, 880], [0.18, 880], [0.36, 1175]]) {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.frequency.value = freq;
-        osc.type = 'sine';
-        gain.gain.setValueAtTime(0.001, now + offset);
-        gain.gain.exponentialRampToValueAtTime(0.25, now + offset + 0.02);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + offset + 0.15);
-        osc.connect(gain).connect(ctx.destination);
-        osc.start(now + offset);
-        osc.stop(now + offset + 0.16);
-      }
-      if (navigator.vibrate) navigator.vibrate([120, 60, 120]);
-    } catch { /* zvuk není kritický */ }
+      this.tone(ctx, now, 1046, 0.18, 0.26);
+      this.tone(ctx, now + 0.22, 1318, 0.32, 0.26);
+    }
+    try { if (navigator.vibrate) navigator.vibrate([120, 60, 200]); } catch { /* noop */ }
   },
 };
 
@@ -3313,6 +3571,7 @@ function renderToday(root) {
       h('div', { class: 'muted small' }, fmtDateFull(todayISO())),
     ),
     heroCard(state),
+    weekStrip(state),
     introCard(state),
     ...offerCards(state),
     nutritionNotice(state),
@@ -3330,10 +3589,11 @@ function heroCard(state) {
   const totalSets = list.reduce((a, e) => a + e.sets, 0);
   const estMin = Math.round((totalSets * 2.4 + 8) / 5) * 5;
 
+  const cyclePos = cyclePosition(state);
   return h('div', { class: 'today-hero stack' },
     h('div', { class: 'row between' },
       h('span', { class: 'label' }, state.deload.active ? `Deload — zbývá ${state.deload.sessionsLeft}` : 'Další trénink'),
-      weekDots(state),
+      h('span', { class: 'label' }, `${cyclePos}. z ${WEEK_TEMPLATE.length} v cyklu`),
     ),
     h('div', { class: 'display unit-name' }, day.name),
     h('div', { class: 'muted small' },
@@ -3348,22 +3608,54 @@ function heroCard(state) {
   );
 }
 
-function weekDots(state) {
+// Týden po dnech — ✓ odcvičeno, · naplánováno, — volno. Dřív to byly holé tečky
+// a nebylo poznat, co znamenají.
+const WEEK_DAYS = ['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne'];
+
+function weekStrip(state) {
   const today = new Date(`${todayISO()}T12:00:00`);
   const monday = new Date(today);
   monday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
-  const dots = [];
+
+  const cells = [];
+  let done = 0;
+  let planned = 0;
+  const restDays = [];
+
   for (let i = 0; i < 7; i++) {
     const d = new Date(monday);
     d.setDate(monday.getDate() + i);
     const iso = d.toISOString().slice(0, 10);
-    const done = state.sessions.some((s) => s.date === iso);
+    const session = state.sessions.find((s) => s.date === iso);
     const isToday = iso === todayISO();
     const isTraining = state.profile.trainingDays.includes((i + 1) % 7);
-    if (!isTraining && !done) continue;
-    dots.push(h('span', { class: `dot${done ? ' done' : ''}${isToday ? ' today' : ''}` }));
+    const isPast = iso < todayISO();
+    if (session) done++;
+    if (isTraining) planned++; else restDays.push(WEEK_DAYS[i]);
+
+    const cls = ['wd-cell'];
+    if (session) cls.push('done');
+    else if (!isTraining) cls.push('rest');
+    else if (isPast) cls.push('missed');
+    if (isToday) cls.push('today');
+
+    cells.push(h('div', { class: cls.join(' ') },
+      h('span', { class: 'wd-day' }, WEEK_DAYS[i]),
+      h('span', { class: 'wd-mark' }, session ? '✓' : isTraining ? '·' : '—'),
+    ));
   }
-  return h('div', { class: 'weekdots' }, dots);
+
+  return h('div', { class: 'card stack', style: 'gap:9px' },
+    h('div', { class: 'row between' },
+      h('span', { class: 'label' }, 'Tento týden'),
+      h('span', { class: 'num small muted' }, `${done}/${planned}`),
+    ),
+    h('div', { class: 'weekstrip' }, cells),
+    h('p', { class: 'muted', style: 'font-size:12px' },
+      restDays.length
+        ? `Volno: ${restDays.join(', ')}. Pořadí Push → Pull → Legs → Upper → Lower jede podle odcvičených tréninků, ne podle dne — když jeden vynecháš, jen se posune.`
+        : 'Trénink máš naplánovaný na každý den v týdnu.'),
+  );
 }
 
 // Jednorázový průvodce — zmizí po „Rozumím".
@@ -3679,12 +3971,13 @@ function exerciseCard(state, workout, entry, entryIndex, nextKey) {
 
   const rangeText = `${p.targetReps.length}× ${def.repRange[0]}–${p.rangeHi ?? def.repRange[1]}`;
   const rirText = workout.deload ? 'RIR 3+' : `RIR ${def.rir[0]}–${def.rir[1]}`;
+  const restText = `pauza ${fmtRest(restSecondsFor(entry.exerciseId))}`;
 
   return h('div', { class: 'card ex-card' },
     h('div', { class: 'ex-head' },
       h('div', { class: 'grow' },
         h('div', { class: 'ex-title' }, def.name, entry.swappedFrom ? h('span', { class: 'muted small' }, ' (náhrada)') : null),
-        h('div', { class: 'ex-sub' }, `${rangeText} · ${rirText}`,
+        h('div', { class: 'ex-sub' }, `${rangeText} · ${rirText} · ${restText}`,
           actionNote(p) ? h('span', { class: 'accent-text' }, actionNote(p)) : null),
       ),
       h('button', { class: 'icon-btn', 'aria-label': 'Proč tenhle cvik', onClick: () => whyModal(def) }, 'ⓘ'),
@@ -3709,10 +4002,31 @@ function actionNote(p) {
 }
 
 function whyModal(def) {
+  const rest = restSecondsFor(def.id);
+  const infoRow = (label, value) => h('div', { class: 'row between' },
+    h('span', { class: 'muted small' }, label),
+    h('span', { class: 'small', style: 'font-weight:600;text-align:right;max-width:62%' }, value),
+  );
   openModal(
     h('h3', {}, def.name),
-    h('p', { class: 'small' }, def.why),
-    h('p', { class: 'muted small' }, 'Parametry cviku vycházejí z rešerše — viz docs/PROGRAM.md v repu projektu.'),
+    h('div', { class: 'label' }, 'Jak to cvičit'),
+    h('p', { class: 'small' }, def.how),
+    h('hr', { class: 'rule' }),
+    infoRow('Rozsah opakování', `${def.repRange[0]}–${def.repRange[1]}`),
+    infoRow('Cílový RIR', `${def.rir[0]}–${def.rir[1]} (rezerva na konci série)`),
+    infoRow('Pauza mezi sériemi', fmtRest(rest)),
+    infoRow('Přidávání', def.incrementRule === 'bodyweight'
+      ? 'nejdřív opakování, pak přídavná zátěž'
+      : `+${String(def.increment).replace('.', ',')} kg, když série sedí na stropu rozsahu`),
+    def.dropset ? h('div', { class: 'stack', style: 'gap:6px' },
+      h('hr', { class: 'rule' }),
+      h('div', { class: 'label accent-text' }, 'Dropset na konci'),
+      h('p', { class: 'small' }, 'Poslední pracovní série do 0–1 rezervy → BEZ pauzy hned shoď váhu o ~22 % '
+        + 'a pokračuj do selhání. Je to jedna dlouhá série ve dvou váhách, ne další kolo.'),
+    ) : null,
+    h('hr', { class: 'rule' }),
+    h('div', { class: 'label' }, 'Proč je v plánu'),
+    h('p', { class: 'muted small' }, def.why),
   );
 }
 
@@ -3736,7 +4050,6 @@ function swapModal(entryIndex, def) {
 
 function setRow(workout, entry, entryIndex, row, rowIndex, ghostSets, nextKey) {
   const def = EXERCISES[entry.exerciseId];
-  const step = loadStep(def);
   const done = !!row.logged;
 
   // dropset cíl se dopočítá z poslední zapsané pracovní série
@@ -3753,15 +4066,19 @@ function setRow(workout, entry, entryIndex, row, rowIndex, ghostSets, nextKey) {
     ? `min. ${fmtKg(ghostSets[workIndex].weightKg, true)}×${ghostSets[workIndex].reps}${ghostSets[workIndex].rir != null ? `@${ghostSets[workIndex].rir}` : ''}`
     : null;
 
-  // type=text + inputmode: iOS klávesnice píše desetinnou čárku a number-pole by ji zahodilo
+  // Cíl je jen šedý NÁVRH v placeholderu — nemusíš nic mazat, klikneš a píšeš.
+  // Prázdné pole při potvrzení znamená „odcvičeno přesně podle návrhu".
+  // type=text + inputmode: iOS klávesnice píše desetinnou čárku a number-pole by ji zahodilo.
   const weightInput = h('input', {
-    class: 'set-input', type: 'text', inputmode: 'decimal', placeholder: 'kg',
-    value: fmtInput(row.logged ? row.logged.weightKg : (target.weightKg ?? '')),
+    class: 'set-input', type: 'text', inputmode: 'decimal',
+    placeholder: target.weightKg != null ? fmtInput(target.weightKg) : 'kg',
+    value: row.logged ? fmtInput(row.logged.weightKg) : '',
     disabled: done,
   });
   const repsInput = h('input', {
-    class: 'set-input', type: 'text', inputmode: 'numeric', placeholder: row.kind === 'drop' ? 'do selh.' : 'op.',
-    value: row.logged ? row.logged.reps : (target.reps ?? ''),
+    class: 'set-input', type: 'text', inputmode: 'numeric',
+    placeholder: target.reps != null ? String(target.reps) : (row.kind === 'drop' ? 'selh.' : 'op.'),
+    value: row.logged ? String(row.logged.reps) : '',
     disabled: done,
   });
 
@@ -3782,16 +4099,18 @@ function setRow(workout, entry, entryIndex, row, rowIndex, ghostSets, nextKey) {
         }))
     : null;
 
-  const label = row.kind === 'warmup' ? 'W · rozcvička' : row.kind === 'drop' ? 'DS · dropset' : `Série ${workIndex + 1}`;
+  const label = row.kind === 'warmup' ? 'W · rozcvička' : row.kind === 'drop' ? 'Dropset (−22 %)' : `Série ${workIndex + 1}`;
 
   const onCheck = () => {
     if (done) {
       Store.mutate((s) => { s.activeWorkout.entries[entryIndex].rows[rowIndex].logged = null; });
       return;
     }
-    const weightKg = parseNum(weightInput.value);
-    const reps = parseInt(repsInput.value, 10);
-    if (Number.isNaN(reps) || reps <= 0) { toast('Doplň opakování.'); return; }
+    // prázdné pole = beru návrh z placeholderu
+    const weightKg = parseNum(weightInput.value) ?? target.weightKg;
+    const typedReps = repsInput.value.trim();
+    const reps = typedReps === '' ? target.reps : parseInt(typedReps, 10);
+    if (reps == null || Number.isNaN(reps) || reps <= 0) { toast('Doplň opakování.'); return; }
     if ((weightKg == null || weightKg < 0) && def.incrementRule !== 'bodyweight') { toast('Doplň váhu.'); return; }
     let adjusted = null;
     Store.mutate((s) => {
@@ -3815,9 +4134,9 @@ function setRow(workout, entry, entryIndex, row, rowIndex, ghostSets, nextKey) {
     }
   };
 
-  const adjNote = row.adjusted === 'up' ? '↑ upraveno — máš na víc'
-    : row.adjusted === 'down' ? '↓ upraveno — šetři síly' : null;
-  const ghostText = adjNote ?? (row.kind === 'drop' ? '−22 % · do selhání' : ghost ?? (row.kind === 'warmup' ? 'lehce, bez RIR' : 'první záznam'));
+  const adjNote = row.adjusted === 'up' ? '↑ přidáno — měl jsi rezervu'
+    : row.adjusted === 'down' ? '↓ ubráno — bylo to na hraně' : null;
+  const ghostText = adjNote ?? (row.kind === 'drop' ? 'hned, bez pauzy, do selhání' : ghost ?? (row.kind === 'warmup' ? 'lehce, bez RIR' : 'první záznam'));
 
   const isNext = !done && nextKey === `${entryIndex}:${rowIndex}`;
   return h('div', { class: `set-block${done ? ' done' : ''}${row.kind === 'warmup' ? ' warmup' : ''}${isNext ? ' next' : ''}` },
@@ -3826,15 +4145,10 @@ function setRow(workout, entry, entryIndex, row, rowIndex, ghostSets, nextKey) {
         h('span', { class: 'set-no' }, label),
         h('span', { class: 'ghost-val' }, ghostText),
       ),
-      weightInput,
-      done ? null : h('div', { class: 'stepper' },
-        h('button', { 'aria-label': 'víc kg', onClick: () => { weightInput.value = fmtInput((parseNum(weightInput.value) ?? 0) + step); } }, '+'),
-        h('button', { 'aria-label': 'míň kg', onClick: () => { weightInput.value = fmtInput(Math.max(0, (parseNum(weightInput.value) ?? 0) - step)); } }, '−'),
-      ),
-      repsInput,
-      done ? null : h('div', { class: 'stepper' },
-        h('button', { 'aria-label': 'víc opakování', onClick: () => { repsInput.value = String((parseInt(repsInput.value, 10) || 0) + 1); } }, '+'),
-        h('button', { 'aria-label': 'míň opakování', onClick: () => { repsInput.value = String(Math.max(0, (parseInt(repsInput.value, 10) || 0) - 1)); } }, '−'),
+      h('div', { class: 'set-fields' },
+        weightInput,
+        h('span', { class: 'set-x' }, '×'),
+        repsInput,
       ),
       h('button', { class: `check-btn${done ? ' done' : ''}`, 'aria-label': done ? 'Odznačit sérii' : 'Potvrdit sérii', onClick: onCheck }, '✓'),
     ),
@@ -3867,27 +4181,47 @@ function finishWorkout() {
   RestTimer.stop();
   const result = Store.mutate((s) => completeWorkout(s));
   if (!result) return;
-  const { session, prs } = result;
+  openRecap(Store.state, result.session, { save: true });
+}
 
-  const workSets = session.entries.reduce((a, e) => a + e.sets.filter((s) => !s.isWarmup).length, 0);
-  const tonnage = Math.round(session.entries.reduce(
-    (a, e) => a + e.sets.filter((s) => !s.isWarmup).reduce((b, s) => b + s.weightKg * s.reps, 0), 0));
-
+// Rekapitulace: co jsi odcvičil, jak to dopadlo proti cíli a co z toho plyne pro příště.
+// Používá se po tréninku i zpětně z historie v Progresu.
+function openRecap(state, session, { save = false } = {}) {
+  const r = sessionRecap(state, session);
   const { close } = openModal(
-    h('div', { class: 'display', style: 'font-size:38px' }, 'Hotovo'),
-    h('div', { class: 'row', style: 'gap:8px' },
-      statTile(String(session.durationMin), 'minut'),
-      statTile(String(workSets), 'sérií'),
-      statTile(`${tonnage.toLocaleString('cs-CZ')}`, 'kg celkem'),
+    h('div', { class: 'row between', style: 'align-items:flex-start' },
+      h('div', {},
+        h('div', { class: 'label' }, save ? 'Hotovo' : 'Trénink'),
+        h('div', { class: 'display', style: 'font-size:34px' }, r.unitName),
+      ),
+      h('div', { class: 'muted small num', style: 'text-align:right' }, fmtDateFull(r.date)),
     ),
-    ...prs.map((pr) => h('div', { class: 'card row between pr-flash', style: 'border-color:var(--accent)' },
+    h('div', { class: 'row', style: 'gap:8px' },
+      statTile(String(r.durationMin), 'minut'),
+      statTile(String(r.workSets), 'sérií'),
+      statTile(r.tonnage.toLocaleString('cs-CZ'), 'kg celkem'),
+      statTile(r.avgRir != null ? String(r.avgRir).replace('.', ',') : '—', '⌀ RIR'),
+    ),
+    h('p', { class: 'small' }, r.headline),
+    ...r.prs.map((pr) => h('div', { class: 'card row between pr-flash', style: 'border-color:var(--accent)' },
       h('span', { style: 'font-weight:700' }, `PR — ${EXERCISES[pr.exerciseId].name}`),
       h('span', { class: 'num accent-text', style: 'font-weight:600' }, `e1RM ${fmtKg(Math.round(pr.e1rm))}`),
     )),
+    h('hr', { class: 'rule' }),
+    h('div', { class: 'label' }, 'Cvik po cviku'),
+    ...r.entries.map((e) => h('div', { class: 'recap-row' },
+      h('div', { class: 'row between', style: 'align-items:flex-start;gap:8px' },
+        h('span', { style: 'font-weight:600;font-size:14.5px' }, e.name),
+        h('span', { class: `badge ${e.tone === 'warn' ? 'warn' : e.tone === 'accent' ? 'accent' : 'ok'}` }, e.verdict),
+      ),
+      h('div', { class: 'num', style: 'font-size:12.5px;color:var(--muted)' }, e.setsText),
+      e.dropsText ? h('div', { class: 'num', style: 'font-size:12px;color:var(--faint)' }, `dropset ${e.dropsText}`) : null,
+      e.nextText ? h('div', { class: 'small accent-text' }, `Příště: ${e.nextText}`) : null,
+    )),
     h('button', {
       class: 'btn primary big',
-      onClick: () => { close(); Store.mutate(() => {}, { publish: true }); },
-    }, 'Zavřít a uložit'),
+      onClick: () => { close(); if (save) Store.mutate(() => {}, { publish: true }); },
+    }, save ? 'Zavřít a uložit' : 'Zavřít'),
   );
 }
 
@@ -3901,6 +4235,7 @@ function statTile(value, label) {
 
 // ===== src/app/view_progress.js =====
 // Progres: trend váhy vs. poctivá projekce, síla (e1RM), pas, milníky, týdenní zpráva.
+
 
 
 
@@ -3923,6 +4258,7 @@ function renderProgress(root) {
     weightCard(state, summary),
     honestyCard(state, summary),
     reviewCard(state),
+    historyCard(state),
     strengthCard(state),
     waistCard(state, summary),
     milestonesCard(state, summary),
@@ -4041,6 +4377,30 @@ function reviewCard(state) {
   return h('div', { class: 'card stack' },
     h('div', { class: 'label' }, 'Týdenní zpráva'),
     ...lines.map((l) => h('p', { class: 'small' }, l)),
+  );
+}
+
+// Historie tréninků — ťuknutím se otevře plná rekapitulace.
+function historyCard(state) {
+  const sessions = [...state.sessions].slice(-8).reverse();
+  if (!sessions.length) return null;
+  return h('div', { class: 'card stack' },
+    h('div', { class: 'label' }, 'Odcvičené tréninky'),
+    ...sessions.map((session) => {
+      const r = sessionRecap(state, session);
+      return h('button', {
+        class: 'history-row',
+        onClick: () => openRecap(state, session),
+      },
+        h('div', { class: 'grow', style: 'text-align:left' },
+          h('div', { style: 'font-weight:600;font-size:14.5px' },
+            r.unitName, r.deload ? h('span', { class: 'muted small' }, ' · deload') : null),
+          h('div', { class: 'muted', style: 'font-size:12.5px' },
+            `${fmtDate(r.date)} · ${r.workSets} sérií · ${r.tonnage.toLocaleString('cs-CZ')} kg`),
+        ),
+        h('span', { class: 'muted', style: 'font-size:18px' }, '›'),
+      );
+    }),
   );
 }
 
@@ -4189,6 +4549,7 @@ function renderSettings(root) {
     h('p', { class: 'screen-sub' }, 'Cíl, výživa, deload a záloha dat.'),
     profileCard(state),
     nutritionCard(state),
+    restCard(state),
     deloadCard(state),
     dataCard(state),
     aboutCard(),
@@ -4269,6 +4630,40 @@ function nutritionCard(state) {
   );
 }
 
+// ---------- pauzy mezi sériemi ----------
+
+const REST_LABELS = {
+  heavy: 'Těžké základy (dřep, bench, mrtvý…)',
+  secondary: 'Sekundární cviky (shyby, leg press…)',
+  isolation: 'Izolace (upažování, biceps, lýtka…)',
+};
+
+const REST_SCALES = [
+  { value: 0.75, label: 'Kratší' },
+  { value: 1, label: 'Doporučené' },
+  { value: 1.25, label: 'Delší' },
+];
+
+function restCard(state) {
+  const scale = state.restScale ?? 1;
+  return h('div', { class: 'card stack' },
+    h('div', { class: 'label' }, 'Pauzy mezi sériemi'),
+    h('p', { class: 'muted', style: 'font-size:12.5px' },
+      'Délku volí appka podle typu cviku — čím těžší cvik, tím delší pauza, aby další série měla plnou sílu. '
+      + 'Časovač startuje sám po potvrzení série a v tréninku ho kdykoli posuneš o ±15 s.'),
+    ...restPlan(state).map((r) => h('div', { class: 'row between' },
+      h('span', { class: 'small muted', style: 'max-width:66%' }, REST_LABELS[r.type] ?? r.type),
+      h('span', { class: 'num small', style: 'font-weight:600' }, fmtRest(r.seconds)),
+    )),
+    h('div', { class: 'row', style: 'gap:6px' },
+      ...REST_SCALES.map((opt) => h('button', {
+        class: `chip${Math.abs(scale - opt.value) < 0.01 ? ' active' : ''}`,
+        onClick: () => Store.mutate((s) => { s.restScale = opt.value; }, { publish: true }),
+      }, opt.label)),
+    ),
+  );
+}
+
 // ---------- deload ----------
 
 function deloadCard(state) {
@@ -4316,6 +4711,7 @@ function dataCard(state) {
     state.pendingPublish && storageInfo.artifactOk
       ? h('button', { class: 'btn', onClick: () => Store.mutate(() => {}, { publish: true }) }, 'Uložit změny do appky teď')
       : null,
+    backupRow(),
     h('div', { class: 'row' },
       h('button', {
         class: 'btn grow',
@@ -4341,6 +4737,43 @@ function dataCard(state) {
         );
       },
     }, 'Smazat všechna data'),
+  );
+}
+
+// Automatická záloha z posledního spuštění appky — poslední záchrana pro odcvičené tréninky.
+function backupRow() {
+  const backup = readBackup();
+  if (!backup) return null;
+  const count = backup.state.sessions.length;
+  return h('div', { class: 'row between' },
+    h('div', { class: 'grow' },
+      h('span', { class: 'small muted' }, 'Automatická záloha v zařízení'),
+      h('div', { class: 'muted', style: 'font-size:12px' },
+        `${fmtDate(backup.savedAt.slice(0, 10))} · ${count} ${count === 1 ? 'trénink' : count < 5 ? 'tréninky' : 'tréninků'}`),
+    ),
+    h('button', {
+      class: 'btn small ghost',
+      onClick: () => {
+        const { close } = openModal(
+          h('h3', {}, 'Obnovit ze zálohy?'),
+          h('p', { class: 'muted small' },
+            `Vrátí stav z ${fmtDate(backup.savedAt.slice(0, 10))} (${count} odcvičených tréninků). `
+            + 'Co jsi zapsal potom, se ztratí.'),
+          h('div', { class: 'row' },
+            h('button', {
+              class: 'btn primary grow',
+              onClick: () => {
+                Store.init(backup.state);
+                Store.mutate(() => {}, { publish: true });
+                close();
+                toast('Data obnovena ze zálohy.');
+              },
+            }, 'Obnovit'),
+            h('button', { class: 'btn grow', onClick: () => close() }, 'Zpět'),
+          ),
+        );
+      },
+    }, 'Obnovit'),
   );
 }
 
@@ -4466,7 +4899,9 @@ function boot() {
   if ('serviceWorker' in navigator && document.querySelector('link[rel="manifest"]')) {
     try { navigator.serviceWorker.register('./sw.js'); } catch { /* nepovinné */ }
   }
-  Store.init(loadPersistedState());
+  const persisted = loadPersistedState();
+  backupState(persisted); // snímek toho, co bylo na disku před spuštěním
+  Store.init(persisted);
   Store.onChange = render;
 
   Store.mutate((s) => dailyMaintenance(s), { rerender: false, publish: false, markDirty: false });
