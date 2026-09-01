@@ -845,6 +845,7 @@ input.set-input {
 <script>
 (() => {
 'use strict';
+const BUILD_ID = "2026-09-01 14:08";
 // ===== src/engine/util.js =====
 // Sdílené utility enginu — čisté funkce, žádné závislosti.
 
@@ -2114,6 +2115,11 @@ function h(tag, props = {}, ...children) {
 }
 
 function clearEl(el) { while (el.firstChild) el.removeChild(el.firstChild); }
+
+// Verzi vkládá build; mimo build (dev/testy) je prázdná.
+function buildId() {
+  try { return typeof BUILD_ID === 'string' ? BUILD_ID : ''; } catch { return ''; }
+}
 
 function todayISO() {
   const d = new Date();
@@ -4784,8 +4790,14 @@ function deloadCard(state) {
 // ---------- data ----------
 
 function dataCard(state) {
+  const last = state.sessions.at(-1);
   return h('div', { class: 'card stack' },
     h('div', { class: 'label' }, 'Data'),
+    h('div', { class: 'row between' },
+      h('span', { class: 'small muted' }, 'Odcvičené tréninky'),
+      h('span', { class: 'num small', style: 'font-weight:600' },
+        last ? `${state.sessions.length} · poslední ${fmtDate(last.date)}` : 'zatím žádný'),
+    ),
     h('div', { class: 'row between' },
       h('span', { class: 'small muted' }, 'Uloženo v zařízení'),
       h('span', { class: `badge ${storageInfo.localOk ? 'ok' : 'bad'}` }, storageInfo.localOk ? 'ano' : 'ne'),
@@ -4909,6 +4921,23 @@ function aboutCard() {
       'Fitko — osobní tréninkový deník na míru. Engine: dvojitá progrese s RIR, reaktivní deloady, '
       + 'výživa řízená trendem váhy, poctivé projekce. Každé pravidlo má zdroj v meta-analýzách '
       + '(docs/PROGRAM.md a docs/research/ v repu projektu).'),
+    h('div', { class: 'row between' },
+      h('span', { class: 'small muted' }, 'Verze appky'),
+      h('span', { class: 'num small' }, buildId() || '—'),
+    ),
+    h('button', {
+      class: 'btn',
+      onClick: async () => {
+        toast('Stahuji nejnovější verzi…');
+        try {
+          const regs = await navigator.serviceWorker?.getRegistrations?.() ?? [];
+          await Promise.all(regs.map((r) => r.unregister()));
+          const keys = await caches?.keys?.() ?? [];
+          await Promise.all(keys.map((k) => caches.delete(k)));
+        } catch { /* i tak zkusíme reload */ }
+        location.reload();
+      },
+    }, 'Načíst nejnovější verzi'),
     h('button', {
       class: 'btn',
       onClick: () => openModal(
