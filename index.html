@@ -879,7 +879,7 @@ input.set-input {
 <script>
 (() => {
 'use strict';
-const BUILD_ID = "2026-09-01 21:40";
+const BUILD_ID = "2026-09-01 21:42";
 // ===== src/engine/util.js =====
 // Sdílené utility enginu — čisté funkce, žádné závislosti.
 
@@ -5127,7 +5127,7 @@ function cloudCard(state) {
                 const { close } = openModal(
                   h('h3', {}, 'Obnovit z GitHubu?'),
                   h('p', { class: 'muted small' },
-                    `Záloha obsahuje ${r.state.sessions.length} tréninků. Nahradí data v tomhle zařízení.`),
+                    `Záloha obsahuje ${plural(r.state.sessions.length)}. Nahradí data v tomhle zařízení.`),
                   h('div', { class: 'row' },
                     h('button', {
                       class: 'btn primary grow',
@@ -5263,6 +5263,10 @@ function dataCard(state) {
   );
 }
 
+function plural(n) {
+  return `${n} ${n === 1 ? 'trénink' : n < 5 ? 'tréninky' : 'tréninků'}`;
+}
+
 // Automatická záloha z posledního spuštění appky — poslední záchrana pro odcvičené tréninky.
 function backupRow() {
   const backup = readBackup();
@@ -5272,7 +5276,7 @@ function backupRow() {
     h('div', { class: 'grow' },
       h('span', { class: 'small muted' }, 'Automatická záloha v zařízení'),
       h('div', { class: 'muted', style: 'font-size:12px' },
-        `${fmtDate(backup.savedAt.slice(0, 10))} · ${count} ${count === 1 ? 'trénink' : count < 5 ? 'tréninky' : 'tréninků'}`),
+        `${fmtDate(backup.savedAt.slice(0, 10))} · ${plural(count)}`),
     ),
     h('button', {
       class: 'btn small ghost',
@@ -5280,7 +5284,7 @@ function backupRow() {
         const { close } = openModal(
           h('h3', {}, 'Obnovit ze zálohy?'),
           h('p', { class: 'muted small' },
-            `Vrátí stav z ${fmtDate(backup.savedAt.slice(0, 10))} (${count} odcvičených tréninků). `
+            `Vrátí stav z ${fmtDate(backup.savedAt.slice(0, 10))} (${plural(count)}). `
             + 'Co jsi zapsal potom, se ztratí.'),
           h('div', { class: 'row' },
             h('button', {
@@ -5316,7 +5320,7 @@ function recoveryModal() {
                   : f.key.startsWith('fitko-state-damaged') ? 'Poškozený zápis' : f.key),
               h('div', { class: 'muted', style: 'font-size:12px' },
                 f.readable
-                  ? `${f.sessions} tréninků${f.lastDate ? ` · poslední ${fmtDate(f.lastDate)}` : ''} · ${f.sizeKb} kB`
+                  ? `${plural(f.sessions)}${f.lastDate ? ` · poslední ${fmtDate(f.lastDate)}` : ''} · ${f.sizeKb} kB`
                   : `nečitelné · ${f.sizeKb} kB`),
             ),
             f.readable && f.sessions > 0
@@ -5325,7 +5329,7 @@ function recoveryModal() {
                   onClick: () => {
                     Store.init(f.state);
                     Store.mutate(() => {}, { publish: true, force: true });
-                    toast(`Obnoveno ${f.sessions} tréninků.`);
+                    toast(`Obnoveno ${plural(f.sessions)}.`);
                   },
                 }, 'Obnovit')
               : null,
