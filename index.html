@@ -879,7 +879,7 @@ input.set-input {
 <script>
 (() => {
 'use strict';
-const BUILD_ID = "2026-09-01 21:23";
+const BUILD_ID = "2026-09-01 21:34";
 // ===== src/engine/util.js =====
 // Sdílené utility enginu — čisté funkce, žádné závislosti.
 
@@ -2195,6 +2195,30 @@ function parseNum(v) {
 
 function fmtInput(n) {
   return n == null || n === '' ? '' : String(n).replace('.', ',');
+}
+
+/**
+ * Do číselného pole nepustí nic než číslice a jeden desetinný oddělovač.
+ * Chrání před zbytky z diktování, chytré klávesnice nebo omylem vloženého textu.
+ */
+function numericField(input, { decimals = true } = {}) {
+  const clean = () => {
+    const before = input.value;
+    let out = before.replace(decimals ? /[^0-9.,]/g : /[^0-9]/g, '');
+    if (decimals) {
+      const firstSep = out.search(/[.,]/);
+      if (firstSep !== -1) {
+        out = out.slice(0, firstSep + 1) + out.slice(firstSep + 1).replace(/[.,]/g, '');
+      }
+    }
+    if (out !== before) {
+      const pos = Math.max(0, (input.selectionStart ?? out.length) - (before.length - out.length));
+      input.value = out;
+      try { input.setSelectionRange(pos, pos); } catch { /* pole to nemusí umět */ }
+    }
+  };
+  input.addEventListener('input', clean);
+  return input;
 }
 
 function fmtSigned(n, digits = 0) {
@@ -3689,10 +3713,10 @@ function numField(label, value, onInput, { placeholder = '', suffix = '' } = {})
   return h('label', { class: 'stack', style: 'gap:5px' },
     h('span', { class: 'label' }, label),
     h('div', { class: 'row' },
-      h('input', {
+      numericField(h('input', {
         class: 'num', type: 'text', inputmode: 'decimal', value, placeholder,
         onInput: (e) => onInput(e.target.value),
-      }),
+      })),
       suffix ? h('span', { class: 'muted small' }, suffix) : null,
     ),
   );
@@ -3733,17 +3757,17 @@ function liftRow(id) {
       isPullup ? h('div', { class: 'muted', style: 'font-size:12px' }, 'přídavná zátěž (0 = vlastní tělo)') : null,
     ),
     h('div', { class: 'row', style: 'gap:6px' },
-      h('input', {
+      numericField(h('input', {
         class: 'num set-input', type: 'text', inputmode: 'decimal', placeholder: 'kg',
         value: lift.weightKg, style: 'width:70px',
         onInput: (e) => { lift.weightKg = e.target.value; },
-      }),
+      })),
       h('span', { class: 'muted' }, '×'),
-      h('input', {
-        class: 'num set-input', type: 'number', inputmode: 'numeric', placeholder: 'op.',
+      numericField(h('input', {
+        class: 'num set-input', type: 'text', inputmode: 'numeric', placeholder: 'op.',
         value: lift.reps, style: 'width:56px',
         onInput: (e) => { lift.reps = e.target.value; },
-      }),
+      }), { decimals: false }),
     ),
   );
 }
@@ -4104,7 +4128,7 @@ function whoopRow() {
       h('div', { class: 'small', style: 'font-weight:600' }, 'Máš WHOOP?'),
       h('div', { class: 'muted', style: 'font-size:12px' }, 'Zadej ranní Recovery % — vyplní check-in za tebe.'),
     ),
-    input = h('input', { class: 'num set-input', type: 'text', inputmode: 'numeric', placeholder: '%', style: 'width:64px' }),
+    input = numericField(h('input', { class: 'num set-input', type: 'text', inputmode: 'numeric', placeholder: '%', style: 'width:64px' }), { decimals: false }),
     h('button', {
       class: 'btn small',
       onClick: () => {
@@ -4154,10 +4178,10 @@ function bodyCard(state, summary) {
     ) : null,
     h('hr', { class: 'rule' }),
     h('div', { class: 'row' },
-      weightInput = h('input', {
+      weightInput = numericField(h('input', {
         class: 'num', type: 'text', inputmode: 'decimal',
         placeholder: weighedToday ? `dnes ${fmtKg(weighedToday.kg, true)}` : 'ranní váha (kg)',
-      }),
+      })),
       h('button', {
         class: 'btn',
         onClick: () => {
@@ -4169,10 +4193,10 @@ function bodyCard(state, summary) {
       }, weighedToday ? 'Opravit' : 'Uložit'),
     ),
     waistDue ? h('div', { class: 'row' },
-      waistInput = h('input', {
+      waistInput = numericField(h('input', {
         class: 'num', type: 'text', inputmode: 'decimal',
         placeholder: lastWaist ? `pas — naposledy ${String(lastWaist.cm).replace('.', ',')} cm` : 'pas u pupku (cm) — 1× týdně',
-      }),
+      })),
       h('button', {
         class: 'btn',
         onClick: () => {
@@ -4410,6 +4434,8 @@ function setRow(workout, entry, entryIndex, row, rowIndex, ghostSets, nextKey) {
     r.draft = { weightKg: w, reps: rp === '' ? null : parseInt(rp, 10), rir };
   }, { rerender: false });
 
+  numericField(weightInput);
+  numericField(repsInput, { decimals: false });
   weightInput.addEventListener('input', saveDraft);
   repsInput.addEventListener('input', saveDraft);
 
