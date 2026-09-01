@@ -748,7 +748,16 @@ input.set-input {
   margin-top: auto;
   gap: 10px;
   padding: 14px 0 calc(34px + env(safe-area-inset-bottom, 0px));
-  background: linear-gradient(to top, var(--bg) 62%, transparent);
+  background: var(--bg);
+}
+
+.onb-actions::before {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: 100%;
+  height: 24px;
+  background: linear-gradient(to top, var(--bg), transparent);
+  pointer-events: none;
 }
 .onb h2 { font-size: 21px; }
 .onb .display.hero { font-size: 38px; letter-spacing: -0.01em; }
@@ -870,7 +879,7 @@ input.set-input {
 <script>
 (() => {
 'use strict';
-const BUILD_ID = "2026-09-01 21:21";
+const BUILD_ID = "2026-09-01 21:23";
 // ===== src/engine/util.js =====
 // Sdílené utility enginu — čisté funkce, žádné závislosti.
 
