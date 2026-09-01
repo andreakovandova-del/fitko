@@ -845,7 +845,7 @@ input.set-input {
 <script>
 (() => {
 'use strict';
-const BUILD_ID = "2026-09-01 19:37";
+const BUILD_ID = "2026-09-01 19:46";
 // ===== src/engine/util.js =====
 // Sdílené utility enginu — čisté funkce, žádné závislosti.
 
@@ -2409,8 +2409,143 @@ function parseImportedJSON(text) {
 }
 
 
+// ===== src/app/cloud.js =====
+// Automatická záloha na GitHub (privátní gist). Bez serveru: appka mluví přímo
+// s GitHub API tvým osobním tokenem. Token žije JEN v tomhle zařízení
+// (localStorage, mimo stav) — nikdy se neposílá nikam jinam a není v exportu dat.
+
+const TOKEN_KEY = 'fitko-gh-token';
+const GIST_KEY = 'fitko-gh-gist';
+const SYNC_KEY = 'fitko-gh-lastsync';
+const FILENAME = 'fitko-zaloha.json';
+const DEBOUNCE_MS = 8000;
+
+const cloudInfo = { enabled: false, syncing: false, lastSync: null, lastError: null };
+
+function ls(key) { try { return localStorage.getItem(key) ?? ''; } catch { return ''; } }
+function lsSet(key, value) { try { localStorage.setItem(key, value); } catch { /* plno */ } }
+function lsDel(key) { try { localStorage.removeItem(key); } catch { /* noop */ } }
+
+function cloudToken() { return ls(TOKEN_KEY); }
+function cloudEnabled() { return !!cloudToken(); }
+
+function initCloud() {
+  cloudInfo.enabled = cloudEnabled();
+  cloudInfo.lastSync = ls(SYNC_KEY) || null;
+}
+
+function setCloudToken(token) {
+  const clean = (token ?? '').trim();
+  if (clean) lsSet(TOKEN_KEY, clean); else lsDel(TOKEN_KEY);
+  cloudInfo.enabled = !!clean;
+  cloudInfo.lastError = null;
+}
+
+function disableCloud() {
+  lsDel(TOKEN_KEY);
+  lsDel(GIST_KEY);
+  lsDel(SYNC_KEY);
+  cloudInfo.enabled = false;
+  cloudInfo.lastSync = null;
+  cloudInfo.lastError = null;
+}
+
+async function api(path, options = {}) {
+  const token = cloudToken();
+  if (!token) throw new Error('Chybí token');
+  const res = await fetch(`https://api.github.com${path}`, {
+    ...options,
+    headers: {
+      Accept: 'application/vnd.github+json',
+      Authorization: `Bearer ${token}`,
+      'X-GitHub-Api-Version': '2022-11-28',
+      'Content-Type': 'application/json',
+    },
+  });
+  if (res.status === 401) throw new Error('Token neplatí (401)');
+  if (res.status === 403) throw new Error('Token nemá právo na gisty (403)');
+  if (res.status === 404) throw new Error('Záloha nenalezena (404)');
+  if (!res.ok) throw new Error(`GitHub odpověděl ${res.status}`);
+  return res.json();
+}
+
+/** Nahraje aktuální stav do privátního gistu (poprvé ho založí). */
+async function cloudBackup(state) {
+  if (!cloudEnabled() || cloudInfo.syncing) return { ok: false, reason: 'off' };
+  cloudInfo.syncing = true;
+  try {
+    const files = { [FILENAME]: { content: JSON.stringify(state, null, 1) } };
+    const id = ls(GIST_KEY);
+    let gist;
+    if (id) {
+      gist = await api(`/gists/${id}`, { method: 'PATCH', body: JSON.stringify({ files }) });
+    } else {
+      gist = await api('/gists', {
+        method: 'POST',
+        body: JSON.stringify({ description: 'Fitko — automatická záloha tréninků', public: false, files }),
+      });
+      lsSet(GIST_KEY, gist.id);
+    }
+    cloudInfo.lastSync = new Date().toISOString();
+    cloudInfo.lastError = null;
+    lsSet(SYNC_KEY, cloudInfo.lastSync);
+    return { ok: true, gistId: gist.id };
+  } catch (err) {
+    cloudInfo.lastError = err?.message ?? String(err);
+    return { ok: false, reason: cloudInfo.lastError };
+  } finally {
+    cloudInfo.syncing = false;
+  }
+}
+
+/** Stáhne poslední zálohu z GitHubu (najde gist i po přeinstalaci telefonu). */
+async function cloudRestore() {
+  if (!cloudEnabled()) return { ok: false, reason: 'Nejdřív zapni zálohu tokenem' };
+  try {
+    let id = ls(GIST_KEY);
+    if (!id) {
+      const list = await api('/gists?per_page=100');
+      const found = list.find((g) => g.files && g.files[FILENAME]);
+      if (!found) return { ok: false, reason: 'Na GitHubu zatím žádná záloha není' };
+      id = found.id;
+      lsSet(GIST_KEY, id);
+    }
+    const gist = await api(`/gists/${id}`);
+    const file = gist.files?.[FILENAME];
+    if (!file) return { ok: false, reason: 'Záloha v gistu chybí' };
+    const content = file.truncated && file.raw_url
+      ? await (await fetch(file.raw_url)).text()
+      : file.content;
+    const state = JSON.parse(content);
+    if (!state?.profile || !Array.isArray(state.sessions)) return { ok: false, reason: 'Záloha je poškozená' };
+    return { ok: true, state, updatedAt: gist.updated_at };
+  } catch (err) {
+    return { ok: false, reason: err?.message ?? String(err) };
+  }
+}
+
+// Automatika: po každé změně dat se záloha naplánuje (a shluky změn se spojí).
+let timer = null;
+let pending = null;
+
+function scheduleCloudBackup(state) {
+  if (!cloudEnabled()) return;
+  pending = state;
+  if (timer) clearTimeout(timer);
+  timer = setTimeout(() => { timer = null; if (pending) cloudBackup(pending); }, DEBOUNCE_MS);
+}
+
+/** Okamžitá záloha (konec tréninku, tlačítko v Nastavení) — nečeká na debounce. */
+function flushCloudBackup(state) {
+  if (timer) { clearTimeout(timer); timer = null; }
+  pending = null;
+  return cloudBackup(state);
+}
+
+
 // ===== src/app/appstate.js =====
 // Stav aplikace a orchestrace enginu. Engine počítá, tohle drží data a pravidla toku.
+
 
 
 
@@ -2474,7 +2609,10 @@ const Store = {
     if (publish) this.state.pendingPublish = false;
     else if (markDirty) this.state.pendingPublish = true;
     saveLocal(this.state, { force });
-    if (publish) publishState(this.state); // async; při úspěchu se stránka reloadne
+    // Automatická záloha na GitHub: na hranicích (konec tréninku, onboarding…) hned,
+    // jinak se shlukne a odešle po pár vteřinách klidu.
+    if (publish) { publishState(this.state); flushCloudBackup(this.state); }
+    else scheduleCloudBackup(this.state);
     if (rerender && this.onChange) this.onChange();
     return result;
   },
@@ -4704,6 +4842,7 @@ function milestonesCard(state, summary) {
 
 
 
+
 function renderSettings(root) {
   const state = Store.state;
   clearEl(root);
@@ -4714,6 +4853,7 @@ function renderSettings(root) {
     profileCard(state),
     nutritionCard(state),
     restCard(state),
+    cloudCard(state),
     deloadCard(state),
     dataCard(state),
     aboutCard(),
@@ -4825,6 +4965,92 @@ function restCard(state) {
         onClick: () => Store.mutate((s) => { s.restScale = opt.value; }, { publish: true }),
       }, opt.label)),
     ),
+  );
+}
+
+// ---------- automatická záloha na GitHub ----------
+
+function cloudCard(state) {
+  const on = cloudEnabled();
+  let tokenInput;
+  return h('div', { class: 'card stack' },
+    h('div', { class: 'row between' },
+      h('div', { class: 'label' }, 'Záloha na GitHub'),
+      h('span', { class: `badge ${on ? 'ok' : 'warn'}` }, on ? 'zapnutá' : 'vypnutá'),
+    ),
+    on
+      ? h('div', { class: 'stack', style: 'gap:8px' },
+          h('div', { class: 'row between' },
+            h('span', { class: 'small muted' }, 'Poslední záloha'),
+            h('span', { class: 'num small', style: 'font-weight:600' },
+              cloudInfo.lastSync ? `${fmtDate(cloudInfo.lastSync.slice(0, 10))} ${cloudInfo.lastSync.slice(11, 16)}` : 'zatím žádná'),
+          ),
+          cloudInfo.lastError
+            ? h('p', { class: 'bad-text', style: 'font-size:12.5px' }, `Chyba: ${cloudInfo.lastError}`)
+            : h('p', { class: 'muted', style: 'font-size:12.5px' },
+                'Zálohuje se samo po každé změně do tvého privátního gistu. Odsud data dostaneš zpátky '
+                + 'i po výměně telefonu.'),
+          h('div', { class: 'row' },
+            h('button', {
+              class: 'btn grow',
+              onClick: async () => {
+                toast('Zálohuji…');
+                const r = await flushCloudBackup(Store.state);
+                toast(r.ok ? 'Záloha na GitHubu je aktuální.' : `Nepovedlo se: ${r.reason}`);
+                Store.onChange?.();
+              },
+            }, 'Zálohovat teď'),
+            h('button', {
+              class: 'btn grow',
+              onClick: async () => {
+                toast('Stahuji zálohu…');
+                const r = await cloudRestore();
+                if (!r.ok) { toast(`Nepovedlo se: ${r.reason}`); return; }
+                const { close } = openModal(
+                  h('h3', {}, 'Obnovit z GitHubu?'),
+                  h('p', { class: 'muted small' },
+                    `Záloha obsahuje ${r.state.sessions.length} tréninků. Nahradí data v tomhle zařízení.`),
+                  h('div', { class: 'row' },
+                    h('button', {
+                      class: 'btn primary grow',
+                      onClick: () => {
+                        Store.init(r.state);
+                        Store.mutate(() => {}, { publish: true, force: true });
+                        close();
+                        toast('Data obnovena z GitHubu.');
+                      },
+                    }, 'Obnovit'),
+                    h('button', { class: 'btn grow', onClick: () => close() }, 'Zpět'),
+                  ),
+                );
+              },
+            }, 'Obnovit z GitHubu'),
+          ),
+          h('button', {
+            class: 'btn ghost',
+            onClick: () => { disableCloud(); Store.onChange?.(); toast('Záloha vypnutá.'); },
+          }, 'Vypnout zálohu'),
+        )
+      : h('div', { class: 'stack', style: 'gap:8px' },
+          h('p', { class: 'muted', style: 'font-size:12.5px' },
+            'Zapni a appka bude po každé změně sama ukládat tvoje tréninky do privátního gistu '
+            + 'na tvém GitHubu. Token si vyrob na github.com/settings/tokens (classic) '
+            + 'a zaškrtni JEN právo „gist". Zůstane uložený v tomhle telefonu — nikam jinam nejde.'),
+          tokenInput = h('input', { type: 'text', placeholder: 'ghp_… (vlož token)', autocapitalize: 'off', autocorrect: 'off', spellcheck: false }),
+          h('button', {
+            class: 'btn primary',
+            onClick: async () => {
+              const t = tokenInput.value.trim();
+              if (t.length < 20) { toast('Token vypadá krátký.'); return; }
+              setCloudToken(t);
+              toast('Zálohuji…');
+              const r = await flushCloudBackup(Store.state);
+              if (!r.ok) { toast(`Nepovedlo se: ${r.reason}`); disableCloud(); }
+              else toast('Hotovo — od teď se zálohuje samo.');
+              Store.onChange?.();
+            },
+          }, 'Zapnout zálohu'),
+        ),
   );
 }
 
@@ -5087,6 +5313,7 @@ function aboutCard() {
 
 
 
+
 let currentTab = 'today';
 
 const TABS = [
@@ -5140,12 +5367,16 @@ function boot() {
   if ('serviceWorker' in navigator && document.querySelector('link[rel="manifest"]')) {
     try { navigator.serviceWorker.register('./sw.js'); } catch { /* nepovinné */ }
   }
+  initCloud();
   const persisted = loadPersistedState();
   backupState(persisted); // snímek toho, co bylo na disku před spuštěním
   Store.init(persisted);
   Store.onChange = render;
 
   Store.mutate((s) => dailyMaintenance(s), { rerender: false, publish: false, markDirty: false });
+
+  // po startu zálohuj, ať je v cloudu vždy poslední stav i bez další akce
+  if (Store.state.sessions?.length) scheduleCloudBackup(Store.state);
 
   render();
 }
