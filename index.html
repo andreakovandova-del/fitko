@@ -737,7 +737,18 @@ input.set-input {
   gap: 18px;
   /* spodních ~24 pt si bere lišta Safari / gesto domů — tlačítka tam nesmí zasahovat,
      jinak ťuknutí na jejich spodní polovinu propadne systému */
-  padding: calc(22px + env(safe-area-inset-top, 0px)) 20px calc(42px + env(safe-area-inset-bottom, 0px));
+  padding: calc(22px + env(safe-area-inset-top, 0px)) 20px 0;
+}
+
+/* Akční tlačítka onboardingu drží u spodní hrany, ale nad zónou gest —
+   při delším kroku obsah roluje pod nimi, tlačítko je vždy celé trefitelné. */
+.onb-actions {
+  position: sticky;
+  bottom: 0;
+  margin-top: auto;
+  gap: 10px;
+  padding: 14px 0 calc(34px + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(to top, var(--bg) 62%, transparent);
 }
 .onb h2 { font-size: 21px; }
 .onb .display.hero { font-size: 38px; letter-spacing: -0.01em; }
@@ -859,7 +870,7 @@ input.set-input {
 <script>
 (() => {
 'use strict';
-const BUILD_ID = "2026-09-01 21:19";
+const BUILD_ID = "2026-09-01 21:21";
 // ===== src/engine/util.js =====
 // Sdílené utility enginu — čisté funkce, žádné závislosti.
 
@@ -3635,7 +3646,7 @@ function renderOnboarding(root) {
 // Pozor: inputy mění draft BEZ překreslení — na renderu se proto nesmí zakládat
 // žádný stav tlačítka (popisek ani disabled). Vše se ověřuje až při kliknutí.
 function nav({ nextLabel = 'Pokračovat', validate = null, onNext = null } = {}) {
-  return h('div', { class: 'row', style: 'margin-top:auto;gap:10px' },
+  return h('div', { class: 'row onb-actions' },
     draft.step > 0
       ? h('button', { class: 'btn ghost', onClick: () => { draft.step--; rerender(); } }, 'Zpět')
       : null,
