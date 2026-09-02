@@ -938,7 +938,7 @@ input.set-input {
 <script>
 (() => {
 'use strict';
-const BUILD_ID = "2026-09-02 15:42";
+const BUILD_ID = "2026-09-02 19:54";
 // ===== src/engine/util.js =====
 // Sdílené utility enginu — čisté funkce, žádné závislosti.
 
@@ -2727,6 +2727,89 @@ function flushCloudBackup(state) {
 }
 
 
+// ===== src/app/updater.js =====
+// Automatické aktualizace: appka se sama ptá serveru, jestli neběží novější verze,
+// a umí se na ni přepnout bez mazání ikony z plochy.
+//
+// Proč to nestačí nechat na service workeru: v nainstalované appce na iOS zůstane
+// stránka v paměti klidně několik dní, takže k novému načtení vůbec nedojde.
+// Proto se ptáme sami — po startu, po návratu do appky a jednou za čas.
+
+
+const CHECK_MS = 10 * 60 * 1000;
+const TRIED_KEY = 'fitko-update-tried';
+
+// Kdyby server hlásil novou verzi, ale stránka se z jakéhokoli důvodu načetla stará
+// (cache CDN, částečný deploy), nesmí se appka přenačítat donekonečna.
+// Každou verzi proto zkoušíme automaticky jen jednou; pak nabídneme tlačítko.
+function alreadyTried(build) {
+  try { return sessionStorage.getItem(TRIED_KEY) === build; } catch { return false; }
+}
+function markTried(build) {
+  try { sessionStorage.setItem(TRIED_KEY, build); } catch { /* noop */ }
+}
+function clearUpdateAttempt() {
+  try { sessionStorage.removeItem(TRIED_KEY); } catch { /* noop */ }
+}
+
+const updateInfo = { available: null, checking: false, lastCheck: null };
+
+async function fetchLatestBuild() {
+  const res = await fetch(`./version.json?t=${Date.now()}`, { cache: 'no-store' });
+  if (!res.ok) throw new Error(String(res.status));
+  const data = await res.json();
+  return typeof data?.build === 'string' ? data.build : null;
+}
+
+/** Zjistí, jestli je na serveru novější verze. Vrací id nové verze, nebo null. */
+async function checkForUpdate() {
+  const current = buildId();
+  if (!current) return null; // dev build bez verze
+  updateInfo.checking = true;
+  try {
+    const latest = await fetchLatestBuild();
+    updateInfo.lastCheck = new Date().toISOString();
+    updateInfo.available = latest && latest !== current ? latest : null;
+    return updateInfo.available;
+  } catch {
+    return null; // offline nebo výpadek — zkusíme příště
+  } finally {
+    updateInfo.checking = false;
+  }
+}
+
+/** Zahodí cache i service worker a načte appku znovu — tedy skutečný update. */
+async function applyUpdate(build = null) {
+  if (build) markTried(build);
+  try {
+    const regs = (await navigator.serviceWorker?.getRegistrations?.()) ?? [];
+    await Promise.all(regs.map((r) => r.unregister().catch(() => {})));
+    const keys = (await caches?.keys?.()) ?? [];
+    await Promise.all(keys.map((k) => caches.delete(k)));
+  } catch { /* i tak přenačteme */ }
+  // cache-busting parametr: iOS jinak umí vrátit stránku z paměti
+  const url = new URL(location.href);
+  url.searchParams.set('v', Date.now().toString(36));
+  location.replace(url.toString());
+}
+
+/**
+ * Spustí hlídání aktualizací.
+ * @param onFound (build) => void — zavolá se, když je novější verze k dispozici
+ */
+function initUpdater(onFound) {
+  const run = async () => {
+    const found = await checkForUpdate();
+    if (!found) { clearUpdateAttempt(); return; }
+    onFound(found, alreadyTried(found));
+  };
+  run();
+  setInterval(run, CHECK_MS);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) run(); });
+  window.addEventListener('online', run);
+}
+
+
 // ===== src/app/appstate.js =====
 // Stav aplikace a orchestrace enginu. Engine počítá, tohle drží data a pravidla toku.
 
@@ -4051,6 +4134,8 @@ function honestRow(label, value) {
 
 
 
+
+
 function renderToday(root) {
   const state = Store.state;
   clearEl(root);
@@ -4061,6 +4146,8 @@ function renderToday(root) {
       h('h1', { class: 'display' }, 'Fitko'),
       h('div', { class: 'muted small' }, fmtDateFull(todayISO())),
     ),
+    updateCard(),
+    backupWarning(state),
     heroCard(state),
     weekStrip(state),
     introCard(state),
@@ -4097,6 +4184,30 @@ function heroCard(state) {
       class: 'btn primary big',
       onClick: () => Store.mutate((s) => { s.activeWorkout = buildWorkout(s); }),
     }, 'Začít trénink'),
+  );
+}
+
+// Nová verze je připravená (během tréninku se sama neinstaluje, ať tě nevyruší).
+function updateCard() {
+  if (!updateInfo.available) return null;
+  return h('div', { class: 'card stack', style: 'border-color:var(--accent)' },
+    h('div', { class: 'label accent-text' }, 'Je tu nová verze'),
+    h('p', { class: 'small' }, 'Stáhne se na jedno ťuknutí — nic nemažeš a o data nepřijdeš.'),
+    h('button', { class: 'btn primary', onClick: () => applyUpdate(updateInfo.available) }, 'Aktualizovat'),
+  );
+}
+
+// Bez zálohy žijí data jen v telefonu — a to už jednou bolelo.
+function backupWarning(state) {
+  if (cloudEnabled() || !state.sessions?.length) return null;
+  return h('div', { class: 'card stack', style: 'border-color:var(--warn)' },
+    h('div', { class: 'label warn-text' }, 'Záloha není zapnutá'),
+    h('p', { class: 'small' }, 'Tréninky teď žijí jen v tomhle telefonu. Zapni zálohu na GitHub '
+      + '(jednou vložíš token) a appka je bude sama ukládat po každé změně.'),
+    h('button', {
+      class: 'btn',
+      onClick: () => { window.__fitkoGoSettings?.(); },
+    }, 'Zapnout zálohu'),
   );
 }
 
@@ -5649,6 +5760,7 @@ function aboutCard() {
 
 
 
+
 let currentTab = 'today';
 
 const TABS = [
@@ -5691,6 +5803,9 @@ function render() {
   requestAnimationFrame(() => window.scrollTo(0, scrollY));
 }
 
+// umožní kartám na Dnes poslat uživatele rovnou do Nastavení
+window.__fitkoGoSettings = () => { currentTab = 'settings'; window.scrollTo(0, 0); render(); };
+
 function boot() {
   captureDocument();
   initCapabilities();
@@ -5712,6 +5827,27 @@ function boot() {
 
   // po startu zálohuj, ať je v cloudu vždy poslední stav i bez další akce
   if (Store.state.sessions?.length) scheduleCloudBackup(Store.state);
+
+  // Prázdné zařízení + zapnutá záloha = data si stáhneme SAMI, bez ptaní.
+  // Přesně tenhle případ (nová verze, vyčištěné úložiště) uživatele nejvíc pálí.
+  if (!Store.state.sessions?.length && cloudEnabled()) {
+    cloudRestore().then((r) => {
+      if (r.ok && r.state?.sessions?.length) {
+        Store.init(r.state);
+        Store.mutate(() => {}, { force: true, rerender: false });
+        render();
+        toast(`Data obnovena ze zálohy — ${r.state.sessions.length} tréninků.`);
+      }
+    });
+  }
+
+  // Automatická aktualizace: mimo trénink se přepne sama, v tréninku počká na tebe.
+  initUpdater((build, alreadyTried) => {
+    // v tréninku a po neúspěšném pokusu nech rozhodnutí na uživateli (karta na Dnes)
+    if (Store.state.activeWorkout || alreadyTried) { render(); return; }
+    toast('Instaluji novou verzi…');
+    setTimeout(() => applyUpdate(build), 900);
+  });
 
   render();
 }

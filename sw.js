@@ -1,5 +1,5 @@
 // Fitko service worker — precache jádra, navigace network-first (updaty), zbytek cache-first.
-const CACHE = 'fitko-mtk9lhtq';
+const CACHE = 'fitko-mtkimay2';
 const CORE = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 
 self.addEventListener('install', (e) => {
@@ -17,6 +17,11 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return;
+  // verze se ptá vždy serveru — jinak by appka nikdy nezjistila, že je nová
+  if (req.url.includes('version.json')) {
+    e.respondWith(fetch(req).catch(() => caches.match(req)));
+    return;
+  }
   if (req.mode === 'navigate') {
     e.respondWith(
       fetch(req)
