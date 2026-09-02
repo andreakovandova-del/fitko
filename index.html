@@ -638,17 +638,36 @@ input.set-input {
 .history-row:first-of-type { border-top: none; }
 .history-row:active { opacity: 0.6; }
 
-/* ---------- rest timer ---------- */
+/* ---------- rest timer — musí být vidět přes celou tělocvičnu ---------- */
 
 .timerbar {
   position: fixed;
-  bottom: 0;
-  left: 0; right: 0;
+  left: 10px; right: 10px;
+  /* Nad spodní lištou Safari: v nainstalované appce stačí safe-area,
+     v prohlížeči je potřeba se vyhnout plovoucí adresní liště. */
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
   z-index: 40;
   background: var(--surface);
-  border-top: 2px solid var(--accent);
-  box-shadow: var(--timer-glow);
-  padding: 10px 16px calc(26px + env(safe-area-inset-bottom, 0px));
+  border: 1.5px solid var(--accent);
+  border-radius: 18px;
+  box-shadow: 0 0 0 4px var(--accent-faint), 0 18px 44px rgba(0, 0, 0, 0.55),
+              0 0 34px -8px var(--accent);
+  padding: 0 0 12px;
+  overflow: hidden;
+}
+
+.timerbar.browser-chrome { bottom: calc(74px + env(safe-area-inset-bottom, 0px)); }
+
+/* ubíhající proužek nahoře = kolik pauzy zbývá */
+.timer-progress {
+  height: 5px;
+  background: var(--surface-2);
+}
+.timer-progress > div {
+  height: 100%;
+  background: var(--accent);
+  box-shadow: 0 0 12px var(--accent);
+  transition: width 0.5s linear;
 }
 
 .timerbar-inner {
@@ -656,25 +675,59 @@ input.set-input {
   margin: 0 auto;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+  padding: 12px 14px 0;
 }
 
 .timer-digits {
   font-family: var(--font-num);
   font-variant-numeric: tabular-nums;
-  font-size: 36px;
+  font-size: 62px;
   font-weight: 700;
-  line-height: 1;
-  letter-spacing: -0.01em;
+  line-height: 0.9;
+  letter-spacing: -0.03em;
   flex: none;
+  color: var(--text);
+  text-shadow: 0 0 26px rgba(255, 98, 55, 0.28);
 }
 
-.timer-digits.overrun { color: var(--warn); }
+/* posledních 5 vteřin: oranžově a tepe */
+.timer-digits.soon { color: var(--accent); animation: tick-pulse 1s ease-in-out infinite; }
+.timer-digits.overrun { color: var(--accent); }
+
+@keyframes tick-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.07); }
+}
+
+.timerbar.done {
+  background: var(--accent-grad);
+  border-color: transparent;
+  box-shadow: 0 0 0 5px var(--accent-soft), 0 18px 50px rgba(0, 0, 0, 0.6), 0 0 60px -6px var(--accent);
+}
+.timerbar.done .timer-digits,
+.timerbar.done .timer-next,
+.timerbar.done .label { color: var(--accent-ink); text-shadow: none; }
+.timerbar.done .btn.small { background: rgba(0, 0, 0, 0.18); border-color: rgba(0, 0, 0, 0.28); color: var(--accent-ink); }
+.timerbar.done .timer-progress { background: rgba(0, 0, 0, 0.2); }
 
 .timer-mid { flex: 1; min-width: 0; }
 
+.timer-actions {
+  display: flex;
+  gap: 8px;
+  padding: 10px 14px 0;
+  max-width: 480px;
+  margin: 0 auto;
+}
+.timer-actions .btn { flex: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+  .timer-digits.soon { animation: none; }
+}
+
 .timer-next {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--muted);
   line-height: 1.25;
   /* dvouřádkový, ať je vidět i cíl série (kg × opakování) */
@@ -684,7 +737,7 @@ input.set-input {
   overflow: hidden;
 }
 
-.timerbar .btn.small { padding: 7px 9px; font-size: 12.5px; white-space: nowrap; flex: none; }
+.timerbar .btn.small { padding: 9px 10px; font-size: 13.5px; white-space: nowrap; }
 
 /* ---------- progres ---------- */
 
@@ -885,7 +938,7 @@ input.set-input {
 <script>
 (() => {
 'use strict';
-const BUILD_ID = "2026-09-02 07:26";
+const BUILD_ID = "2026-09-02 15:38";
 // ===== src/engine/util.js =====
 // Sdílené utility enginu — čisté funkce, žádné závislosti.
 
@@ -3361,11 +3414,13 @@ const RestTimer = {
   audioCtx: null,
   beeped: false,
   scheduled: [],
+  totalSec: null,
   tonesReady: false,
   resuming: false,
   visibilityBound: false,
 
   start(seconds, label = '') {
+    this.totalSec = seconds;
     this.endTime = Date.now() + seconds * 1000;
     this.label = label;
     this.beeped = false;
@@ -3378,6 +3433,7 @@ const RestTimer = {
   adjust(deltaSeconds) {
     if (!this.endTime) return;
     this.endTime += deltaSeconds * 1000;
+    this.totalSec = Math.max(1, (this.totalSec ?? 0) + deltaSeconds);
     this.scheduleTones();
     this.render();
   },
@@ -3396,9 +3452,23 @@ const RestTimer = {
     return Math.round((this.endTime - Date.now()) / 1000);
   },
 
+  // V prohlížeči (ne v appce z plochy) sedí dole plovoucí lišta Safari —
+  // časovač se musí posadit nad ni, jinak ho uživatel neuvidí.
+  inBrowserChrome() {
+    try {
+      const standalone = window.matchMedia?.('(display-mode: standalone)')?.matches
+        || window.navigator.standalone === true;
+      return !standalone;
+    } catch { return false; }
+  },
+
   ensureUI() {
     if (this.el) return;
-    this.el = h('div', { class: 'timerbar', role: 'timer' });
+    this.el = h('div', {
+      class: `timerbar${this.inBrowserChrome() ? ' browser-chrome' : ''}`,
+      role: 'timer',
+      'aria-live': 'off',
+    });
     document.body.append(this.el);
     if (!this.interval) this.interval = setInterval(() => this.render(), 500);
     // listener jen jednou za život appky a jen když časovač opravdu běží,
@@ -3419,21 +3489,30 @@ const RestTimer = {
     if (remaining == null) return;
     if (remaining <= 0 && !this.beeped) { this.beep(); this.beeped = true; }
 
-    const overrun = remaining < 0;
+    const overrun = remaining <= 0;
     const abs = Math.abs(remaining);
     const mm = Math.floor(abs / 60);
     const ss = String(abs % 60).padStart(2, '0');
+    const soon = !overrun && remaining <= 5;
+    const pct = this.totalSec ? Math.max(0, Math.min(100, (remaining / this.totalSec) * 100)) : 0;
 
-    this.el.replaceChildren(h('div', { class: 'timerbar-inner' },
-      h('div', { class: `timer-digits${overrun ? ' overrun' : ''}` }, `${overrun ? '+' : ''}${mm}:${ss}`),
-      h('div', { class: 'timer-mid' },
-        h('div', { class: 'label' }, 'Pauza'),
-        this.label ? h('div', { class: 'timer-next' }, this.label) : null,
+    this.el.className = `timerbar${this.inBrowserChrome() ? ' browser-chrome' : ''}${overrun ? ' done' : ''}`;
+    this.el.replaceChildren(
+      h('div', { class: 'timer-progress' }, h('div', { style: `width:${overrun ? 100 : pct}%` })),
+      h('div', { class: 'timerbar-inner' },
+        h('div', { class: `timer-digits${soon ? ' soon' : ''}${overrun ? ' overrun' : ''}` },
+          `${overrun && remaining < 0 ? '+' : ''}${mm}:${ss}`),
+        h('div', { class: 'timer-mid' },
+          h('div', { class: 'label' }, overrun ? 'Jdi na to' : 'Pauza'),
+          this.label ? h('div', { class: 'timer-next' }, this.label) : null,
+        ),
       ),
-      h('button', { class: 'btn small ghost', onClick: () => this.adjust(-15) }, '−15'),
-      h('button', { class: 'btn small ghost', onClick: () => this.adjust(15) }, '+15'),
-      h('button', { class: 'btn small', 'aria-label': 'Přeskočit pauzu', onClick: () => this.stop() }, '✕'),
-    ));
+      h('div', { class: 'timer-actions' },
+        h('button', { class: 'btn small ghost', onClick: () => this.adjust(-15) }, '−15 s'),
+        h('button', { class: 'btn small ghost', onClick: () => this.adjust(15) }, '+15 s'),
+        h('button', { class: 'btn small', onClick: () => this.stop() }, 'Hotovo'),
+      ),
+    );
   },
 
   async requestWakeLock() {
