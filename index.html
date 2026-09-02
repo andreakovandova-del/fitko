@@ -938,7 +938,7 @@ input.set-input {
 <script>
 (() => {
 'use strict';
-const BUILD_ID = "2026-09-02 15:38";
+const BUILD_ID = "2026-09-02 15:42";
 // ===== src/engine/util.js =====
 // Sdílené utility enginu — čisté funkce, žádné závislosti.
 
@@ -1482,10 +1482,15 @@ function computeNextPrescription(exDef, state, recent = []) {
   const hi = state.rangeHi ?? baseHi;
 
   if (state.status === 'calibration' || state.loadKg == null) {
+    // Shyby, dipy, zvedání nohou: „váha" je PŘÍDAVNÁ zátěž, takže vlastní tělo = 0.
+    // Uživatel tedy nic nehledá — jen udělá, co zvládne.
+    const bodyweight = exDef.incrementRule === 'bodyweight';
     return {
-      action: 'calibrate', loadKg: null, rangeHi: baseHi,
+      action: 'calibrate',
+      loadKg: bodyweight ? 0 : null,
+      rangeHi: baseHi,
       targetReps: Array(sets).fill(Math.round((lo + baseHi) / 2)),
-      note: 'find_load',
+      note: bodyweight ? 'bodyweight_start' : 'find_load',
     };
   }
 
@@ -3908,7 +3913,7 @@ function liftRow(id) {
   return h('div', { class: 'card row', style: 'gap:8px' },
     h('div', { class: 'grow' },
       h('div', { style: 'font-weight:600;font-size:14.5px' }, def.name),
-      isPullup ? h('div', { class: 'muted', style: 'font-size:12px' }, 'přídavná zátěž (0 = vlastní tělo)') : null,
+      isPullup ? h('div', { class: 'muted', style: 'font-size:12px' }, 'do kg dej PŘÍDAVNOU zátěž — jen vlastní tělo = 0') : null,
     ),
     h('div', { class: 'row', style: 'gap:6px' },
       numericField(h('input', {
@@ -4463,6 +4468,7 @@ function exerciseCard(state, workout, entry, entryIndex, nextKey) {
   const rangeText = `${p.targetReps.length}× ${def.repRange[0]}–${p.rangeHi ?? def.repRange[1]}`;
   const rirText = workout.deload ? 'RIR 3+' : `RIR ${def.rir[0]}–${def.rir[1]}`;
   const restText = `pauza ${fmtRest(restSecondsFor(entry.exerciseId))}`;
+  const bodyweight = def.incrementRule === 'bodyweight';
 
   return h('div', { class: 'card ex-card' },
     h('div', { class: 'ex-head' },
@@ -4476,7 +4482,9 @@ function exerciseCard(state, workout, entry, entryIndex, nextKey) {
     ),
     calibrating
       ? h('div', { class: 'small', style: 'padding:0 14px 10px;color:var(--accent)' },
-          `Kalibrace: najdi váhu na ~${p.targetReps[0]} opakování při ${rirText}.`)
+          bodyweight
+            ? `Jen vlastní tělo → nech v poli 0. Udělej ~${p.targetReps[0]} opakování při ${rirText} a zapiš, kolik jich bylo.`
+            : `Kalibrace: najdi váhu na ~${p.targetReps[0]} opakování při ${rirText}.`)
       : null,
     ...entry.rows.map((row, rowIndex) => setRow(workout, entry, entryIndex, row, rowIndex, ghostSets, nextKey)),
   );
@@ -4506,8 +4514,11 @@ function whyModal(def) {
     infoRow('Rozsah opakování', `${def.repRange[0]}–${def.repRange[1]}`),
     infoRow('Cílový RIR', `${def.rir[0]}–${def.rir[1]} (rezerva na konci série)`),
     infoRow('Pauza mezi sériemi', fmtRest(rest)),
+    infoRow('Váha v poli', def.incrementRule === 'bodyweight'
+      ? 'PŘÍDAVNÁ zátěž — jen vlastní tělo = 0'
+      : 'zvednutá zátěž (činka, stroj)'),
     infoRow('Přidávání', def.incrementRule === 'bodyweight'
-      ? 'nejdřív opakování, pak přídavná zátěž'
+      ? 'nejdřív opakování, pak přídavná zátěž v pásu'
       : `+${String(def.increment).replace('.', ',')} kg, když série sedí na stropu rozsahu`),
     def.dropset ? h('div', { class: 'stack', style: 'gap:6px' },
       h('hr', { class: 'rule' }),
@@ -4571,9 +4582,11 @@ function setRow(workout, entry, entryIndex, row, rowIndex, ghostSets, nextKey) {
   const shownWeight = row.logged ? row.logged.weightKg : draft?.weightKg;
   const shownReps = row.logged ? row.logged.reps : draft?.reps;
 
+  const bodyweightEx = def.incrementRule === 'bodyweight';
   const weightInput = h('input', {
     class: 'set-input', type: 'text', inputmode: 'decimal',
-    placeholder: target.weightKg != null ? fmtInput(target.weightKg) : 'kg',
+    placeholder: target.weightKg != null ? fmtInput(target.weightKg) : (bodyweightEx ? '0' : 'kg'),
+    'aria-label': bodyweightEx ? 'Přídavná zátěž v kg' : 'Váha v kg',
     value: shownWeight != null ? fmtInput(shownWeight) : '',
     disabled: done,
   });
@@ -4664,7 +4677,9 @@ function setRow(workout, entry, entryIndex, row, rowIndex, ghostSets, nextKey) {
 
   const adjNote = row.adjusted === 'up' ? '↑ přidáno (měl jsi rezervu)'
     : row.adjusted === 'down' ? '↓ ubráno (bylo to na hraně)' : null;
-  const ghostText = adjNote ?? (row.kind === 'drop' ? 'bez pauzy do selhání' : ghost ?? (row.kind === 'warmup' ? 'lehce, bez RIR' : 'první záznam'));
+  const ghostText = adjNote ?? (row.kind === 'drop' ? 'bez pauzy do selhání'
+    : ghost ?? (row.kind === 'warmup' ? 'lehce, bez RIR'
+      : bodyweightEx ? '0 = jen vlastní tělo' : 'první záznam'));
 
   const isNext = !done && nextKey === `${entryIndex}:${rowIndex}`;
   return h('div', { class: `set-block${done ? ' done' : ''}${row.kind === 'warmup' ? ' warmup' : ''}${isNext ? ' next' : ''}` },
