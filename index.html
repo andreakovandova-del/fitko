@@ -938,7 +938,7 @@ input.set-input {
 <script>
 (() => {
 'use strict';
-const BUILD_ID = "2026-09-02 19:54";
+const BUILD_ID = "2026-09-02 20:10";
 // ===== src/engine/util.js =====
 // Sdílené utility enginu — čisté funkce, žádné závislosti.
 
@@ -4153,7 +4153,6 @@ function renderToday(root) {
     introCard(state),
     ...offerCards(state),
     nutritionNotice(state),
-    checkinCard(state),
     bodyCard(state, summary),
     footRow(state, summary),
   ));
@@ -4364,53 +4363,77 @@ const CHECKIN_ROWS = [
   { key: 'motivation', label: 'Chuť trénovat' },
 ];
 
-function checkinCard(state) {
+// Připravenost — NEPOVINNÉ. Ranní dotazník byl otravný a subjektivní; deload
+// stejně spolehlivě spouští pokles výkonu a pojistka po 10 týdnech. Kdo má WHOOP,
+// zadá jedno objektivní číslo; kdo chce, rozklikne si tři rychlé otázky.
+function readinessRow(state) {
   const today = todayISO();
   const existing = state.checkins.find((c) => c.date === today);
-  if (existing && existing.sleep && existing.soreness && existing.motivation) return null;
-  const values = { sleep: existing?.sleep, soreness: existing?.soreness, motivation: existing?.motivation };
+  if (existing?.whoopPct != null || (existing?.sleep && existing?.soreness && existing?.motivation)) {
+    return h('div', { class: 'row between' },
+      h('span', { class: 'small muted' }, 'Připravenost dnes'),
+      h('span', { class: 'num small', style: 'font-weight:600' },
+        existing.whoopPct != null ? `WHOOP ${existing.whoopPct} %` : `${existing.sleep}/5`),
+    );
+  }
 
-  return h('div', { class: 'card stack' },
-    h('div', { class: 'row between' },
-      h('div', { class: 'label' }, 'Ranní check-in'),
-      h('span', { class: 'muted', style: 'font-size:12px' }, '1 = mizérie · 5 = top'),
+  let input;
+  const row = h('div', { class: 'stack', style: 'gap:8px' },
+    h('div', { class: 'row' },
+      h('div', { class: 'grow' },
+        h('div', { class: 'small', style: 'font-weight:600' }, 'Připravenost (nepovinné)'),
+        h('div', { class: 'muted', style: 'font-size:12px' }, 'WHOOP Recovery % — pomáhá enginu odhadnout únavu dřív.'),
+      ),
+      input = numericField(h('input', {
+        class: 'num set-input', type: 'text', inputmode: 'numeric', placeholder: '%', style: 'width:64px',
+      }), { decimals: false }),
+      h('button', {
+        class: 'btn small',
+        onClick: () => {
+          const pct = parseNum(input.value);
+          if (pct == null || pct < 0 || pct > 100) { toast('Recovery je 0–100 %.'); return; }
+          const m = Math.min(5, Math.max(1, Math.ceil(pct / 20)));
+          Store.mutate((s) => upsertCheckin(s, { sleep: m, soreness: m, motivation: m, whoopPct: Math.round(pct) }));
+          toast(`Recovery ${Math.round(pct)} % uloženo.`);
+        },
+      }, 'Uložit'),
     ),
-    h('p', { class: 'muted', style: 'font-size:12.5px' }, 'Tři ťuknutí — podle nich appka pozná únavu a včas ti uleví.'),
+    h('button', {
+      class: 'btn ghost small',
+      style: 'align-self:flex-start',
+      onClick: () => openScaleModal(state),
+    }, 'Nemám WHOOP — hodnotit ručně'),
+  );
+  return row;
+}
+
+function openScaleModal(state) {
+  const values = {};
+  const { close } = openModal(
+    h('h3', {}, 'Jak se dnes cítíš?'),
+    h('p', { class: 'muted small' }, '1 = mizérie · 5 = top. Je to nepovinné — engine si vystačí i s výkonem v tréninku.'),
     ...CHECKIN_ROWS.map((row) => h('div', { class: 'stack', style: 'gap:5px' },
       h('span', { class: 'small muted' }, row.label),
       h('div', { class: 'scale-row' },
-        ...[1, 2, 3, 4, 5].map((v) => h('button', {
-          class: values[row.key] === v ? 'active' : '',
-          onClick: () => {
-            values[row.key] = v;
-            Store.mutate((s) => upsertCheckin(s, { [row.key]: v }));
-            if (values.sleep && values.soreness && values.motivation) toast('Check-in uložen.');
-          },
-        }, String(v))),
+        ...[1, 2, 3, 4, 5].map((v) => {
+          const btn = h('button', {
+            onClick: () => {
+              values[row.key] = v;
+              btn.parentElement.querySelectorAll('button').forEach((b) => b.classList.remove('active'));
+              btn.classList.add('active');
+            },
+          }, String(v));
+          return btn;
+        }),
       ),
     )),
-    h('hr', { class: 'rule' }),
-    whoopRow(),
-  );
-}
-
-// WHOOP zkratka: jedno číslo (Recovery %) vyplní celý check-in.
-function whoopRow() {
-  let input;
-  return h('div', { class: 'row' },
-    h('div', { class: 'grow' },
-      h('div', { class: 'small', style: 'font-weight:600' }, 'Máš WHOOP?'),
-      h('div', { class: 'muted', style: 'font-size:12px' }, 'Zadej ranní Recovery % — vyplní check-in za tebe.'),
-    ),
-    input = numericField(h('input', { class: 'num set-input', type: 'text', inputmode: 'numeric', placeholder: '%', style: 'width:64px' }), { decimals: false }),
     h('button', {
-      class: 'btn small',
+      class: 'btn primary big',
       onClick: () => {
-        const pct = parseNum(input.value);
-        if (pct == null || pct < 0 || pct > 100) { toast('Recovery je 0–100 %.'); return; }
-        const m = Math.min(5, Math.max(1, Math.ceil(pct / 20)));
-        Store.mutate((s) => upsertCheckin(s, { sleep: m, soreness: m, motivation: m, whoopPct: Math.round(pct) }));
-        toast(`Recovery ${Math.round(pct)} % → připravenost ${m}/5.`);
+        if (!values.sleep || !values.soreness || !values.motivation) { toast('Ťukni všechny tři.'); return; }
+        Store.mutate((s) => upsertCheckin(s, values));
+        close();
+        toast('Uloženo.');
       },
     }, 'Uložit'),
   );
@@ -4485,6 +4508,8 @@ function bodyCard(state, summary) {
       h('span', { class: 'small muted' }, '7denní průměr'),
       h('span', { class: 'num small', style: 'font-weight:600' }, fmtKg(summary.avg7)),
     ) : null,
+    h('hr', { class: 'rule' }),
+    readinessRow(state),
   );
 }
 
@@ -5262,9 +5287,8 @@ function renderSettings(root) {
     profileCard(state),
     nutritionCard(state),
     restCard(state),
-    cloudCard(state),
     deloadCard(state),
-    dataCard(state),
+    backupCard(state),
     aboutCard(),
   ));
 }
@@ -5377,75 +5401,74 @@ function restCard(state) {
   );
 }
 
-// ---------- automatická záloha na GitHub ----------
+// ---------- záloha a data (jedno místo, jedno tlačítko) ----------
 
-function cloudCard(state) {
+function backupCard(state) {
   const on = cloudEnabled();
+  const last = state.sessions.at(-1);
   let tokenInput;
+
   return h('div', { class: 'card stack' },
     h('div', { class: 'row between' },
-      h('div', { class: 'label' }, 'Záloha na GitHub'),
-      h('span', { class: `badge ${on ? 'ok' : 'warn'}` }, on ? 'zapnutá' : 'vypnutá'),
+      h('div', { class: 'label' }, 'Záloha a data'),
+      h('span', { class: `badge ${on ? 'ok' : 'warn'}` }, on ? 'zálohuje se samo' : 'jen v telefonu'),
     ),
+    h('div', { class: 'row between' },
+      h('span', { class: 'small muted' }, 'Uložené tréninky'),
+      h('span', { class: 'num small', style: 'font-weight:600' },
+        last ? `${plural(state.sessions.length)} · poslední ${fmtDate(last.date)}` : 'zatím žádný'),
+    ),
+
     on
+      // ZAPNUTO: stav + jedno hlavní tlačítko, zbytek drobně
       ? h('div', { class: 'stack', style: 'gap:8px' },
           h('div', { class: 'row between' },
-            h('span', { class: 'small muted' }, 'Poslední záloha'),
+            h('span', { class: 'small muted' }, 'Poslední záloha na GitHub'),
             h('span', { class: 'num small', style: 'font-weight:600' },
-              cloudInfo.lastSync ? `${fmtDate(cloudInfo.lastSync.slice(0, 10))} ${cloudInfo.lastSync.slice(11, 16)}` : 'zatím žádná'),
+              cloudInfo.lastSync
+                ? `${fmtDate(cloudInfo.lastSync.slice(0, 10))} ${cloudInfo.lastSync.slice(11, 16)}`
+                : 'čeká na první změnu'),
           ),
           cloudInfo.lastError
             ? h('p', { class: 'bad-text', style: 'font-size:12.5px' }, `Chyba: ${cloudInfo.lastError}`)
             : h('p', { class: 'muted', style: 'font-size:12.5px' },
-                'Zálohuje se samo po každé změně do tvého privátního gistu. Odsud data dostaneš zpátky '
-                + 'i po výměně telefonu.'),
-          h('div', { class: 'row' },
-            h('button', {
-              class: 'btn grow',
-              onClick: async () => {
-                toast('Zálohuji…');
-                const r = await flushCloudBackup(Store.state);
-                toast(r.ok ? 'Záloha na GitHubu je aktuální.' : `Nepovedlo se: ${r.reason}`);
-                Store.onChange?.();
-              },
-            }, 'Zálohovat teď'),
-            h('button', {
-              class: 'btn grow',
-              onClick: async () => {
-                toast('Stahuji zálohu…');
-                const r = await cloudRestore();
-                if (!r.ok) { toast(`Nepovedlo se: ${r.reason}`); return; }
-                const { close } = openModal(
-                  h('h3', {}, 'Obnovit z GitHubu?'),
-                  h('p', { class: 'muted small' },
-                    `Záloha obsahuje ${plural(r.state.sessions.length)}. Nahradí data v tomhle zařízení.`),
-                  h('div', { class: 'row' },
-                    h('button', {
-                      class: 'btn primary grow',
-                      onClick: () => {
-                        Store.init(r.state);
-                        Store.mutate(() => {}, { publish: true, force: true });
-                        close();
-                        toast('Data obnovena z GitHubu.');
-                      },
-                    }, 'Obnovit'),
-                    h('button', { class: 'btn grow', onClick: () => close() }, 'Zpět'),
-                  ),
-                );
-              },
-            }, 'Obnovit z GitHubu'),
-          ),
+                'Ukládá se samo po každém zápisu. Na novém telefonu appka data najde a stáhne sama.'),
           h('button', {
-            class: 'btn ghost',
-            onClick: () => { disableCloud(); Store.onChange?.(); toast('Záloha vypnutá.'); },
-          }, 'Vypnout zálohu'),
+            class: 'btn primary',
+            onClick: async () => {
+              toast('Stahuji zálohu…');
+              const r = await cloudRestore();
+              if (!r.ok) { toast(`Nepovedlo se: ${r.reason}`); return; }
+              const { close } = openModal(
+                h('h3', {}, 'Obnovit ze zálohy?'),
+                h('p', { class: 'small' },
+                  `Záloha obsahuje ${plural(r.state.sessions.length)}. Nahradí data v tomhle telefonu.`),
+                h('div', { class: 'row' },
+                  h('button', {
+                    class: 'btn primary grow',
+                    onClick: () => {
+                      Store.init(r.state);
+                      Store.mutate(() => {}, { publish: true, force: true });
+                      close();
+                      toast('Data obnovena.');
+                    },
+                  }, 'Obnovit'),
+                  h('button', { class: 'btn grow', onClick: () => close() }, 'Zpět'),
+                ),
+              );
+            },
+          }, 'Obnovit data z GitHubu'),
         )
+      // VYPNUTO: jedno pole a jedno tlačítko
       : h('div', { class: 'stack', style: 'gap:8px' },
           h('p', { class: 'muted', style: 'font-size:12.5px' },
-            'Zapni a appka bude po každé změně sama ukládat tvoje tréninky do privátního gistu '
-            + 'na tvém GitHubu. Token si vyrob na github.com/settings/tokens (classic) '
-            + 'a zaškrtni JEN právo „gist". Zůstane uložený v tomhle telefonu — nikam jinam nejde.'),
-          tokenInput = h('input', { type: 'text', placeholder: 'ghp_… (vlož token)', autocapitalize: 'off', autocorrect: 'off', spellcheck: false }),
+            'Zapni a appka po každém zápisu sama uloží tréninky do tvého privátního gistu. '
+            + 'Token si vyrob na github.com/settings/tokens (classic) s právem „gist" — '
+            + 'zůstane jen v tomhle telefonu.'),
+          tokenInput = h('input', {
+            type: 'text', placeholder: 'ghp_… (vlož token)',
+            autocapitalize: 'off', autocorrect: 'off', spellcheck: false,
+          }),
           h('button', {
             class: 'btn primary',
             onClick: async () => {
@@ -5453,22 +5476,23 @@ function cloudCard(state) {
               if (t.length < 20) { toast('Token vypadá krátký.'); return; }
               setCloudToken(t);
               toast('Hledám zálohu na GitHubu…');
-              // Nejdřív zjisti, jestli na účtu už záloha je — jinak by se založila
-              // druhá, prázdná, a ta původní by z appky zůstala nedosažitelná.
               const found = await adoptExistingBackup();
               if (!found.ok) { toast(`Nepovedlo se: ${found.reason}`); disableCloud(); Store.onChange?.(); return; }
               const mine = Store.state.sessions?.length ?? 0;
               if (found.sessions > mine) {
                 const { close } = openModal(
-                  h('h3', {}, 'Na GitHubu je starší záloha'),
+                  h('h3', {}, 'Na GitHubu už záloha je'),
                   h('p', { class: 'small' },
-                    `Našel jsem zálohu s ${plural(found.sessions)}, v tomhle zařízení máš ${plural(mine)}. Co s tím?`),
+                    `Našel jsem ${plural(found.sessions)}, v telefonu máš ${plural(mine)}.`),
                   h('button', {
                     class: 'btn primary big',
                     onClick: async () => {
                       const r = await cloudRestore();
-                      if (r.ok) { Store.init(r.state); Store.mutate(() => {}, { publish: true, force: true }); toast('Data ze zálohy obnovena.'); }
-                      else toast(`Nepovedlo se: ${r.reason}`);
+                      if (r.ok) {
+                        Store.init(r.state);
+                        Store.mutate(() => {}, { publish: true, force: true });
+                        toast('Data ze zálohy stažena.');
+                      } else toast(`Nepovedlo se: ${r.reason}`);
                       close();
                     },
                   }, 'Stáhnout zálohu do telefonu'),
@@ -5477,23 +5501,99 @@ function cloudCard(state) {
                     onClick: async () => {
                       await flushCloudBackup(Store.state);
                       close();
-                      toast('Zálohu jsem přepsal tímhle zařízením.');
+                      toast('Záloha přepsána daty z telefonu.');
                       Store.onChange?.();
                     },
-                  }, 'Přepsat zálohu daty z telefonu'),
+                  }, 'Přepsat ji daty z telefonu'),
                 );
                 Store.onChange?.();
                 return;
               }
-              toast('Zálohuji…');
               const r = await flushCloudBackup(Store.state);
-              if (!r.ok && !String(r.reason).includes('prázdný')) { toast(`Nepovedlo se: ${r.reason}`); disableCloud(); }
-              else toast('Hotovo — od teď se zálohuje samo.');
+              if (!r.ok && !String(r.reason).includes('prázdný')) {
+                toast(`Nepovedlo se: ${r.reason}`);
+                disableCloud();
+              } else toast('Hotovo — od teď se zálohuje samo.');
               Store.onChange?.();
             },
-          }, 'Zapnout zálohu'),
+          }, 'Zapnout automatickou zálohu'),
         ),
+
+    // vše ostatní schované pod jedním odkazem, ať karta nekřičí
+    h('button', {
+      class: 'btn ghost small',
+      style: 'align-self:flex-start',
+      onClick: () => moreDataModal(state),
+    }, 'Další možnosti se zálohou'),
   );
+}
+
+function moreDataModal(state) {
+  const backup = readBackup();
+  openModal(
+    h('h3', {}, 'Další možnosti'),
+    h('p', { class: 'muted small' },
+      'Appka drží tvoje data v telefonu a (když je zapnutá záloha) v tvém privátním gistu. '
+      + 'Tohle jsou ruční pojistky navíc.'),
+    backup ? h('div', { class: 'row between' },
+      h('div', { class: 'grow' },
+        h('div', { class: 'small', style: 'font-weight:600' }, 'Záloha v telefonu'),
+        h('div', { class: 'muted', style: 'font-size:12px' },
+          `${fmtDate(backup.savedAt.slice(0, 10))} · ${plural(backup.state.sessions.length)}`),
+      ),
+      h('button', {
+        class: 'btn small',
+        onClick: () => {
+          Store.init(backup.state);
+          Store.mutate(() => {}, { publish: true, force: true });
+          toast('Obnoveno ze zálohy v telefonu.');
+        },
+      }, 'Obnovit'),
+    ) : null,
+    h('div', { class: 'row' },
+      h('button', {
+        class: 'btn grow',
+        onClick: async () => {
+          const r = await exportJSON(state);
+          if (r.ok && r.via === 'downloads') toast('Soubor se stahuje.');
+          else if (r.ok) toast('Zkopírováno do schránky.');
+          else showExportFallback(r.data);
+        },
+      }, 'Export do souboru'),
+      h('button', { class: 'btn grow', onClick: importModal }, 'Obnovit ze souboru'),
+    ),
+    h('button', { class: 'btn ghost', onClick: recoveryModal }, 'Prohledat úložiště telefonu'),
+    disableBackupButton(),
+    h('button', {
+      class: 'btn danger',
+      onClick: () => {
+        const { close } = openModal(
+          h('h3', {}, 'Smazat úplně všechno?'),
+          h('p', { class: 'muted small' }, 'Historie tréninků, váhy i nastavení. Nejde vzít zpět (leda ze zálohy).'),
+          h('div', { class: 'row' },
+            h('button', {
+              class: 'btn danger grow',
+              onClick: () => {
+                wipeAllData();
+                Store.init(defaultState());
+                Store.mutate(() => {}, { publish: true, force: true });
+                close();
+              },
+            }, 'Smazat vše'),
+            h('button', { class: 'btn grow', onClick: () => close() }, 'Zpět'),
+          ),
+        );
+      },
+    }, 'Smazat všechna data'),
+  );
+}
+
+function disableBackupButton() {
+  if (!cloudEnabled()) return null;
+  return h('button', {
+    class: 'btn ghost',
+    onClick: () => { disableCloud(); Store.onChange?.(); toast('Automatická záloha vypnutá.'); },
+  }, 'Vypnout automatickou zálohu');
 }
 
 // ---------- deload ----------
@@ -5526,106 +5626,8 @@ function deloadCard(state) {
 
 // ---------- data ----------
 
-function dataCard(state) {
-  const last = state.sessions.at(-1);
-  return h('div', { class: 'card stack' },
-    h('div', { class: 'label' }, 'Data'),
-    h('div', { class: 'row between' },
-      h('span', { class: 'small muted' }, 'Odcvičené tréninky'),
-      h('span', { class: 'num small', style: 'font-weight:600' },
-        last ? `${state.sessions.length} · poslední ${fmtDate(last.date)}` : 'zatím žádný'),
-    ),
-    h('div', { class: 'row between' },
-      h('span', { class: 'small muted' }, 'Uloženo v zařízení'),
-      h('span', { class: `badge ${storageInfo.localOk ? 'ok' : 'bad'}` }, storageInfo.localOk ? 'ano' : 'ne'),
-    ),
-    storageInfo.artifactOk
-      ? h('div', { class: 'row between' },
-          h('span', { class: 'small muted' }, 'Uloženo v appce (cloud)'),
-          h('span', { class: 'badge ok' }, 'ano'),
-        )
-      : h('p', { class: 'muted', style: 'font-size:12.5px' },
-          'Data žijí jen v tomhle zařízení — jednou za čas si stáhni zálohu.'),
-    state.pendingPublish && storageInfo.artifactOk
-      ? h('button', { class: 'btn', onClick: () => Store.mutate(() => {}, { publish: true }) }, 'Uložit změny do appky teď')
-      : null,
-    backupRow(),
-    h('button', { class: 'btn', onClick: recoveryModal }, 'Prohledat úložiště (záchrana dat)'),
-    h('div', { class: 'row' },
-      h('button', {
-        class: 'btn grow',
-        onClick: async () => {
-          const r = await exportJSON(state);
-          if (r.ok && r.via === 'downloads') toast('Záloha se stahuje.');
-          else if (r.ok) toast('Záloha zkopírována do schránky.');
-          else showExportFallback(r.data);
-        },
-      }, 'Exportovat zálohu'),
-      h('button', { class: 'btn grow', onClick: importModal }, 'Obnovit ze zálohy'),
-    ),
-    h('button', {
-      class: 'btn danger',
-      onClick: () => {
-        const { close } = openModal(
-          h('h3', {}, 'Smazat úplně všechno?'),
-          h('p', { class: 'muted small' }, 'Historie tréninků, váhy i nastavení. Nejde vzít zpět (leda ze zálohy).'),
-          h('div', { class: 'row' },
-            h('button', {
-              class: 'btn danger grow',
-              onClick: () => {
-                wipeAllData();
-                Store.init(defaultState());
-                Store.mutate(() => {}, { publish: true, force: true });
-                close();
-              },
-            }, 'Smazat vše'),
-            h('button', { class: 'btn grow', onClick: () => close() }, 'Zpět'),
-          ),
-        );
-      },
-    }, 'Smazat všechna data'),
-  );
-}
-
 function plural(n) {
   return `${n} ${n === 1 ? 'trénink' : n < 5 ? 'tréninky' : 'tréninků'}`;
-}
-
-// Automatická záloha z posledního spuštění appky — poslední záchrana pro odcvičené tréninky.
-function backupRow() {
-  const backup = readBackup();
-  if (!backup) return null;
-  const count = backup.state.sessions.length;
-  return h('div', { class: 'row between' },
-    h('div', { class: 'grow' },
-      h('span', { class: 'small muted' }, 'Automatická záloha v zařízení'),
-      h('div', { class: 'muted', style: 'font-size:12px' },
-        `${fmtDate(backup.savedAt.slice(0, 10))} · ${plural(count)}`),
-    ),
-    h('button', {
-      class: 'btn small ghost',
-      onClick: () => {
-        const { close } = openModal(
-          h('h3', {}, 'Obnovit ze zálohy?'),
-          h('p', { class: 'muted small' },
-            `Vrátí stav z ${fmtDate(backup.savedAt.slice(0, 10))} (${plural(count)}). `
-            + 'Co jsi zapsal potom, se ztratí.'),
-          h('div', { class: 'row' },
-            h('button', {
-              class: 'btn primary grow',
-              onClick: () => {
-                Store.init(backup.state);
-                Store.mutate(() => {}, { publish: true, force: true });
-                close();
-                toast('Data obnovena ze zálohy.');
-              },
-            }, 'Obnovit'),
-            h('button', { class: 'btn grow', onClick: () => close() }, 'Zpět'),
-          ),
-        );
-      },
-    }, 'Obnovit'),
-  );
 }
 
 // Záchrana: ukáže všechny nalezené záznamy Fitka v zařízení a nabídne obnovu.
@@ -5659,12 +5661,10 @@ function recoveryModal() {
               : null,
           )),
           usable.length ? null : h('p', { class: 'muted small' },
-            'Žádný záznam s odcvičenými tréninky. Zkus otevřít appku tam, kde jsi ji používal '
+            'Žádný záznam s odcvičenými tréninky. Zkus appku otevřít tam, kde jsi ji používal '
             + '(ikona na ploše vs. Safari) — každé prostředí má vlastní paměť.'),
         )
-      : h('p', { class: 'muted small' },
-          'V tomhle prostředí není uloženo nic. Data jsou nejspíš v druhém prostředí — '
-          + 'zkus ikonu na ploše, případně Safari, podle toho, kde jsi trénink zapisoval.'),
+      : h('p', { class: 'muted small' }, 'V tomhle prostředí není uloženo nic.'),
     h('div', { class: 'row between' },
       h('span', { class: 'small muted' }, 'Trvalé úložiště povoleno'),
       h('span', { class: `badge ${storageInfo.persisted ? 'ok' : 'warn'}` },
