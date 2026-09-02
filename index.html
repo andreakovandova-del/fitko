@@ -398,6 +398,8 @@ hr.rule { border: none; border-top: 1px solid var(--line); margin: 4px 0; }
 .badge {
   display: inline-flex;
   align-items: center;
+  flex: none;
+  white-space: nowrap;
   border-radius: 999px;
   padding: 3px 10px;
   font-size: 11px;
@@ -521,9 +523,10 @@ hr.rule { border: none; border-top: 1px solid var(--line); margin: 4px 0; }
   color: var(--faint);
   font-family: var(--font-num);
   font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 1.25;
+  /* raději zalomit na dva řádky než useknout — v posilovně musí být pokyn celý */
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 /* pole série: cíl je jen placeholder, hodnotu píšeš přímo — bez stepperů */
@@ -673,9 +676,12 @@ input.set-input {
 .timer-next {
   font-size: 12px;
   color: var(--muted);
-  white-space: nowrap;
+  line-height: 1.25;
+  /* dvouřádkový, ať je vidět i cíl série (kg × opakování) */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .timerbar .btn.small { padding: 7px 9px; font-size: 12.5px; white-space: nowrap; flex: none; }
@@ -879,7 +885,7 @@ input.set-input {
 <script>
 (() => {
 'use strict';
-const BUILD_ID = "2026-09-01 21:42";
+const BUILD_ID = "2026-09-02 07:26";
 // ===== src/engine/util.js =====
 // Sdílené utility enginu — čisté funkce, žádné závislosti.
 
@@ -1483,9 +1489,14 @@ function computeNextPrescription(exDef, state, recent = []) {
         targetReps: Array(sets).fill(hi + 2), note: 'small_increment_extend',
       };
     }
+    // Rozsah je na stropu a menší kotouč než nejmenší krok neexistuje — pak se
+    // zátěž zvedne i přes 10% pravidlo, jinak by cvik uvízl navždy.
     return {
-      action: 'suggest_slot', loadKg: state.loadKg, rangeHi: hi,
-      targetReps: Array(sets).fill(hi), note: 'range_maxed_add_set',
+      action: 'increase_load',
+      loadKg: roundToStep(state.loadKg + exDef.increment, loadStep(exDef)),
+      rangeHi: baseHi,
+      targetReps: Array(sets).fill(lo),
+      note: 'range_maxed_step_up',
     };
   }
 
@@ -1606,6 +1617,13 @@ function dropsetPrescription(exDef, loadKg) {
 // Reaktivní deload + pojistka — docs/PROGRAM.md §Deload (žádný fixní kalendářní deload).
 
 
+// Průměr jen ze skutečně vyplněných políček check-inu (nedokončený den → null,
+// jinak by NaN tiše vypnul deload a naopak pustil přidávání objemu).
+function dayScore(day) {
+  const vals = [day?.sleep, day?.soreness, day?.motivation].filter((v) => typeof v === 'number');
+  return vals.length ? avg(vals) : null;
+}
+
 const READINESS_THRESHOLD = 2.5; // průměr check-inu (1–5, 5 = nejlepší)
 const READINESS_DAYS = 3;
 const FAILSAFE_WEEKS = 10; // pásmo 8–12 týdnů tvrdého tréninku
@@ -1628,9 +1646,8 @@ function detectDeloadTriggers({ keyRegressions = [], readinessLog = [], weeksSin
 
   const lastDays = readinessLog.slice(-READINESS_DAYS);
   if (lastDays.length === READINESS_DAYS) {
-    const allBad = lastDays.every(
-      (d) => avg([d.sleep, d.soreness, d.motivation]) < READINESS_THRESHOLD,
-    );
+    const scores = lastDays.map(dayScore);
+    const allBad = scores.every((s) => s != null && s < READINESS_THRESHOLD);
     if (allBad) reasons.push({ type: 'readiness', detail: lastDays.map((d) => d.date) });
   }
 
@@ -1658,9 +1675,8 @@ function deloadPrescription(exDef, state, loadStepFn) {
 
 // Průměrná připravenost za posledních N dní (pro podmínku progrese objemu).
 function readinessAvg(readinessLog, days = 7) {
-  const window = readinessLog.slice(-days);
-  if (!window.length) return null;
-  return avg(window.map((d) => avg([d.sleep, d.soreness, d.motivation])));
+  const scores = readinessLog.slice(-days).map(dayScore).filter((s) => s != null);
+  return scores.length ? avg(scores) : null;
 }
 
 
@@ -1780,11 +1796,20 @@ function initialTargets(profile, weightKg) {
  * @param input { targets, weighIns: [{date, kg}], weeksOnPlan }
  * @returns { newKcal, deltaKcal, ratePctWk, reason }
  */
-function weeklyAdjustment({ targets, weighIns = [], weeksOnPlan = 0 }) {
+const STALE_WEIGHIN_DAYS = 5;
+
+function weeklyAdjustment({ targets, weighIns = [], weeksOnPlan = 0, today = null }) {
   const noChange = (reason) => ({ newKcal: targets.kcal, deltaKcal: 0, ratePctWk: null, reason });
 
   if (weeksOnPlan < 3) return noChange('too_early'); // glykogen/voda prvních 2 týdnů
   const series = weighIns.map((w) => ({ date: w.date, value: w.kg }));
+
+  // Zastaralá data nesmí řídit kalorie: bez čerstvého vážení by se stejný starý
+  // trend aplikoval znovu a znovu a cíl by ujel o stovky kcal.
+  if (today && series.length) {
+    const latest = [...series].sort((a, b) => a.date.localeCompare(b.date)).at(-1).date;
+    if (daysBetween(latest, today) > STALE_WEIGHIN_DAYS) return noChange('stale_data');
+  }
   const avgNow = windowAvg(series, 0, 7);
   const avgPrev = windowAvg(series, 7, 14);
   const count14 = countRecent(series, 14);
@@ -1885,10 +1910,20 @@ function currentAvgWeight(weighIns) {
  * Projekce data dosažení cílové váhy z 28denního trendu.
  * @returns { etaDate, rateKgWk, status: 'ok'|'stalled'|'losing'|'need_more_data'|'reached' }
  */
-function projectGoalDate({ weighIns = [], goalKg }) {
+const STALE_DAYS = 10;
+
+function projectGoalDate({ weighIns = [], goalKg, today = null }) {
   const series = weighIns.map((w) => ({ date: w.date, value: w.kg }));
   const avgNow = currentAvgWeight(weighIns);
   if (avgNow == null) return { etaDate: null, rateKgWk: null, status: 'need_more_data' };
+
+  // Ze starých vážení nesmí vzniknout „projekce" s datem v minulosti.
+  if (today && series.length) {
+    const latest = [...series].sort((a, b) => a.date.localeCompare(b.date)).at(-1).date;
+    if (daysBetween(latest, today) > STALE_DAYS) {
+      return { etaDate: null, rateKgWk: null, status: 'stale', lastWeighIn: latest };
+    }
+  }
   if (avgNow >= goalKg) return { etaDate: null, rateKgWk: null, status: 'reached' };
 
   const perDay = seriesTrendPerDay(series, 28, 8);
@@ -2530,6 +2565,12 @@ async function api(path, options = {}) {
 /** Nahraje aktuální stav do privátního gistu (poprvé ho založí). */
 async function cloudBackup(state) {
   if (!cloudEnabled() || cloudInfo.syncing) return { ok: false, reason: 'off' };
+  // POJISTKA: stav bez tréninků nikdy nepřepíše existující zálohu na GitHubu.
+  // (Nenačtená data, rozdělaný onboarding v druhém okně, chyba při startu…)
+  if (!state?.sessions?.length && ls(GIST_KEY)) {
+    cloudInfo.lastError = null;
+    return { ok: false, reason: 'prázdný stav — záloha ponechána' };
+  }
   cloudInfo.syncing = true;
   try {
     const files = { [FILENAME]: { content: JSON.stringify(state, null, 1) } };
@@ -2553,6 +2594,33 @@ async function cloudBackup(state) {
     return { ok: false, reason: cloudInfo.lastError };
   } finally {
     cloudInfo.syncing = false;
+  }
+}
+
+/**
+ * Najde už existující zálohu na účtu (po přeinstalaci telefonu / novém zařízení),
+ * aby se nezaložil druhý prázdný gist a ten původní nezůstal nedosažitelný.
+ * @returns { ok, gistId, sessions } — sessions = kolik tréninků záloha obsahuje
+ */
+async function adoptExistingBackup() {
+  if (!cloudEnabled()) return { ok: false, reason: 'Nejdřív vlož token' };
+  try {
+    if (ls(GIST_KEY)) {
+      const known = await api(`/gists/${ls(GIST_KEY)}`);
+      const c = known.files?.[FILENAME]?.content;
+      const st = c ? JSON.parse(c) : null;
+      return { ok: true, gistId: known.id, sessions: st?.sessions?.length ?? 0 };
+    }
+    const list = await api('/gists?per_page=100');
+    const found = list.find((g) => g.files && g.files[FILENAME]);
+    if (!found) return { ok: true, gistId: null, sessions: 0 };
+    lsSet(GIST_KEY, found.id);
+    const gist = await api(`/gists/${found.id}`);
+    const content = gist.files?.[FILENAME]?.content;
+    const state = content ? JSON.parse(content) : null;
+    return { ok: true, gistId: found.id, sessions: state?.sessions?.length ?? 0 };
+  } catch (err) {
+    return { ok: false, reason: err?.message ?? String(err) };
   }
 }
 
@@ -2846,6 +2914,11 @@ function completeWorkout(state) {
     durationMin: Math.max(1, Math.round((Date.now() - workout.startedAt) / 60000)),
     entries,
   };
+  // Je tenhle trénink nejnovější? Zpětně dopsaný starý trénink NESMÍ přepsat
+  // aktuální zátěže, PR ani stav cviků — jinak by progrese spadla o týdny zpět.
+  const newest = state.sessions.length ? state.sessions[state.sessions.length - 1].date : null;
+  const isNewest = !newest || session.date >= newest;
+
   state.sessions.push(session);
   // chronologicky — zpětně dopsaný trénink se musí zařadit podle data,
   // jinak by ho engine bral jako nejnovější výkon
@@ -2856,7 +2929,7 @@ function completeWorkout(state) {
     const def = EXERCISES[entry.exerciseId];
     const perf = { date: session.date, sets: entry.sets };
 
-    if (!session.deload) {
+    if (!session.deload && isNewest) {
       const exState = ensureExerciseState(state, entry.exerciseId);
       const workoutEntry = workout.entries.find((e) => e.exerciseId === entry.exerciseId);
       state.exercises[entry.exerciseId] = nextStateAfterSession(def, exState, perf, workoutEntry?.prescription);
@@ -3018,7 +3091,7 @@ function dailyMaintenance(state) {
   const lastAdjust = state.nutritionLog.at(-1)?.date ?? null;
   if (!lastAdjust || daysBetween(lastAdjust, today) >= 6) {
     const weeksOnPlan = Math.floor(daysBetween(state.profile.startDate, today) / 7) + 1;
-    const result = weeklyAdjustment({ targets: state.targets, weighIns: state.weighIns, weeksOnPlan });
+    const result = weeklyAdjustment({ targets: state.targets, weighIns: state.weighIns, weeksOnPlan, today });
     if (result.deltaKcal !== 0) {
       state.targets.kcal = result.newKcal;
       state.nutritionLog.push({ date: today, kcal: result.newKcal, deltaKcal: result.deltaKcal, reason: result.reason });
@@ -3118,7 +3191,7 @@ function progressSummary(state) {
   const avg7 = currentAvgWeight(state.weighIns);
   return {
     avg7,
-    projection: projectGoalDate({ weighIns: state.weighIns, goalKg: state.profile.goalWeightKg }),
+    projection: projectGoalDate({ weighIns: state.weighIns, goalKg: state.profile.goalWeightKg, today: todayISO() }),
     quality: gainQuality({ weighIns: state.weighIns, waistSeries: state.waist }),
     composition: gainComposition({ weighIns: state.weighIns, trainingAgeMonths: trainingAgeMonthsNow(state) }),
     weightMilestone: nextWeightMilestone(avg7, state.profile.weightKg, state.profile.goalWeightKg),
@@ -3920,7 +3993,8 @@ function renderToday(root) {
 function heroCard(state) {
   const day = nextUnitDay(state);
   const list = unitExerciseList(state, day);
-  const totalSets = list.reduce((a, e) => a + e.sets, 0);
+  // v deload týdnu jede engine na polovině sérií — karta to musí říkat pravdivě
+  const totalSets = list.reduce((a, e) => a + (state.deload.active ? Math.ceil(e.sets / 2) : e.sets), 0);
   const estMin = Math.round((totalSets * 2.4 + 8) / 5) * 5;
 
   const cyclePos = cyclePosition(state);
@@ -4074,7 +4148,10 @@ function offerCard(title, tone, text, buttons) {
 function nutritionNotice(state) {
   const last = state.nutritionLog.at(-1);
   if (!last || last.deltaKcal === 0 || daysBetween(last.date, todayISO()) > 2) return null;
-  const why = last.reason === 'too_slow' ? 'váha roste pomaleji, než má' : 'váha roste rychleji, než má';
+  const cutting = state.targets?.phase === 'minicut';
+  const why = last.reason === 'too_slow'
+    ? (cutting ? 'hubneš rychleji, než je zdrávo' : 'váha roste pomaleji, než má')
+    : (cutting ? 'hubneš pomaleji, než má' : 'váha roste rychleji, než má');
   return h('div', { class: 'card row between' },
     h('div', {},
       h('div', { class: 'label' }, 'Výživa upravena'),
@@ -4367,11 +4444,14 @@ function whyModal(def) {
 
 function swapModal(state, entryIndex, def) {
   const subs = availableSubstitutes(state, def.id);
+  const logged = (state.activeWorkout?.entries[entryIndex]?.rows ?? []).filter((r) => r.logged).length;
   const { close } = openModal(
     h('h3', {}, 'Vyměnit cvik'),
     h('p', { class: 'muted small' }, subs.length
       ? 'Obsazené nářadí? Náhrada dědí rozsah; váha se kalibruje znovu.'
       : 'Pro tenhle cvik teď není volná náhrada — ostatní varianty už v tréninku máš.'),
+    logged ? h('p', { class: 'warn-text small' },
+      `Pozor: u tohohle cviku máš zapsané ${logged === 1 ? '1 sérii' : `${logged} série`} — výměnou o ně přijdeš.`) : null,
     ...subs.map((id) => h('button', {
       class: 'btn', style: 'justify-content:flex-start',
       onClick: () => {
@@ -4503,9 +4583,9 @@ function setRow(workout, entry, entryIndex, row, rowIndex, ghostSets, nextKey) {
     }
   };
 
-  const adjNote = row.adjusted === 'up' ? '↑ přidáno — měl jsi rezervu'
-    : row.adjusted === 'down' ? '↓ ubráno — bylo to na hraně' : null;
-  const ghostText = adjNote ?? (row.kind === 'drop' ? 'hned, bez pauzy, do selhání' : ghost ?? (row.kind === 'warmup' ? 'lehce, bez RIR' : 'první záznam'));
+  const adjNote = row.adjusted === 'up' ? '↑ přidáno (měl jsi rezervu)'
+    : row.adjusted === 'down' ? '↓ ubráno (bylo to na hraně)' : null;
+  const ghostText = adjNote ?? (row.kind === 'drop' ? 'bez pauzy do selhání' : ghost ?? (row.kind === 'warmup' ? 'lehce, bez RIR' : 'první záznam'));
 
   const isNext = !done && nextKey === `${entryIndex}:${rowIndex}`;
   return h('div', { class: `set-block${done ? ' done' : ''}${row.kind === 'warmup' ? ' warmup' : ''}${isNext ? ' next' : ''}` },
@@ -4536,8 +4616,8 @@ function nextUpLabel(workout) {
         const t = row.target;
         const what = t.weightKg != null && t.reps != null
           ? `${fmtKg(t.weightKg, true)} kg × ${t.reps}`
-          : t.reps != null ? `× ${t.reps}` : 'dropset';
-        return `Další: ${def.name} ${what}`;
+          : t.reps != null ? `× ${t.reps}` : 'dropset do selhání';
+        return `${def.name} · ${what}`;
       }
     }
   }
@@ -4713,6 +4793,9 @@ function honestyCard(state, summary) {
     lines.push('Váha stagnuje — projekce k cíli teď neexistuje. Engine přidá kalorie, drž příjem.');
   } else if (p.status === 'losing') {
     lines.push('Váha klesá — od cíle se vzdaluješ (pokud neběží mini-cut, je to problém příjmu).');
+  } else if (p.status === 'stale') {
+    lines.push(`Poslední vážení je z ${fmtDate(p.lastWeighIn)} — projekci nemůžu spočítat z ležatých dat. `
+      + 'Zvaž se ráno a čísla se rozjedou.');
   } else if (p.status === 'reached') {
     lines.push('Cílová váha dosažena. Teď rozhoduje pas a zrcadlo.');
   } else {
@@ -4932,7 +5015,10 @@ function milestonesCard(state, summary) {
 
   return h('div', { class: 'card stack' },
     h('div', { class: 'label' }, 'Milníky'),
-    wm && avg7 != null ? h('div', { class: 'stack', style: 'gap:5px' },
+    wm && avg7 != null && honestPlan({
+      startWeightKg: avg7, goalWeightKg: state.profile.goalWeightKg,
+      priority: state.profile.priority, trainingAgeMonths: 0, fromIso: todayISO(),
+    }).mode !== 'there' ? h('div', { class: 'stack', style: 'gap:5px' },
       h('div', { class: 'row between' },
         h('span', { class: 'small' }, `Váha → ${wm.targetKg} kg`),
         h('span', { class: 'num small muted' }, `${fmtKg(avg7, true)} / ${wm.targetKg}`),
@@ -5161,9 +5247,42 @@ function cloudCard(state) {
               const t = tokenInput.value.trim();
               if (t.length < 20) { toast('Token vypadá krátký.'); return; }
               setCloudToken(t);
+              toast('Hledám zálohu na GitHubu…');
+              // Nejdřív zjisti, jestli na účtu už záloha je — jinak by se založila
+              // druhá, prázdná, a ta původní by z appky zůstala nedosažitelná.
+              const found = await adoptExistingBackup();
+              if (!found.ok) { toast(`Nepovedlo se: ${found.reason}`); disableCloud(); Store.onChange?.(); return; }
+              const mine = Store.state.sessions?.length ?? 0;
+              if (found.sessions > mine) {
+                const { close } = openModal(
+                  h('h3', {}, 'Na GitHubu je starší záloha'),
+                  h('p', { class: 'small' },
+                    `Našel jsem zálohu s ${plural(found.sessions)}, v tomhle zařízení máš ${plural(mine)}. Co s tím?`),
+                  h('button', {
+                    class: 'btn primary big',
+                    onClick: async () => {
+                      const r = await cloudRestore();
+                      if (r.ok) { Store.init(r.state); Store.mutate(() => {}, { publish: true, force: true }); toast('Data ze zálohy obnovena.'); }
+                      else toast(`Nepovedlo se: ${r.reason}`);
+                      close();
+                    },
+                  }, 'Stáhnout zálohu do telefonu'),
+                  h('button', {
+                    class: 'btn danger',
+                    onClick: async () => {
+                      await flushCloudBackup(Store.state);
+                      close();
+                      toast('Zálohu jsem přepsal tímhle zařízením.');
+                      Store.onChange?.();
+                    },
+                  }, 'Přepsat zálohu daty z telefonu'),
+                );
+                Store.onChange?.();
+                return;
+              }
               toast('Zálohuji…');
               const r = await flushCloudBackup(Store.state);
-              if (!r.ok) { toast(`Nepovedlo se: ${r.reason}`); disableCloud(); }
+              if (!r.ok && !String(r.reason).includes('prázdný')) { toast(`Nepovedlo se: ${r.reason}`); disableCloud(); }
               else toast('Hotovo — od teď se zálohuje samo.');
               Store.onChange?.();
             },
