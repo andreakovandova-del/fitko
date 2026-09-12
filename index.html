@@ -1023,7 +1023,7 @@ input.set-input {
 <script>
 (() => {
 'use strict';
-const BUILD_ID = "2026-09-12 18:01";
+const BUILD_ID = "2026-09-12 18:04";
 const VAPID_PUBLIC_KEY = "BD_ok8gw7j2oTGo4onj5L0RKeoBb8CwcRXI6kBmWMQGHidqYlHqA-Mcl8tffN3j8ZxnzX7Fzq_RmG80iWyI6X0M";
 // ===== src/engine/util.js =====
 // Sdílené utility enginu — čisté funkce, žádné závislosti.
@@ -2339,6 +2339,7 @@ function buildInitialExerciseStates(reportedLifts = {}) {
 //   pieceG    hmotnost 1 kusu, pokud se jídlo přirozeně počítá na kusy (vejce, banán, rohlík)
 //   packG     typické balení v Lidlu — nákupní seznam zaokrouhluje na celá balení
 //   packLabel volitelný popisek balení („10 ks“, „1 l“)
+//   loose     kupuje se na kusy (ovoce, zelenina) — nákupní seznam ukáže počet kusů
 //   match     vzory (bez diakritiky, malá písmena) pro párování s názvy zboží v akci:
 //             každé slovo vzoru je předponou některého slova názvu; „slovo$“ = přesné slovo
 //   exclude   vzory, které párování zakážou („cherry“ u obyčejných rajčat)
@@ -2375,7 +2376,7 @@ const FOODS = {
   veprova_krkovice: { name: 'Vepřová krkovice', cat: 'maso', kcal: 250, p: 17, c: 0, f: 20, packG: 500, match: ['veprova krkov', 'krkovice'] },
   losos: { name: 'Losos (filet)', cat: 'maso', kcal: 200, p: 20, c: 0, f: 13, packG: 250, match: ['losos'] },
   treska: { name: 'Treska (filet)', cat: 'maso', kcal: 80, p: 18, c: 0, f: 0.7, packG: 400, match: ['treska', 'tresci'] },
-  tunak_konzerva: { name: 'Tuňák ve vlastní šťávě (okapaný)', cat: 'maso', kcal: 110, p: 25, c: 0, f: 1, packG: 110, packLabel: '1 konzerva', match: ['tunak'] },
+  tunak_konzerva: { name: 'Tuňák ve vlastní šťávě (okapaný)', cat: 'maso', kcal: 110, p: 25, c: 0, f: 1, packG: 110, packLabel: '1 konzerva', match: ['tunak'], exclude: ['steak', 'filet', 'cerstv'] },
   sardinky: { name: 'Sardinky v oleji (okapané)', cat: 'maso', kcal: 210, p: 24, c: 0, f: 12, packG: 90, packLabel: '1 konzerva', match: ['sardink'] },
   sunka: { name: 'Šunka nejvyšší jakosti', cat: 'maso', kcal: 110, p: 20, c: 1, f: 3, packG: 100, match: ['sunka', 'sunky'], exclude: ['salam'] },
   kureci_sunka: { name: 'Kuřecí šunka', cat: 'maso', kcal: 100, p: 18, c: 1, f: 2, packG: 100, match: ['kureci sunk'] },
@@ -2389,7 +2390,7 @@ const FOODS = {
   tvaroh_odtucneny: { name: 'Tvaroh odtučněný', cat: 'mlecne', kcal: 70, p: 12, c: 4, f: 0.5, packG: 250, match: ['tvaroh odtuc', 'tvaroh nizkotuc'] },
   tvaroh_tucny: { name: 'Tvaroh tučný', cat: 'mlecne', kcal: 155, p: 11, c: 3.5, f: 11, packG: 250, match: ['tvaroh tucn'] },
   recky_jogurt: { name: 'Řecký jogurt 0 %', cat: 'mlecne', kcal: 57, p: 10, c: 4, f: 0.2, packG: 400, match: ['recky jogurt', 'jogurt reck'] },
-  bily_jogurt: { name: 'Bílý jogurt 3 %', cat: 'mlecne', kcal: 65, p: 4, c: 5, f: 3, packG: 150, match: ['bily jogurt', 'jogurt bily'] },
+  bily_jogurt: { name: 'Bílý jogurt 3 %', cat: 'mlecne', kcal: 65, p: 4, c: 5, f: 3, packG: 150, match: ['bily jogurt', 'jogurt bily'], exclude: ['reck'] },
   cottage: { name: 'Cottage sýr', cat: 'mlecne', kcal: 100, p: 12, c: 3, f: 4, packG: 200, match: ['cottage'] },
   mleko_polotucne: { name: 'Mléko polotučné 1,5 %', cat: 'mlecne', kcal: 46, p: 3.3, c: 4.8, f: 1.5, packG: 1000, packLabel: '1 l', match: ['mleko polotuc', 'mleko 1,5'] },
   mleko_plnotucne: { name: 'Mléko plnotučné 3,5 %', cat: 'mlecne', kcal: 62, p: 3.3, c: 4.7, f: 3.5, packG: 1000, packLabel: '1 l', match: ['mleko plnotuc', 'mleko 3,5'] },
@@ -2398,7 +2399,7 @@ const FOODS = {
   mozzarella: { name: 'Mozzarella', cat: 'mlecne', kcal: 250, p: 18, c: 1, f: 19, packG: 125, match: ['mozzarella'] },
   balkansky_syr: { name: 'Balkánský sýr / feta', cat: 'mlecne', kcal: 250, p: 16, c: 1, f: 20, packG: 200, match: ['balkansky', 'feta'] },
   parmezan: { name: 'Parmezán', cat: 'mlecne', kcal: 400, p: 33, c: 0, f: 28, packG: 100, match: ['parmez', 'grana padano', 'parmigiano'] },
-  smetanovy_syr: { name: 'Smetanový sýr (Lučina typ)', cat: 'mlecne', kcal: 250, p: 6, c: 3, f: 24, packG: 200, match: ['lucina', 'smetanovy syr', 'zervais'] },
+  smetanovy_syr: { name: 'Smetanový sýr (Lučina typ)', cat: 'mlecne', kcal: 250, p: 6, c: 3, f: 24, packG: 200, match: ['lucina', 'smetanovy syr', 'zervais'], exclude: ['cheesecake', 'dort', 'mrazen'] },
   maslo: { name: 'Máslo', cat: 'mlecne', kcal: 740, p: 0.7, c: 0.6, f: 82, packG: 250, match: ['maslo$'] },
 
   // ---------- přílohy a obiloviny (syrové) ----------
@@ -2421,28 +2422,28 @@ const FOODS = {
   tortilla: { name: 'Tortilla (pšeničná)', cat: 'pecivo', kcal: 300, p: 8, c: 50, f: 8, pieceG: 40, packG: 240, packLabel: '6 ks', match: ['tortill', 'wrap'] },
 
   // ---------- ovoce ----------
-  banan: { name: 'Banán', cat: 'ovoce', kcal: 89, p: 1.1, c: 23, f: 0.3, pieceG: 120, packG: 1000, match: ['banan'], exclude: ['chips', 'susen'] },
-  jablko: { name: 'Jablko', cat: 'ovoce', kcal: 52, p: 0.3, c: 14, f: 0.2, pieceG: 180, packG: 1000, match: ['jablk'], exclude: ['dzus', 'stava', 'mostu'] },
-  pomeranc: { name: 'Pomeranč', cat: 'ovoce', kcal: 47, p: 0.9, c: 12, f: 0.1, pieceG: 200, packG: 1000, match: ['pomeranc'], exclude: ['dzus', 'stava'] },
-  mandarinka: { name: 'Mandarinka', cat: 'ovoce', kcal: 53, p: 0.8, c: 13, f: 0.3, pieceG: 70, packG: 1000, match: ['mandarink', 'klementin'] },
+  banan: { name: 'Banán', cat: 'ovoce', kcal: 89, p: 1.1, c: 23, f: 0.3, pieceG: 120, packG: 1000, match: ['banan'], exclude: ['chips', 'susen'], loose: true },
+  jablko: { name: 'Jablko', cat: 'ovoce', kcal: 52, p: 0.3, c: 14, f: 0.2, pieceG: 180, packG: 1000, match: ['jablk'], exclude: ['dzus', 'stava', 'mostu', 'susen'], loose: true },
+  pomeranc: { name: 'Pomeranč', cat: 'ovoce', kcal: 47, p: 0.9, c: 12, f: 0.1, pieceG: 200, packG: 1000, match: ['pomeranc'], exclude: ['dzus', 'stava'], loose: true },
+  mandarinka: { name: 'Mandarinka', cat: 'ovoce', kcal: 53, p: 0.8, c: 13, f: 0.3, pieceG: 70, packG: 1000, match: ['mandarink', 'klementin'], loose: true },
   boruvky: { name: 'Borůvky', cat: 'ovoce', kcal: 57, p: 0.7, c: 14, f: 0.3, packG: 125, match: ['boruvk'] },
-  jahody: { name: 'Jahody', cat: 'ovoce', kcal: 32, p: 0.7, c: 8, f: 0.3, packG: 250, match: ['jahod'] },
+  jahody: { name: 'Jahody', cat: 'ovoce', kcal: 32, p: 0.7, c: 8, f: 0.3, packG: 250, match: ['jahod'], exclude: ['susen', 'mrazem', 'dzem', 'sirup'] },
   hrozny: { name: 'Hrozny', cat: 'ovoce', kcal: 69, p: 0.7, c: 18, f: 0.2, packG: 500, match: ['hrozn', 'hrozen'] },
   kiwi: { name: 'Kiwi', cat: 'ovoce', kcal: 61, p: 1.1, c: 15, f: 0.5, pieceG: 75, packG: 450, packLabel: '6 ks', match: ['kiwi'] },
-  hruska: { name: 'Hruška', cat: 'ovoce', kcal: 57, p: 0.4, c: 15, f: 0.1, pieceG: 170, packG: 1000, match: ['hrusk'] },
+  hruska: { name: 'Hruška', cat: 'ovoce', kcal: 57, p: 0.4, c: 15, f: 0.1, pieceG: 170, packG: 1000, match: ['hrusk'], exclude: ['dzus', 'stava'], loose: true },
 
   // ---------- zelenina ----------
   brokolice: { name: 'Brokolice', cat: 'zelenina', kcal: 34, p: 2.8, c: 7, f: 0.4, pieceG: 400, packG: 400, packLabel: '1 ks', match: ['brokolic'] },
   spenat_mrazeny: { name: 'Špenát (mražený)', cat: 'zelenina', kcal: 23, p: 2.9, c: 3.6, f: 0.4, packG: 400, match: ['spenat'] },
-  rajcata: { name: 'Rajčata', cat: 'zelenina', kcal: 18, p: 0.9, c: 3.9, f: 0.2, pieceG: 120, packG: 500, match: ['rajcat', 'rajce'], exclude: ['cherry', 'loupan', 'protlak', 'konzerv', 'pasta'] },
+  rajcata: { name: 'Rajčata', cat: 'zelenina', kcal: 18, p: 0.9, c: 3.9, f: 0.2, pieceG: 120, packG: 500, match: ['rajcat', 'rajce'], exclude: ['cherry', 'loupan', 'protlak', 'konzerv', 'pasta', 'susen'], loose: true },
   cherry_rajcata: { name: 'Cherry rajčata', cat: 'zelenina', kcal: 18, p: 0.9, c: 3.9, f: 0.2, packG: 250, match: ['rajcata cherry', 'cherry rajc'] },
   okurka: { name: 'Okurka salátová', cat: 'zelenina', kcal: 15, p: 0.7, c: 3, f: 0.1, pieceG: 300, packG: 300, packLabel: '1 ks', match: ['okurka', 'okurky salat'], exclude: ['nakladan', 'sterilov'] },
-  paprika: { name: 'Paprika', cat: 'zelenina', kcal: 31, p: 1, c: 6, f: 0.3, pieceG: 150, packG: 450, packLabel: '3 ks', match: ['paprika', 'papriky'], exclude: ['mleta', 'korenici'] },
-  mrkev: { name: 'Mrkev', cat: 'zelenina', kcal: 41, p: 0.9, c: 10, f: 0.2, pieceG: 80, packG: 1000, match: ['mrkev'] },
+  paprika: { name: 'Paprika', cat: 'zelenina', kcal: 31, p: 1, c: 6, f: 0.3, pieceG: 150, packG: 450, packLabel: '3 ks', match: ['paprika', 'papriky'], exclude: ['mleta', 'korenici', 'sterilov'], loose: true },
+  mrkev: { name: 'Mrkev', cat: 'zelenina', kcal: 41, p: 0.9, c: 10, f: 0.2, pieceG: 80, packG: 1000, match: ['mrkev'], loose: true },
   cuketa: { name: 'Cuketa', cat: 'zelenina', kcal: 17, p: 1.2, c: 3, f: 0.3, pieceG: 300, packG: 300, packLabel: '1 ks', match: ['cuket'] },
   ledovy_salat: { name: 'Ledový salát', cat: 'zelenina', kcal: 14, p: 0.9, c: 3, f: 0.1, pieceG: 400, packG: 400, packLabel: '1 ks', match: ['ledovy salat', 'salat ledov'] },
-  cibule: { name: 'Cibule', cat: 'zelenina', kcal: 40, p: 1.1, c: 9, f: 0.1, pieceG: 100, packG: 1000, match: ['cibule'] },
-  cesnek: { name: 'Česnek', cat: 'zelenina', kcal: 149, p: 6.4, c: 33, f: 0.5, pieceG: 5, packG: 100, match: ['cesnek'] },
+  cibule: { name: 'Cibule', cat: 'zelenina', kcal: 40, p: 1.1, c: 9, f: 0.1, pieceG: 100, packG: 1000, match: ['cibule'], exclude: ['smazen', 'susen'], loose: true },
+  cesnek: { name: 'Česnek', cat: 'zelenina', kcal: 149, p: 6.4, c: 33, f: 0.5, pieceG: 5, packG: 100, match: ['cesnek$'], loose: true },
   avokado: { name: 'Avokádo', cat: 'zelenina', kcal: 160, p: 2, c: 9, f: 15, pieceG: 130, packG: 130, packLabel: '1 ks', match: ['avokad'] },
   kukurice_konzerva: { name: 'Kukuřice (konzerva, okapaná)', cat: 'zelenina', kcal: 80, p: 2.5, c: 15, f: 1, packG: 165, packLabel: '1 konzerva', match: ['kukurice'] },
   hrasek_mrazeny: { name: 'Hrášek (mražený)', cat: 'zelenina', kcal: 80, p: 5, c: 14, f: 0.4, packG: 450, match: ['hrasek'] },
@@ -2451,20 +2452,20 @@ const FOODS = {
   // ---------- luštěniny a rostlinné ----------
   cocka: { name: 'Čočka (syrová)', cat: 'lusteniny', kcal: 350, p: 25, c: 60, f: 1, packG: 500, match: ['cocka'] },
   cizrna_konzerva: { name: 'Cizrna (konzerva, okapaná)', cat: 'lusteniny', kcal: 140, p: 8, c: 22, f: 3, packG: 240, packLabel: '1 konzerva', match: ['cizrna'] },
-  fazole_konzerva: { name: 'Fazole (konzerva, okapané)', cat: 'lusteniny', kcal: 100, p: 7, c: 17, f: 0.5, packG: 240, packLabel: '1 konzerva', match: ['fazole'] },
+  fazole_konzerva: { name: 'Fazole (konzerva, okapané)', cat: 'lusteniny', kcal: 100, p: 7, c: 17, f: 0.5, packG: 240, packLabel: '1 konzerva', match: ['fazole$', 'fazole cerven', 'fazole bil'] },
   tofu: { name: 'Tofu', cat: 'lusteniny', kcal: 120, p: 12, c: 2, f: 7, packG: 200, match: ['tofu'] },
 
   // ---------- tuky, ořechy a semínka ----------
   olivovy_olej: { name: 'Olivový olej', cat: 'tuky', kcal: 884, p: 0, c: 0, f: 100, packG: 750, packLabel: '750 ml', match: ['olivovy olej', 'olej olivov'] },
   repkovy_olej: { name: 'Řepkový olej', cat: 'tuky', kcal: 884, p: 0, c: 0, f: 100, packG: 1000, packLabel: '1 l', match: ['repkovy olej', 'olej repkov', 'slunecnicovy olej'] },
   arasidove_maslo: { name: 'Arašídové máslo', cat: 'tuky', kcal: 600, p: 25, c: 20, f: 50, packG: 350, match: ['arasidove maslo', 'arasidovy krem', 'burakove maslo'] },
-  mandle: { name: 'Mandle', cat: 'tuky', kcal: 580, p: 21, c: 22, f: 50, packG: 200, match: ['mandle'], exclude: ['mleko', 'napoj'] },
+  mandle: { name: 'Mandle', cat: 'tuky', kcal: 580, p: 21, c: 22, f: 50, packG: 200, match: ['mandle'], exclude: ['mleko', 'napoj', 'cukru', 'cokolad', 'solen'] },
   vlasske_orechy: { name: 'Vlašské ořechy', cat: 'tuky', kcal: 650, p: 15, c: 14, f: 65, packG: 150, match: ['vlasske'] },
   kesu: { name: 'Kešu', cat: 'tuky', kcal: 553, p: 18, c: 30, f: 44, packG: 200, match: ['kesu'] },
   chia: { name: 'Chia semínka', cat: 'tuky', kcal: 490, p: 17, c: 42, f: 31, packG: 200, match: ['chia'] },
 
   // ---------- ostatní ----------
-  protein_syrovatkovy: { name: 'Syrovátkový protein (prášek)', cat: 'ostatni', kcal: 380, p: 78, c: 6, f: 5, pieceG: 30, packG: 1000, match: ['protein', 'whey'], exclude: ['tycink', 'napoj', 'pudink'] },
+  protein_syrovatkovy: { name: 'Syrovátkový protein (prášek)', cat: 'ostatni', kcal: 380, p: 78, c: 6, f: 5, pieceG: 30, packG: 1000, match: ['whey', 'syrovatkov', 'proteinovy prasek', 'protein prasek'], exclude: ['tycink', 'napoj', 'pudink', 'jogurt', 'rohlik', 'chleb'] },
   med: { name: 'Med', cat: 'ostatni', kcal: 320, p: 0.3, c: 80, f: 0, packG: 250, match: ['med$'] },
   dzem: { name: 'Džem', cat: 'ostatni', kcal: 250, p: 0.5, c: 60, f: 0, packG: 340, match: ['dzem', 'marmelad'] },
   horka_cokolada: { name: 'Hořká čokoláda 70 %', cat: 'ostatni', kcal: 580, p: 8, c: 35, f: 42, packG: 100, match: ['horka cokolada', 'cokolada horka'] },
@@ -2756,7 +2757,9 @@ function shoppingList(plan, meals, customFoods = [], discounted = {}) {
     if (!food) continue;
     const packG = food.packG ?? 500;
     const packs = Math.max(1, Math.ceil(g / packG - 0.05)); // 5 % tolerance — kvůli 505 g nekupuj dvě balení
-    const pieces = food.pieceG ? Math.ceil(g / food.pieceG) : null;
+    // počet kusů jen tam, kde se tak nakupuje (vejce „10 ks“, ovoce na kusy) — ne u chleba (krajíce) ani proteinu (odměrky)
+    const countable = !!food.pieceG && (food.loose || /\bks\b/.test(food.packLabel ?? ''));
+    const pieces = countable ? Math.ceil(g / food.pieceG) : null;
     const cat = food.cat ?? 'ostatni';
     (byCat[cat] ??= []).push({
       foodId, name: food.name, grams: Math.round(g), packs, pieces,
