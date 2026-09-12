@@ -938,7 +938,7 @@ input.set-input {
 <script>
 (() => {
 'use strict';
-const BUILD_ID = "2026-09-02 20:10";
+const BUILD_ID = "2026-09-12 17:21";
 // ===== src/engine/util.js =====
 // Sdílené utility enginu — čisté funkce, žádné závislosti.
 
@@ -1609,8 +1609,10 @@ function recomputeEntryTargets(exDef, entry) {
  *  - velká rezerva (RIR ≥ horní cíl + 2) → další série těžší (přírůstek; když
  *    10% pravidlo skok nepovolí, +2 opakování),
  *  - pod cílovou rezervou (RIR < spodní cíl) → další série drží zátěž a cíl
- *    opakování klesne na to, co reálně šlo.
- * Mutuje targets nezapsaných work řádků; vrací 'up' | 'down' | null.
+ *    opakování klesne na to, co reálně šlo; když je cíl už na spodku rozsahu,
+ *    ubere se místo toho jeden krok na zátěži ('lighter').
+ * Štítek se nastaví JEN když se cíl opravdu změnil — jinak by v UI lhal.
+ * Mutuje targets nezapsaných work řádků; vrací 'up' | 'down' | 'lighter' | null.
  */
 function adjustRemainingTargets(exDef, rows) {
   const [lo] = exDef.repRange;
@@ -1650,11 +1652,31 @@ function adjustRemainingTargets(exDef, rows) {
   }
 
   if (logged.rir < rirLo) {
-    for (const r of remaining) {
-      r.target.reps = Math.max(lo, Math.min(r.target.reps ?? lo, logged.reps));
-      r.adjusted = 'down';
+    const repsAfter = (r) => Math.max(lo, Math.min(r.target.reps ?? lo, logged.reps));
+    if (remaining.some((r) => repsAfter(r) < (r.target.reps ?? lo))) {
+      for (const r of remaining) {
+        r.target.reps = repsAfter(r);
+        r.adjusted = 'down';
+      }
+      return 'down';
     }
-    return 'down';
+    // Cíl opakování je už na spodku rozsahu — jediná cesta zpět do cílové rezervy
+    // je ubrat na zátěži. Bereme fyzický krok cviku (nejbližší lehčí pár/deska);
+    // 10% pravidlo se tu neuplatní, to hlídá jen příliš velké SKOKY NAHORU.
+    if (logged.weightKg > 0) {
+      const step = loadStep(exDef);
+      const lighter = roundToStep(logged.weightKg - exDef.increment, step);
+      const floor = exDef.incrementRule === 'bodyweight' ? 0 : step;
+      if (lighter >= floor && lighter < logged.weightKg) {
+        for (const r of remaining) {
+          r.target.weightKg = lighter;
+          r.target.reps = lo;
+          r.adjusted = 'lighter';
+        }
+        return 'lighter';
+      }
+    }
+    return null; // nejde ubrat (jen vlastní tělo) → žádný štítek, žádná lež
   }
 
   return null;
@@ -4803,7 +4825,8 @@ function setRow(workout, entry, entryIndex, row, rowIndex, ghostSets, nextKey) {
       }
     });
     if (adjusted === 'up') toast('Měl jsi rezervu — další série jde nahoru.');
-    if (adjusted === 'down') toast('Bylo to na hraně — další série má nižší cíl.');
+    if (adjusted === 'down') toast('Bylo to na hraně — další série má míň opakování.');
+    if (adjusted === 'lighter') toast('Bylo to na hraně — další série jde o krok níž na váze.');
     if (row.kind !== 'warmup') {
       RestTimer.start(restSecondsFor(entry.exerciseId), nextUpLabel(Store.state.activeWorkout));
     } else {
@@ -4812,7 +4835,8 @@ function setRow(workout, entry, entryIndex, row, rowIndex, ghostSets, nextKey) {
   };
 
   const adjNote = row.adjusted === 'up' ? '↑ přidáno (měl jsi rezervu)'
-    : row.adjusted === 'down' ? '↓ ubráno (bylo to na hraně)' : null;
+    : row.adjusted === 'down' ? '↓ míň opakování (bylo to na hraně)'
+      : row.adjusted === 'lighter' ? '↓ lehčí (bylo to na hraně)' : null;
   const ghostText = adjNote ?? (row.kind === 'drop' ? 'bez pauzy do selhání'
     : ghost ?? (row.kind === 'warmup' ? 'lehce, bez RIR'
       : bodyweightEx ? '0 = jen vlastní tělo' : 'první záznam'));
