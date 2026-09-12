@@ -1023,7 +1023,7 @@ input.set-input {
 <script>
 (() => {
 'use strict';
-const BUILD_ID = "2026-09-12 17:59";
+const BUILD_ID = "2026-09-12 18:01";
 const VAPID_PUBLIC_KEY = "BD_ok8gw7j2oTGo4onj5L0RKeoBb8CwcRXI6kBmWMQGHidqYlHqA-Mcl8tffN3j8ZxnzX7Fzq_RmG80iWyI6X0M";
 // ===== src/engine/util.js =====
 // Sdílené utility enginu — čisté funkce, žádné závislosti.
@@ -3436,7 +3436,8 @@ function initUpdater(onFound) {
 const FEED_URL = './akce-lidl.json';
 const FRESH_MS = 6 * 60 * 60 * 1000; // častěji než à 6 h nemá smysl se ptát — feed se mění 2× týdně
 
-const akceInfo = { loading: false, lastError: null };
+const akceInfo = { loading: false, lastError: null, lastAttempt: 0 };
+const RETRY_MS = 60 * 1000; // po chybě / 404 se neptáme častěji než jednou za minutu
 
 /** Stáří feedu ve dnech (null = žádný). */
 function feedAgeDays(feed) {
@@ -3448,8 +3449,9 @@ function feedAgeDays(feed) {
 async function refreshDiscounts(current) {
   const checkedAt = current?.checkedAt ? new Date(current.checkedAt).getTime() : 0;
   if (Date.now() - checkedAt < FRESH_MS) return null;
-  if (akceInfo.loading) return null;
+  if (akceInfo.loading || Date.now() - akceInfo.lastAttempt < RETRY_MS) return null;
   akceInfo.loading = true;
+  akceInfo.lastAttempt = Date.now();
   try {
     const res = await fetch(`${FEED_URL}?t=${Date.now()}`, { cache: 'no-store' });
     if (res.status === 404) { akceInfo.lastError = 'feed zatím neexistuje'; return null; }
@@ -7331,6 +7333,7 @@ function render() {
   }
 
   RestTimer.stop();
+  if (currentTab === 'food') refreshDiscountFeed(); // hned po onboardingu i po dlouhé době v pozadí
   const tab = TABS.find((t) => t.id === currentTab) ?? TABS[0];
   tab.render(root);
 
@@ -7404,10 +7407,8 @@ function boot() {
     });
   }
 
-  if (Store.state.onboarded) {
-    refreshDiscountFeed();
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshDiscountFeed(); });
-  }
+  if (Store.state.onboarded) refreshDiscountFeed();
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && Store.state.onboarded) refreshDiscountFeed(); });
 
   // Automatická aktualizace: mimo trénink se přepne sama, v tréninku počká na tebe.
   initUpdater((build, alreadyTried) => {
