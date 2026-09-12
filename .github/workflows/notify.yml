@@ -1,0 +1,23 @@
+name: notify
+on:
+  schedule:
+    - cron: '*/30 5-21 * * *'   # 07:00–23:30 v Praze (léto); noční ticho hlídá i skript sám
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: notify
+  cancel-in-progress: false
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install --no-save --no-audit --no-fund web-push@3
+      - run: node scripts/notify.mjs
+        env:
+          FITKO_GH_TOKEN: ${{ secrets.FITKO_GH_TOKEN }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}

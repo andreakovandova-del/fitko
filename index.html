@@ -930,6 +930,91 @@ input.set-input {
   .btn:active, .chip:active, .rir-chip:active, .check-btn:active, .icon-btn:active, .scale-row button:active { transform: none; }
 }
 
+/* ---------- Jídlo ---------- */
+.subnav {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin: -2px 0 2px;
+  padding-bottom: 2px;
+}
+.subnav::-webkit-scrollbar { display: none; }
+.chip.plain { background: var(--surface); }
+.chip.plain.active::before { content: none; }
+
+.food-summary .progressline.ok > div { background: linear-gradient(90deg, var(--ok), #8fd8a8); box-shadow: 0 0 10px rgba(111, 192, 142, 0.35); }
+
+.food-slot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+.food-slot:first-child { border-top: none; padding-top: 2px; }
+.food-slot:last-child { padding-bottom: 2px; }
+.food-slot.done .food-slot-name { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--faint); }
+.food-slot.empty .food-slot-name { color: var(--faint); font-weight: 500; }
+.food-slot .check-btn { flex: none; }
+.food-slot-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--text);
+}
+.food-slot-name { font-size: 15.5px; font-weight: 600; line-height: 1.25; }
+
+.today-outline { box-shadow: var(--card-shadow), 0 0 0 1.5px var(--accent); }
+.faint { color: var(--faint); }
+
+.history-row.selected { background: var(--accent-faint); margin: 0 -6px; padding-left: 6px; padding-right: 6px; border-radius: 10px; }
+
+.shop-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 9px 0;
+  border-top: 1px solid var(--line);
+  background: none;
+  border-left: none; border-right: none; border-bottom: none;
+  color: var(--text);
+  text-align: left;
+}
+.shop-row:first-of-type { border-top: none; }
+.shop-row.done { opacity: 0.5; }
+.shop-row.done > .grow > div:first-child { text-decoration: line-through; }
+.shop-check {
+  flex: none;
+  width: 26px; height: 26px;
+  border-radius: 8px;
+  border: 1.5px solid var(--line-strong);
+  background: var(--surface-2);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 700;
+  color: var(--accent-ink);
+}
+.shop-check.on { background: var(--accent-grad); border-color: transparent; box-shadow: var(--check-glow); }
+
+.ing-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-top: 1px solid var(--line);
+}
+.ing-row:first-child { border-top: none; }
+.ing-row input.set-input { text-align: right; padding: 8px 10px; }
+
+.food-today-card .progressline { margin-top: 8px; }
+
 </style>
 </head>
 <body>
@@ -938,7 +1023,8 @@ input.set-input {
 <script>
 (() => {
 'use strict';
-const BUILD_ID = "2026-09-12 17:21";
+const BUILD_ID = "2026-09-12 17:59";
+const VAPID_PUBLIC_KEY = "BD_ok8gw7j2oTGo4onj5L0RKeoBb8CwcRXI6kBmWMQGHidqYlHqA-Mcl8tffN3j8ZxnzX7Fzq_RmG80iWyI6X0M";
 // ===== src/engine/util.js =====
 // Sdílené utility enginu — čisté funkce, žádné závislosti.
 
@@ -2241,6 +2327,502 @@ function buildInitialExerciseStates(reportedLifts = {}) {
 
 
 
+// ===== src/engine/foods.js =====
+// Databáze potravin — české základy pro lean bulk, hodnoty na 100 g (u tekutin na 100 ml).
+// Zdroj hodnot: běžné tabulky (ÚZEI / USDA / etikety Lidl vlastních značek), zaokrouhleno.
+// Kdo chce přesnou etiketu konkrétního výrobku, přidá si ho přes Open Food Facts nebo ručně.
+//
+// Pole:
+//   name      název jak ho vidí uživatel
+//   cat       kategorie (FOOD_CATEGORIES) — řadí nákupní seznam
+//   kcal/p/c/f na 100 g — energie, bílkoviny, sacharidy, tuky
+//   pieceG    hmotnost 1 kusu, pokud se jídlo přirozeně počítá na kusy (vejce, banán, rohlík)
+//   packG     typické balení v Lidlu — nákupní seznam zaokrouhluje na celá balení
+//   packLabel volitelný popisek balení („10 ks“, „1 l“)
+//   match     vzory (bez diakritiky, malá písmena) pro párování s názvy zboží v akci:
+//             každé slovo vzoru je předponou některého slova názvu; „slovo$“ = přesné slovo
+//   exclude   vzory, které párování zakážou („cherry“ u obyčejných rajčat)
+
+const FOOD_CATEGORIES = {
+  maso: 'Maso a ryby',
+  mlecne: 'Mléčné a vejce',
+  sacharidy: 'Přílohy a obiloviny',
+  pecivo: 'Pečivo',
+  ovoce: 'Ovoce',
+  zelenina: 'Zelenina',
+  lusteniny: 'Luštěniny a rostlinné',
+  tuky: 'Tuky, ořechy a semínka',
+  ostatni: 'Ostatní',
+};
+
+const FOOD_SLOTS = [
+  { id: 'snidane', label: 'Snídaně', share: 0.25, hour: 7, minute: 30 },
+  { id: 'svacina1', label: 'Svačina', share: 0.10, hour: 10, minute: 30 },
+  { id: 'obed', label: 'Oběd', share: 0.30, hour: 12, minute: 30 },
+  { id: 'svacina2', label: 'Svačina', share: 0.10, hour: 16, minute: 0 },
+  { id: 'vecere', label: 'Večeře', share: 0.25, hour: 19, minute: 0 },
+];
+
+const FOODS = {
+  // ---------- maso a ryby (syrové) ----------
+  kureci_prsa: { name: 'Kuřecí prsa', cat: 'maso', kcal: 110, p: 23, c: 0, f: 1.5, packG: 600, match: ['kureci prs', 'kureci rizk', 'kureci prsni'] },
+  kureci_stehna: { name: 'Kuřecí stehna (bez kosti, s kůží)', cat: 'maso', kcal: 180, p: 17, c: 0, f: 12, packG: 600, match: ['kureci stehn', 'kureci stehenni'] },
+  kruti_prsa: { name: 'Krůtí prsa', cat: 'maso', kcal: 105, p: 24, c: 0, f: 1, packG: 500, match: ['kruti prs', 'kruti rizk'] },
+  hovezi_mlete: { name: 'Hovězí mleté (10 % tuku)', cat: 'maso', kcal: 175, p: 20, c: 0, f: 10, packG: 500, match: ['hovezi mlete', 'mlete hovezi'] },
+  hovezi_zadni: { name: 'Hovězí zadní (libové)', cat: 'maso', kcal: 125, p: 22, c: 0, f: 4, packG: 500, match: ['hovezi zadni', 'hovezi kyta', 'hovezi kulata'] },
+  veprova_panenka: { name: 'Vepřová panenka', cat: 'maso', kcal: 110, p: 21, c: 0, f: 2.5, packG: 500, match: ['veprova panenka', 'panenka'] },
+  veprova_kyta: { name: 'Vepřová kýta', cat: 'maso', kcal: 140, p: 21, c: 0, f: 6, packG: 500, match: ['veprova kyta', 'veprovy rizek', 'veprova plec'] },
+  veprova_krkovice: { name: 'Vepřová krkovice', cat: 'maso', kcal: 250, p: 17, c: 0, f: 20, packG: 500, match: ['veprova krkov', 'krkovice'] },
+  losos: { name: 'Losos (filet)', cat: 'maso', kcal: 200, p: 20, c: 0, f: 13, packG: 250, match: ['losos'] },
+  treska: { name: 'Treska (filet)', cat: 'maso', kcal: 80, p: 18, c: 0, f: 0.7, packG: 400, match: ['treska', 'tresci'] },
+  tunak_konzerva: { name: 'Tuňák ve vlastní šťávě (okapaný)', cat: 'maso', kcal: 110, p: 25, c: 0, f: 1, packG: 110, packLabel: '1 konzerva', match: ['tunak'] },
+  sardinky: { name: 'Sardinky v oleji (okapané)', cat: 'maso', kcal: 210, p: 24, c: 0, f: 12, packG: 90, packLabel: '1 konzerva', match: ['sardink'] },
+  sunka: { name: 'Šunka nejvyšší jakosti', cat: 'maso', kcal: 110, p: 20, c: 1, f: 3, packG: 100, match: ['sunka', 'sunky'], exclude: ['salam'] },
+  kureci_sunka: { name: 'Kuřecí šunka', cat: 'maso', kcal: 100, p: 18, c: 1, f: 2, packG: 100, match: ['kureci sunk'] },
+  slanina: { name: 'Slanina', cat: 'maso', kcal: 450, p: 15, c: 0, f: 42, packG: 100, match: ['slanina'] },
+
+  // ---------- mléčné a vejce ----------
+  vejce: { name: 'Vejce', cat: 'mlecne', kcal: 143, p: 12.6, c: 0.7, f: 9.5, pieceG: 55, packG: 550, packLabel: '10 ks', match: ['vejce', 'vajec'], exclude: ['testovin', 'liker'] },
+  bilky: { name: 'Vaječné bílky (tekuté)', cat: 'mlecne', kcal: 50, p: 11, c: 0.7, f: 0.2, packG: 500, match: ['bilky', 'vajecne bilky'] },
+  skyr: { name: 'Skyr natural', cat: 'mlecne', kcal: 63, p: 11, c: 4, f: 0.2, packG: 450, match: ['skyr'] },
+  tvaroh_polotucny: { name: 'Tvaroh polotučný', cat: 'mlecne', kcal: 105, p: 12, c: 4, f: 4.5, packG: 250, match: ['tvaroh polotuc', 'tvaroh mekky'] },
+  tvaroh_odtucneny: { name: 'Tvaroh odtučněný', cat: 'mlecne', kcal: 70, p: 12, c: 4, f: 0.5, packG: 250, match: ['tvaroh odtuc', 'tvaroh nizkotuc'] },
+  tvaroh_tucny: { name: 'Tvaroh tučný', cat: 'mlecne', kcal: 155, p: 11, c: 3.5, f: 11, packG: 250, match: ['tvaroh tucn'] },
+  recky_jogurt: { name: 'Řecký jogurt 0 %', cat: 'mlecne', kcal: 57, p: 10, c: 4, f: 0.2, packG: 400, match: ['recky jogurt', 'jogurt reck'] },
+  bily_jogurt: { name: 'Bílý jogurt 3 %', cat: 'mlecne', kcal: 65, p: 4, c: 5, f: 3, packG: 150, match: ['bily jogurt', 'jogurt bily'] },
+  cottage: { name: 'Cottage sýr', cat: 'mlecne', kcal: 100, p: 12, c: 3, f: 4, packG: 200, match: ['cottage'] },
+  mleko_polotucne: { name: 'Mléko polotučné 1,5 %', cat: 'mlecne', kcal: 46, p: 3.3, c: 4.8, f: 1.5, packG: 1000, packLabel: '1 l', match: ['mleko polotuc', 'mleko 1,5'] },
+  mleko_plnotucne: { name: 'Mléko plnotučné 3,5 %', cat: 'mlecne', kcal: 62, p: 3.3, c: 4.7, f: 3.5, packG: 1000, packLabel: '1 l', match: ['mleko plnotuc', 'mleko 3,5'] },
+  kefir: { name: 'Kefír', cat: 'mlecne', kcal: 55, p: 3.3, c: 4, f: 3, packG: 500, packLabel: '500 ml', match: ['kefir'] },
+  eidam: { name: 'Eidam 30 %', cat: 'mlecne', kcal: 260, p: 27, c: 0, f: 17, packG: 250, match: ['eidam', 'gouda'] },
+  mozzarella: { name: 'Mozzarella', cat: 'mlecne', kcal: 250, p: 18, c: 1, f: 19, packG: 125, match: ['mozzarella'] },
+  balkansky_syr: { name: 'Balkánský sýr / feta', cat: 'mlecne', kcal: 250, p: 16, c: 1, f: 20, packG: 200, match: ['balkansky', 'feta'] },
+  parmezan: { name: 'Parmezán', cat: 'mlecne', kcal: 400, p: 33, c: 0, f: 28, packG: 100, match: ['parmez', 'grana padano', 'parmigiano'] },
+  smetanovy_syr: { name: 'Smetanový sýr (Lučina typ)', cat: 'mlecne', kcal: 250, p: 6, c: 3, f: 24, packG: 200, match: ['lucina', 'smetanovy syr', 'zervais'] },
+  maslo: { name: 'Máslo', cat: 'mlecne', kcal: 740, p: 0.7, c: 0.6, f: 82, packG: 250, match: ['maslo$'] },
+
+  // ---------- přílohy a obiloviny (syrové) ----------
+  ovesne_vlocky: { name: 'Ovesné vločky', cat: 'sacharidy', kcal: 370, p: 13, c: 60, f: 7, packG: 500, match: ['ovesne vlocky', 'vlocky ovesne'] },
+  ryze: { name: 'Rýže (syrová)', cat: 'sacharidy', kcal: 355, p: 7, c: 78, f: 0.6, packG: 1000, match: ['ryze$', 'basmati', 'jasminova'] },
+  testoviny: { name: 'Těstoviny (syrové)', cat: 'sacharidy', kcal: 360, p: 12, c: 72, f: 1.5, packG: 500, match: ['testoviny', 'spaget', 'penne', 'fusilli'] },
+  brambory: { name: 'Brambory', cat: 'sacharidy', kcal: 75, p: 2, c: 16, f: 0.1, packG: 2000, match: ['brambory', 'brambor$'] },
+  bataty: { name: 'Batáty', cat: 'sacharidy', kcal: 86, p: 1.6, c: 20, f: 0.1, packG: 1000, match: ['batat'] },
+  kuskus: { name: 'Kuskus (syrový)', cat: 'sacharidy', kcal: 360, p: 12, c: 72, f: 1, packG: 500, match: ['kuskus'] },
+  bulgur: { name: 'Bulgur (syrový)', cat: 'sacharidy', kcal: 340, p: 12, c: 70, f: 1.5, packG: 500, match: ['bulgur'] },
+  quinoa: { name: 'Quinoa (syrová)', cat: 'sacharidy', kcal: 370, p: 14, c: 64, f: 6, packG: 500, match: ['quinoa'] },
+  pohanka: { name: 'Pohanka (syrová)', cat: 'sacharidy', kcal: 345, p: 13, c: 70, f: 3, packG: 500, match: ['pohanka'] },
+  musli: { name: 'Müsli', cat: 'sacharidy', kcal: 400, p: 9, c: 65, f: 10, packG: 750, match: ['musli', 'granola'] },
+  ryzove_chlebicky: { name: 'Rýžové chlebíčky', cat: 'sacharidy', kcal: 385, p: 8, c: 82, f: 3, pieceG: 8, packG: 100, match: ['ryzove chleb', 'ryzovy chleb'] },
+
+  // ---------- pečivo ----------
+  chleb: { name: 'Chléb žitno-pšeničný', cat: 'pecivo', kcal: 240, p: 8, c: 47, f: 1.5, pieceG: 45, packG: 500, match: ['chleb$'] },
+  celozrnny_toust: { name: 'Celozrnný toustový chléb', cat: 'pecivo', kcal: 250, p: 9, c: 43, f: 4, pieceG: 30, packG: 500, match: ['toustov', 'toast'] },
+  rohlik: { name: 'Rohlík', cat: 'pecivo', kcal: 300, p: 9, c: 58, f: 3, pieceG: 43, packG: 43, packLabel: '1 ks', match: ['rohlik'] },
+  tortilla: { name: 'Tortilla (pšeničná)', cat: 'pecivo', kcal: 300, p: 8, c: 50, f: 8, pieceG: 40, packG: 240, packLabel: '6 ks', match: ['tortill', 'wrap'] },
+
+  // ---------- ovoce ----------
+  banan: { name: 'Banán', cat: 'ovoce', kcal: 89, p: 1.1, c: 23, f: 0.3, pieceG: 120, packG: 1000, match: ['banan'], exclude: ['chips', 'susen'] },
+  jablko: { name: 'Jablko', cat: 'ovoce', kcal: 52, p: 0.3, c: 14, f: 0.2, pieceG: 180, packG: 1000, match: ['jablk'], exclude: ['dzus', 'stava', 'mostu'] },
+  pomeranc: { name: 'Pomeranč', cat: 'ovoce', kcal: 47, p: 0.9, c: 12, f: 0.1, pieceG: 200, packG: 1000, match: ['pomeranc'], exclude: ['dzus', 'stava'] },
+  mandarinka: { name: 'Mandarinka', cat: 'ovoce', kcal: 53, p: 0.8, c: 13, f: 0.3, pieceG: 70, packG: 1000, match: ['mandarink', 'klementin'] },
+  boruvky: { name: 'Borůvky', cat: 'ovoce', kcal: 57, p: 0.7, c: 14, f: 0.3, packG: 125, match: ['boruvk'] },
+  jahody: { name: 'Jahody', cat: 'ovoce', kcal: 32, p: 0.7, c: 8, f: 0.3, packG: 250, match: ['jahod'] },
+  hrozny: { name: 'Hrozny', cat: 'ovoce', kcal: 69, p: 0.7, c: 18, f: 0.2, packG: 500, match: ['hrozn', 'hrozen'] },
+  kiwi: { name: 'Kiwi', cat: 'ovoce', kcal: 61, p: 1.1, c: 15, f: 0.5, pieceG: 75, packG: 450, packLabel: '6 ks', match: ['kiwi'] },
+  hruska: { name: 'Hruška', cat: 'ovoce', kcal: 57, p: 0.4, c: 15, f: 0.1, pieceG: 170, packG: 1000, match: ['hrusk'] },
+
+  // ---------- zelenina ----------
+  brokolice: { name: 'Brokolice', cat: 'zelenina', kcal: 34, p: 2.8, c: 7, f: 0.4, pieceG: 400, packG: 400, packLabel: '1 ks', match: ['brokolic'] },
+  spenat_mrazeny: { name: 'Špenát (mražený)', cat: 'zelenina', kcal: 23, p: 2.9, c: 3.6, f: 0.4, packG: 400, match: ['spenat'] },
+  rajcata: { name: 'Rajčata', cat: 'zelenina', kcal: 18, p: 0.9, c: 3.9, f: 0.2, pieceG: 120, packG: 500, match: ['rajcat', 'rajce'], exclude: ['cherry', 'loupan', 'protlak', 'konzerv', 'pasta'] },
+  cherry_rajcata: { name: 'Cherry rajčata', cat: 'zelenina', kcal: 18, p: 0.9, c: 3.9, f: 0.2, packG: 250, match: ['rajcata cherry', 'cherry rajc'] },
+  okurka: { name: 'Okurka salátová', cat: 'zelenina', kcal: 15, p: 0.7, c: 3, f: 0.1, pieceG: 300, packG: 300, packLabel: '1 ks', match: ['okurka', 'okurky salat'], exclude: ['nakladan', 'sterilov'] },
+  paprika: { name: 'Paprika', cat: 'zelenina', kcal: 31, p: 1, c: 6, f: 0.3, pieceG: 150, packG: 450, packLabel: '3 ks', match: ['paprika', 'papriky'], exclude: ['mleta', 'korenici'] },
+  mrkev: { name: 'Mrkev', cat: 'zelenina', kcal: 41, p: 0.9, c: 10, f: 0.2, pieceG: 80, packG: 1000, match: ['mrkev'] },
+  cuketa: { name: 'Cuketa', cat: 'zelenina', kcal: 17, p: 1.2, c: 3, f: 0.3, pieceG: 300, packG: 300, packLabel: '1 ks', match: ['cuket'] },
+  ledovy_salat: { name: 'Ledový salát', cat: 'zelenina', kcal: 14, p: 0.9, c: 3, f: 0.1, pieceG: 400, packG: 400, packLabel: '1 ks', match: ['ledovy salat', 'salat ledov'] },
+  cibule: { name: 'Cibule', cat: 'zelenina', kcal: 40, p: 1.1, c: 9, f: 0.1, pieceG: 100, packG: 1000, match: ['cibule'] },
+  cesnek: { name: 'Česnek', cat: 'zelenina', kcal: 149, p: 6.4, c: 33, f: 0.5, pieceG: 5, packG: 100, match: ['cesnek'] },
+  avokado: { name: 'Avokádo', cat: 'zelenina', kcal: 160, p: 2, c: 9, f: 15, pieceG: 130, packG: 130, packLabel: '1 ks', match: ['avokad'] },
+  kukurice_konzerva: { name: 'Kukuřice (konzerva, okapaná)', cat: 'zelenina', kcal: 80, p: 2.5, c: 15, f: 1, packG: 165, packLabel: '1 konzerva', match: ['kukurice'] },
+  hrasek_mrazeny: { name: 'Hrášek (mražený)', cat: 'zelenina', kcal: 80, p: 5, c: 14, f: 0.4, packG: 450, match: ['hrasek'] },
+  zeleninova_smes: { name: 'Zeleninová směs (mražená)', cat: 'zelenina', kcal: 45, p: 2.5, c: 8, f: 0.5, packG: 750, match: ['zeleninova smes', 'smes zelenin', 'zelenina mrazen'] },
+
+  // ---------- luštěniny a rostlinné ----------
+  cocka: { name: 'Čočka (syrová)', cat: 'lusteniny', kcal: 350, p: 25, c: 60, f: 1, packG: 500, match: ['cocka'] },
+  cizrna_konzerva: { name: 'Cizrna (konzerva, okapaná)', cat: 'lusteniny', kcal: 140, p: 8, c: 22, f: 3, packG: 240, packLabel: '1 konzerva', match: ['cizrna'] },
+  fazole_konzerva: { name: 'Fazole (konzerva, okapané)', cat: 'lusteniny', kcal: 100, p: 7, c: 17, f: 0.5, packG: 240, packLabel: '1 konzerva', match: ['fazole'] },
+  tofu: { name: 'Tofu', cat: 'lusteniny', kcal: 120, p: 12, c: 2, f: 7, packG: 200, match: ['tofu'] },
+
+  // ---------- tuky, ořechy a semínka ----------
+  olivovy_olej: { name: 'Olivový olej', cat: 'tuky', kcal: 884, p: 0, c: 0, f: 100, packG: 750, packLabel: '750 ml', match: ['olivovy olej', 'olej olivov'] },
+  repkovy_olej: { name: 'Řepkový olej', cat: 'tuky', kcal: 884, p: 0, c: 0, f: 100, packG: 1000, packLabel: '1 l', match: ['repkovy olej', 'olej repkov', 'slunecnicovy olej'] },
+  arasidove_maslo: { name: 'Arašídové máslo', cat: 'tuky', kcal: 600, p: 25, c: 20, f: 50, packG: 350, match: ['arasidove maslo', 'arasidovy krem', 'burakove maslo'] },
+  mandle: { name: 'Mandle', cat: 'tuky', kcal: 580, p: 21, c: 22, f: 50, packG: 200, match: ['mandle'], exclude: ['mleko', 'napoj'] },
+  vlasske_orechy: { name: 'Vlašské ořechy', cat: 'tuky', kcal: 650, p: 15, c: 14, f: 65, packG: 150, match: ['vlasske'] },
+  kesu: { name: 'Kešu', cat: 'tuky', kcal: 553, p: 18, c: 30, f: 44, packG: 200, match: ['kesu'] },
+  chia: { name: 'Chia semínka', cat: 'tuky', kcal: 490, p: 17, c: 42, f: 31, packG: 200, match: ['chia'] },
+
+  // ---------- ostatní ----------
+  protein_syrovatkovy: { name: 'Syrovátkový protein (prášek)', cat: 'ostatni', kcal: 380, p: 78, c: 6, f: 5, pieceG: 30, packG: 1000, match: ['protein', 'whey'], exclude: ['tycink', 'napoj', 'pudink'] },
+  med: { name: 'Med', cat: 'ostatni', kcal: 320, p: 0.3, c: 80, f: 0, packG: 250, match: ['med$'] },
+  dzem: { name: 'Džem', cat: 'ostatni', kcal: 250, p: 0.5, c: 60, f: 0, packG: 340, match: ['dzem', 'marmelad'] },
+  horka_cokolada: { name: 'Hořká čokoláda 70 %', cat: 'ostatni', kcal: 580, p: 8, c: 35, f: 42, packG: 100, match: ['horka cokolada', 'cokolada horka'] },
+  kecup: { name: 'Kečup', cat: 'ostatni', kcal: 100, p: 1.5, c: 25, f: 0.2, packG: 500, match: ['kecup'] },
+  horcice: { name: 'Hořčice', cat: 'ostatni', kcal: 90, p: 5, c: 8, f: 4, packG: 250, match: ['horcice'] },
+  sojova_omacka: { name: 'Sójová omáčka', cat: 'ostatni', kcal: 60, p: 6, c: 6, f: 0, packG: 150, packLabel: '150 ml', match: ['sojova omacka'] },
+  rajcatovy_protlak: { name: 'Rajčatový protlak / passata', cat: 'ostatni', kcal: 30, p: 1.5, c: 5, f: 0.3, packG: 500, match: ['passata', 'protlak', 'rajcata loupan', 'loupana rajcata'] },
+  kakao: { name: 'Kakao (holandské)', cat: 'ostatni', kcal: 350, p: 20, c: 12, f: 20, packG: 100, match: ['kakao holand', 'kakaovy prasek'], exclude: ['granko', 'instant'] },
+};
+
+const FOOD_IDS = Object.keys(FOODS);
+
+/** Text bez diakritiky, malá písmena, sjednocené mezery — pro vyhledávání a párování akcí. */
+function normText(s) {
+  return String(s ?? '')
+    .toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9%,.$\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+
+// ===== src/engine/food.js =====
+// Jídlo: jídla složená z potravin (makra se počítají PŘI TVORBĚ, ne při jídle),
+// týdenní plán na kalorie a bílkoviny z enginu výživy, nákupní seznam sečtený
+// z celého týdne a zaokrouhlený na balení, a jednoduché „snědeno“ bez focení.
+// Čistý modul bez DOM — všechno je testovatelné.
+
+
+
+const PORTION_MIN = 0.6;
+const PORTION_MAX = 1.6;
+const PORTION_STEP = 0.05;
+
+// ---------- potraviny ----------
+
+/** Potravina podle id — vestavěná, nebo vlastní (z Open Food Facts / ručně). */
+function foodById(id, customFoods = []) {
+  return FOODS[id] ?? customFoods.find((f) => f.id === id) ?? null;
+}
+
+/** Fulltext nad vestavěnými + vlastními potravinami, bez diakritiky, řazeno podle shody. */
+function searchFoods(query, customFoods = [], limit = 12) {
+  const q = normText(query);
+  if (!q) return [];
+  const words = q.split(' ');
+  const all = [
+    ...Object.entries(FOODS).map(([id, f]) => ({ id, ...f })),
+    ...customFoods,
+  ];
+  return all
+    .map((f) => {
+      const name = normText(f.name);
+      let score = 0;
+      for (const w of words) {
+        if (name.startsWith(w)) score += 3;
+        else if (name.split(' ').some((n) => n.startsWith(w))) score += 2;
+        else if (name.includes(w)) score += 1;
+        else return null;
+      }
+      return { food: f, score };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.score - a.score || a.food.name.localeCompare(b.food.name, 'cs'))
+    .slice(0, limit)
+    .map((x) => x.food);
+}
+
+// ---------- makra ----------
+
+function emptyMacros() { return { kcal: 0, p: 0, c: 0, f: 0 }; }
+
+function addMacros(a, b, factor = 1) {
+  return { kcal: a.kcal + b.kcal * factor, p: a.p + b.p * factor, c: a.c + b.c * factor, f: a.f + b.f * factor };
+}
+
+function roundMacros(m) {
+  return { kcal: Math.round(m.kcal), p: Math.round(m.p), c: Math.round(m.c), f: Math.round(m.f) };
+}
+
+/** Makra jedné položky jídla { foodId, grams }. Neznámá potravina = 0 (jídlo se nerozbije). */
+function itemMacros(item, customFoods = []) {
+  const food = foodById(item.foodId, customFoods);
+  if (!food || !(item.grams > 0)) return emptyMacros();
+  const k = item.grams / 100;
+  return { kcal: food.kcal * k, p: food.p * k, c: food.c * k, f: food.f * k };
+}
+
+/** Makra celého jídla (na 1 porci). */
+function mealMacros(meal, customFoods = []) {
+  return (meal?.items ?? []).reduce((acc, it) => addMacros(acc, itemMacros(it, customFoods)), emptyMacros());
+}
+
+// ---------- plán ----------
+
+/** Pondělí týdne, do kterého spadá iso. */
+function weekStartOf(iso) {
+  const d = new Date(`${iso}T00:00:00`);
+  const dow = (d.getDay() + 6) % 7; // Po = 0
+  return addDays(iso, -dow);
+}
+
+function weekDays(weekStart) {
+  return Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+}
+
+/** Kalorický cíl slotu z denního cíle (podíly ze FOOD_SLOTS). */
+function slotTargets(targets) {
+  return Object.fromEntries(FOOD_SLOTS.map((s) => [s.id, { kcal: targets.kcal * s.share, proteinG: targets.proteinG * s.share }]));
+}
+
+function bestPortion(mealKcal, wantKcal) {
+  if (!(mealKcal > 0)) return 1;
+  const raw = wantKcal / mealKcal;
+  return Math.round(clamp(raw, PORTION_MIN, PORTION_MAX) / PORTION_STEP) * PORTION_STEP;
+}
+
+/**
+ * Potraviny, které jsou teď v akci (id → položka akce). Párování přes vzory v FOODS.match.
+ * @param discounts { items: [{ name, ... }] } feed z akce-lidl.json
+ */
+function matchDiscounts(discounts, customFoods = []) {
+  const out = {};
+  const items = discounts?.items ?? [];
+  const all = [
+    ...Object.entries(FOODS).map(([id, f]) => ({ id, ...f })),
+    ...customFoods.filter((f) => f.match?.length),
+  ];
+  for (const item of items) {
+    const words = normText(item.name).split(' ');
+    for (const f of all) {
+      if (out[f.id]) continue;
+      if ((f.exclude ?? []).some((x) => patternHits(x, words))) continue;
+      if ((f.match ?? []).some((m) => patternHits(m, words))) out[f.id] = item;
+    }
+  }
+  return out;
+}
+
+// Vzor „kureci prs“ = každé slovo vzoru je předponou některého slova názvu (pořadí nehraje roli);
+// „med$“ = přesné slovo. Díky tomu „Mléko trvanlivé … 3,5% plnotučné“ chytne „mleko plnotuc“.
+function patternHits(pattern, nameWords) {
+  const parts = normText(pattern.replace(/\$/g, ' $')).split(' ');
+  for (let i = 0; i < parts.length; i++) {
+    const w = parts[i];
+    if (w === '$' || !w) continue;
+    const exact = parts[i + 1] === '$';
+    if (!nameWords.some((n) => (exact ? n === w : n.startsWith(w)))) return false;
+  }
+  return true;
+}
+
+/** Kolik položek jídla je v akci (0–1 podíl gramů) — pro plánovač i štítek v UI. */
+function mealDiscountShare(meal, discounted) {
+  const total = (meal.items ?? []).reduce((a, it) => a + (it.grams || 0), 0);
+  if (!total) return 0;
+  const hit = meal.items.reduce((a, it) => a + (discounted[it.foodId] ? it.grams : 0), 0);
+  return hit / total;
+}
+
+/**
+ * Naplánuje týden: pro každý den a slot vybere jídlo tak, aby den seděl na kcal
+ * (±5 %) a bílkoviny (≥ cíl), s preferencí jídel v akci a s obměnou dnů.
+ * Deterministické — stejný vstup, stejný plán.
+ * @returns { days: { [iso]: { [slotId]: { mealId, portion } } }, totals: { [iso]: macros } } | null
+ */
+function planWeek({ targets, meals, customFoods = [], weekStart, discounted = {}, keep = {} }) {
+  if (!targets || !meals?.length) return null;
+  const withMacros = meals.map((m) => ({ meal: m, macros: mealMacros(m, customFoods), disc: mealDiscountShare(m, discounted) }))
+    .filter((x) => x.macros.kcal > 0);
+  if (!withMacros.length) return null;
+
+  const slotT = slotTargets(targets);
+  const days = {};
+  const totals = {};
+  const usedAt = {}; // mealId → poslední den (index), kdy bylo použito — obměna
+  const dayList = weekDays(weekStart);
+
+  dayList.forEach((iso, di) => {
+    const day = {};
+    let dayMacros = emptyMacros();
+
+    for (const slot of FOOD_SLOTS) {
+      const kept = keep?.[iso]?.[slot.id];
+      if (kept?.mealId) {
+        const km = withMacros.find((x) => x.meal.id === kept.mealId);
+        if (km) {
+          day[slot.id] = { mealId: kept.mealId, portion: kept.portion ?? 1 };
+          dayMacros = addMacros(dayMacros, km.macros, kept.portion ?? 1);
+          usedAt[kept.mealId] = di;
+          continue;
+        }
+      }
+      const want = slotT[slot.id];
+      let best = null;
+      for (const x of withMacros) {
+        const fits = !x.meal.slot || x.meal.slot === slot.id.replace(/\d$/, '');
+        if (!fits) continue;
+        const portion = bestPortion(x.macros.kcal, want.kcal);
+        const kcalErr = Math.abs(x.macros.kcal * portion - want.kcal) / Math.max(want.kcal, 1);
+        const proteinBonus = Math.min(x.macros.p * portion / Math.max(want.proteinG, 1), 1.5);
+        const recency = usedAt[x.meal.id] == null ? 0 : Math.max(0, 3 - (di - usedAt[x.meal.id]));
+        const score = -kcalErr * 4 + proteinBonus * 1.2 + x.disc * 1.5 - recency * 0.9;
+        if (!best || score > best.score) best = { x, portion, score };
+      }
+      if (!best) continue;
+      day[slot.id] = { mealId: best.x.meal.id, portion: best.portion };
+      dayMacros = addMacros(dayMacros, best.x.macros, best.portion);
+      usedAt[best.x.meal.id] = di;
+    }
+
+    // Dorovnání dne: kcal do ±5 % a bílkoviny ≥ cíl — škáluje porce jídel s nejvyšší hustotou bílkovin
+    for (let iter = 0; iter < 6; iter++) {
+      const kcalGap = targets.kcal - dayMacros.kcal;
+      const pGap = targets.proteinG - dayMacros.p;
+      if (Math.abs(kcalGap) <= targets.kcal * 0.05 && pGap <= 0) break;
+      const entries = Object.entries(day).filter(([sid]) => !keep?.[iso]?.[sid]?.mealId);
+      if (!entries.length) break;
+      const scored = entries.map(([sid, e]) => {
+        const x = withMacros.find((m) => m.meal.id === e.mealId);
+        const density = x.macros.p / Math.max(x.macros.kcal, 1);
+        return { sid, e, x, density };
+      });
+      // bílkoviny chybí → zvětši nejhustší; kalorie přebývají → zmenši nejméně hustou
+      const pick = pGap > 0 || kcalGap > 0
+        ? scored.sort((a, b) => b.density - a.density)[0]
+        : scored.sort((a, b) => a.density - b.density)[0];
+      const dir = kcalGap > 0 || pGap > 0 ? 1 : -1;
+      const next = clamp(pick.e.portion + dir * PORTION_STEP * 2, PORTION_MIN, PORTION_MAX);
+      if (next === pick.e.portion) break;
+      dayMacros = addMacros(dayMacros, pick.x.macros, next - pick.e.portion);
+      pick.e.portion = Math.round(next * 100) / 100;
+    }
+
+    days[iso] = day;
+    totals[iso] = roundMacros(dayMacros);
+  });
+
+  return { weekStart, days, totals };
+}
+
+/** Makra dne z plánu (s porcemi). */
+function dayPlanMacros(dayPlan, meals, customFoods = []) {
+  let m = emptyMacros();
+  for (const e of Object.values(dayPlan ?? {})) {
+    const meal = meals.find((x) => x.id === e.mealId);
+    if (meal) m = addMacros(m, mealMacros(meal, customFoods), e.portion ?? 1);
+  }
+  return roundMacros(m);
+}
+
+// ---------- snědeno ----------
+
+/**
+ * Co bylo dnes reálně snědeno: zaškrtnuté sloty z plánu + volné položky navíc.
+ * @param eatenDay { [slotId]: true, extra: [{ name, kcal, p }] }
+ */
+function eatenMacros(dayPlan, eatenDay, meals, customFoods = []) {
+  let m = emptyMacros();
+  for (const [sid, e] of Object.entries(dayPlan ?? {})) {
+    if (!eatenDay?.[sid]) continue;
+    const meal = meals.find((x) => x.id === e.mealId);
+    if (meal) m = addMacros(m, mealMacros(meal, customFoods), e.portion ?? 1);
+  }
+  for (const x of eatenDay?.extra ?? []) m = addMacros(m, { kcal: x.kcal || 0, p: x.p || 0, c: x.c || 0, f: x.f || 0 });
+  return roundMacros(m);
+}
+
+// ---------- nákupní seznam ----------
+
+/**
+ * Sečte gramy potravin přes celý týden (porce × položky), zaokrouhlí na balení
+ * a připojí akci, pokud potravina v akci je. Seskupeno podle kategorie.
+ * @returns [{ cat, label, items: [{ foodId, name, grams, packs, packLabel, discount }] }]
+ */
+function shoppingList(plan, meals, customFoods = [], discounted = {}) {
+  const grams = {};
+  for (const day of Object.values(plan?.days ?? {})) {
+    for (const e of Object.values(day)) {
+      const meal = meals.find((x) => x.id === e.mealId);
+      if (!meal) continue;
+      for (const it of meal.items ?? []) grams[it.foodId] = (grams[it.foodId] ?? 0) + it.grams * (e.portion ?? 1);
+    }
+  }
+  const byCat = {};
+  for (const [foodId, g] of Object.entries(grams)) {
+    const food = foodById(foodId, customFoods);
+    if (!food) continue;
+    const packG = food.packG ?? 500;
+    const packs = Math.max(1, Math.ceil(g / packG - 0.05)); // 5 % tolerance — kvůli 505 g nekupuj dvě balení
+    const pieces = food.pieceG ? Math.ceil(g / food.pieceG) : null;
+    const cat = food.cat ?? 'ostatni';
+    (byCat[cat] ??= []).push({
+      foodId, name: food.name, grams: Math.round(g), packs, pieces,
+      packLabel: food.packLabel ?? (packG >= 1000 ? `${packG / 1000} kg` : `${packG} g`),
+      discount: discounted[foodId] ?? null,
+    });
+  }
+  return Object.keys(FOOD_CATEGORIES)
+    .filter((cat) => byCat[cat])
+    .map((cat) => ({ cat, label: FOOD_CATEGORIES[cat], items: byCat[cat].sort((a, b) => b.grams - a.grams) }));
+}
+
+// ---------- startovní jídla ----------
+
+// 14 poctivých jídel na lean bulk — každé z vestavěných potravin, ať jde plán udělat
+// na jeden klik. Uživatel si je upraví nebo smaže.
+function starterMeals() {
+  const m = (id, name, slot, items) => ({ id, name, slot, items: items.map(([foodId, grams]) => ({ foodId, grams })), starter: true });
+  return [
+    m('s_ovesna_kase', 'Ovesná kaše s tvarohem a banánem', 'snidane', [['ovesne_vlocky', 80], ['mleko_polotucne', 250], ['tvaroh_polotucny', 125], ['banan', 120], ['med', 15]]),
+    m('s_vejce_chleb', 'Míchaná vejce s chlebem a zeleninou', 'snidane', [['vejce', 165], ['chleb', 90], ['maslo', 8], ['rajcata', 120], ['sunka', 50]]),
+    m('s_skyr_musli', 'Skyr s müsli a borůvkami', 'snidane', [['skyr', 300], ['musli', 60], ['boruvky', 100], ['mandle', 15]]),
+    m('s_tvaroh_med', 'Tvaroh s medem a ořechy', 'svacina', [['tvaroh_polotucny', 250], ['med', 20], ['vlasske_orechy', 20]]),
+    m('s_protein_banan', 'Protein s mlékem a banánem', 'svacina', [['protein_syrovatkovy', 30], ['mleko_polotucne', 300], ['banan', 120]]),
+    m('s_jogurt_ovoce', 'Řecký jogurt s ovocem', 'svacina', [['recky_jogurt', 200], ['jablko', 180], ['arasidove_maslo', 15]]),
+    m('s_chleb_sunka_syr', 'Chléb se šunkou, sýrem a okurkou', 'svacina', [['chleb', 90], ['sunka', 60], ['eidam', 30], ['okurka', 100]]),
+    m('s_kure_ryze', 'Kuřecí prsa s rýží a brokolicí', 'obed', [['kureci_prsa', 200], ['ryze', 100], ['brokolice', 200], ['olivovy_olej', 10]]),
+    m('s_hovezi_brambory', 'Hovězí mleté s bramborami a zeleninou', 'obed', [['hovezi_mlete', 180], ['brambory', 350], ['zeleninova_smes', 200], ['repkovy_olej', 8]]),
+    m('s_testoviny_tunak', 'Těstoviny s tuňákem a rajčaty', 'obed', [['testoviny', 120], ['tunak_konzerva', 110], ['rajcatovy_protlak', 150], ['cibule', 50], ['olivovy_olej', 10], ['parmezan', 15]]),
+    m('s_losos_bataty', 'Losos s batáty a špenátem', 'vecere', [['losos', 180], ['bataty', 300], ['spenat_mrazeny', 150], ['olivovy_olej', 8]]),
+    m('s_kure_kuskus', 'Kuřecí s kuskusem a zeleninou', 'vecere', [['kureci_prsa', 180], ['kuskus', 90], ['paprika', 150], ['cuketa', 150], ['olivovy_olej', 10]]),
+    m('s_tortilla_kure', 'Tortilly s kuřecím, sýrem a salátem', 'vecere', [['tortilla', 120], ['kureci_prsa', 150], ['eidam', 40], ['ledovy_salat', 80], ['rajcata', 100], ['kecup', 20]]),
+    m('s_ryze_vejce_zelenina', 'Smažená rýže s vejci a zeleninou', 'vecere', [['ryze', 100], ['vejce', 110], ['zeleninova_smes', 200], ['sojova_omacka', 15], ['repkovy_olej', 10]]),
+  ];
+}
+
+// ---------- vlastní potravina z Open Food Facts ----------
+
+/** Převod produktu z OFF na vlastní potravinu (id stabilní z čárového kódu). */
+function foodFromOpenFoodFacts(product) {
+  const n = product?.nutriments ?? {};
+  const kcal = Number(n['energy-kcal_100g'] ?? (n['energy_100g'] ? n['energy_100g'] / 4.184 : NaN));
+  if (!Number.isFinite(kcal)) return null;
+  const name = [product.product_name, product.brands].filter(Boolean).join(' · ').trim();
+  if (!name) return null;
+  return {
+    id: `off_${product.code ?? normText(name).replace(/\s+/g, '_')}`,
+    name,
+    cat: 'ostatni',
+    kcal: Math.round(kcal),
+    p: Number(n.proteins_100g ?? 0),
+    c: Number(n.carbohydrates_100g ?? 0),
+    f: Number(n.fat_100g ?? 0),
+    packG: parsePackGrams(product.quantity) ?? 500,
+    source: 'off',
+  };
+}
+
+function parsePackGrams(q) {
+  const m = normText(q).match(/(\d+(?:[.,]\d+)?)\s*(kg|g|ml|l)\b/);
+  if (!m) return null;
+  const v = parseFloat(m[1].replace(',', '.'));
+  return m[2] === 'kg' || m[2] === 'l' ? Math.round(v * 1000) : Math.round(v);
+}
+
+
 // ===== src/app/ui.js =====
 // DOM helpery — žádný framework, jen disciplína.
 
@@ -2364,6 +2946,8 @@ const stroke = 'fill="none" stroke="currentColor" stroke-width="1.8" stroke-line
 const ICONS = {
   today: `<svg viewBox="0 0 24 24" ${stroke}><path d="M3 12h2m14 0h2M7 12h10"/><rect x="5" y="8" width="2.6" height="8" rx="0.8"/><rect x="16.4" y="8" width="2.6" height="8" rx="0.8"/></svg>`,
   progress: `<svg viewBox="0 0 24 24" ${stroke}><path d="M4 19V5"/><path d="M4 19h16"/><path d="M7 14l4-4 3 3 5-6"/></svg>`,
+  food: `<svg viewBox="0 0 24 24" ${stroke}><path d="M5 3v7a3 3 0 0 0 3 3v8"/><path d="M11 3v7a3 3 0 0 1-3 3"/><path d="M8 3v7"/><path d="M18 3c-2 1.5-3 4-3 7 0 2 1 3 3 3v8"/></svg>`,
+  bell: `<svg viewBox="0 0 24 24" ${stroke}><path d="M6 16V11a6 6 0 1 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>`,
   settings: `<svg viewBox="0 0 24 24" ${stroke}><circle cx="12" cy="12" r="3"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M18.4 5.6l-1.8 1.8M7.4 16.6l-1.8 1.8"/></svg>`,
 };
 
@@ -2730,6 +3314,18 @@ async function cloudRestore() {
   }
 }
 
+/** Přečte vedlejší soubor z gistu (např. fitko-notif.json, který zapisuje GitHub Action). */
+async function cloudReadFile(name) {
+  if (!cloudEnabled() || !ls(GIST_KEY)) return null;
+  try {
+    const gist = await api(`/gists/${ls(GIST_KEY)}`);
+    const file = gist.files?.[name];
+    if (!file) return null;
+    const content = file.truncated && file.raw_url ? await (await fetch(file.raw_url)).text() : file.content;
+    return JSON.parse(content);
+  } catch { return null; }
+}
+
 // Automatika: po každé změně dat se záloha naplánuje (a shluky změn se spojí).
 let timer = null;
 let pending = null;
@@ -2832,6 +3428,124 @@ function initUpdater(onFound) {
 }
 
 
+// ===== src/app/akce.js =====
+// Akce z Lidlu: appka NEČTE kupi.cz přímo (CORS + křehkost). GitHub Action 2× týdně
+// stáhne akční potraviny a uloží je jako ./akce-lidl.json vedle appky; tady je jen
+// načteme, uložíme do stavu (aby fungovaly offline) a hlídáme jejich stáří.
+
+const FEED_URL = './akce-lidl.json';
+const FRESH_MS = 6 * 60 * 60 * 1000; // častěji než à 6 h nemá smysl se ptát — feed se mění 2× týdně
+
+const akceInfo = { loading: false, lastError: null };
+
+/** Stáří feedu ve dnech (null = žádný). */
+function feedAgeDays(feed) {
+  if (!feed?.fetchedAt) return null;
+  return Math.floor((Date.now() - new Date(feed.fetchedAt).getTime()) / 86400000);
+}
+
+/** Načte feed, pokud je uložený starší než FRESH_MS. Vrací nový feed nebo null (nic nového / offline). */
+async function refreshDiscounts(current) {
+  const checkedAt = current?.checkedAt ? new Date(current.checkedAt).getTime() : 0;
+  if (Date.now() - checkedAt < FRESH_MS) return null;
+  if (akceInfo.loading) return null;
+  akceInfo.loading = true;
+  try {
+    const res = await fetch(`${FEED_URL}?t=${Date.now()}`, { cache: 'no-store' });
+    if (res.status === 404) { akceInfo.lastError = 'feed zatím neexistuje'; return null; }
+    if (!res.ok) throw new Error(String(res.status));
+    const feed = await res.json();
+    if (!Array.isArray(feed?.items)) throw new Error('neplatný feed');
+    akceInfo.lastError = null;
+    return { ...feed, checkedAt: new Date().toISOString() };
+  } catch (err) {
+    akceInfo.lastError = err?.message ?? String(err);
+    return null;
+  } finally {
+    akceInfo.loading = false;
+  }
+}
+
+/** Jen položky, které ještě platí (validTo dnes nebo později; bez data = necháme). */
+function validDiscountItems(feed, todayIso) {
+  return (feed?.items ?? []).filter((it) => !it.validTo || it.validTo >= todayIso);
+}
+
+
+// ===== src/app/push.js =====
+// Notifikace: iOS je umí jen v appce přidané na plochu (iOS 16.4+) a jen po klepnutí
+// uživatele. Odesílá je GitHub Action (bez serveru) — ta si přihlášení (subscription)
+// přečte ze zálohy na GitHubu. Bez zapnuté zálohy proto notifikace nejdou.
+
+
+const pushInfo = { supported: false, standalone: false, permission: 'default', busy: false, lastError: null };
+
+function vapidKey() {
+  try { return typeof VAPID_PUBLIC_KEY === 'string' ? VAPID_PUBLIC_KEY : ''; } catch { return ''; }
+}
+
+function initPush() {
+  pushInfo.standalone = window.matchMedia?.('(display-mode: standalone)')?.matches || navigator.standalone === true;
+  pushInfo.supported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window && !!vapidKey();
+  pushInfo.permission = typeof Notification !== 'undefined' ? Notification.permission : 'default';
+}
+
+/** Proč notifikace nejdou zapnout (null = jde). */
+function pushBlocker() {
+  if (!pushInfo.supported) return pushInfo.standalone ? 'Tenhle prohlížeč notifikace nepodporuje.' : 'Otevři Fitko z ikony na ploše — v Safari to iOS nedovolí.';
+  if (pushInfo.permission === 'denied') return 'Notifikace jsou pro Fitko zakázané v Nastavení iPhonu → Fitko → Oznámení.';
+  if (!cloudEnabled()) return 'Nejdřív zapni zálohu na GitHub — notifikace se posílají z ní.';
+  return null;
+}
+
+function b64ToBytes(b64url) {
+  const pad = '='.repeat((4 - (b64url.length % 4)) % 4);
+  const raw = atob((b64url + pad).replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from(raw, (c) => c.charCodeAt(0));
+}
+
+/** Musí běžet z kliknutí. Vrací { ok, subscription } nebo { ok: false, reason }. */
+async function subscribePush() {
+  const blocker = pushBlocker();
+  if (blocker) return { ok: false, reason: blocker };
+  pushInfo.busy = true;
+  try {
+    const perm = await Notification.requestPermission();
+    pushInfo.permission = perm;
+    if (perm !== 'granted') return { ok: false, reason: 'Nepovolil jsi notifikace.' };
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(vapidKey()) });
+    }
+    pushInfo.lastError = null;
+    return { ok: true, subscription: sub.toJSON() };
+  } catch (err) {
+    pushInfo.lastError = err?.message ?? String(err);
+    return { ok: false, reason: pushInfo.lastError };
+  } finally {
+    pushInfo.busy = false;
+  }
+}
+
+async function unsubscribePush() {
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if (sub) await sub.unsubscribe();
+  } catch { /* nevadí — hlavní je smazat subscription ze stavu */ }
+}
+
+/** Lokální zkušební notifikace přes service worker — ověří, že iPhone zobrazuje. */
+async function testLocalNotification() {
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    await reg.showNotification('Fitko', { body: 'Notifikace fungují. Ty ostré chodí z GitHubu.', tag: 'fitko-test', icon: './icon-192.png' });
+    return true;
+  } catch { return false; }
+}
+
+
 // ===== src/app/appstate.js =====
 // Stav aplikace a orchestrace enginu. Engine počítá, tohle drží data a pravidla toku.
 
@@ -2875,7 +3589,34 @@ function defaultState() {
     minicutEndDate: null,
     introDismissed: false,
     restScale: 1, // 0.75 kratší · 1 doporučené · 1.25 delší
+    food: defaultFood(),
+    push: defaultPush(),
   };
+}
+
+// Jídlo: jídla (makra spočítaná při tvorbě), plán aktuálního týdne, co bylo snědeno,
+// co je koupené, a poslední stažený feed akcí (kvůli offline).
+function defaultFood() {
+  return { meals: [], customFoods: [], plan: null, eaten: {}, bought: {}, discounts: null };
+}
+
+// Notifikace: subscription žije ve stavu, protože ji čte GitHub Action ze zálohy.
+function defaultPush() {
+  return {
+    subscription: null,
+    enabledAt: null,
+    prefs: { workout: true, weigh: true, meals: true, protein: true, shopping: true, quietFrom: 22, quietTo: 7 },
+  };
+}
+
+/** Doplní chybějící podklíče (starší zálohy) — volat před každým čtením state.food / state.push. */
+function ensureFood(state) {
+  if (!state.food) state.food = defaultFood();
+  for (const [k, v] of Object.entries(defaultFood())) if (!(k in state.food)) state.food[k] = v;
+  if (!state.push) state.push = defaultPush();
+  if (!state.push.prefs) state.push.prefs = defaultPush().prefs;
+  for (const [k, v] of Object.entries(defaultPush().prefs)) if (!(k in state.push.prefs)) state.push.prefs[k] = v;
+  return state.food;
 }
 
 // ---------- Store ----------
@@ -2912,6 +3653,7 @@ const Store = {
 function migrate(state) {
   const fresh = defaultState();
   for (const key of Object.keys(fresh)) if (!(key in state)) state[key] = fresh[key];
+  ensureFood(state);
 }
 
 // ---------- plán a předpisy ----------
@@ -4158,6 +4900,8 @@ function honestRow(label, value) {
 
 
 
+
+
 function renderToday(root) {
   const state = Store.state;
   clearEl(root);
@@ -4175,9 +4919,39 @@ function renderToday(root) {
     introCard(state),
     ...offerCards(state),
     nutritionNotice(state),
+    foodTodayCard(state),
     bodyCard(state, summary),
     footRow(state, summary),
   ));
+}
+
+// ---------- jídlo dnes (zkratka do záložky Jídlo) ----------
+
+function foodTodayCard(state) {
+  const t = state.targets;
+  const food = state.food;
+  if (!t || !food) return null;
+  const today = todayISO();
+  const plan = food.plan && food.plan.weekStart === weekStartOf(today) ? food.plan : null;
+  const dayPlan = plan?.days?.[today] ?? null;
+  const eatenDay = food.eaten?.[today] ?? {};
+  const eaten = eatenMacros(dayPlan, eatenDay, food.meals ?? [], food.customFoods ?? []);
+  const slotsDone = FOOD_SLOTS.filter((s) => eatenDay[s.id]).length;
+  const slotsPlanned = dayPlan ? FOOD_SLOTS.filter((s) => dayPlan[s.id]).length : 0;
+  const pct = Math.min(100, Math.round((eaten.kcal / t.kcal) * 100));
+  return h('button', { class: 'card stack food-today-card', style: 'text-align:left', onClick: () => window.__fitkoGoTab?.('food') },
+    h('div', { class: 'row between' },
+      h('div', { class: 'label' }, 'Jídlo dnes'),
+      h('span', { class: `badge ${!dayPlan ? 'warn' : eaten.p >= t.proteinG ? 'ok' : 'plain'}` },
+        !dayPlan ? 'bez plánu' : `${slotsDone} / ${slotsPlanned} jídel`),
+    ),
+    h('div', { class: 'row', style: 'gap:5px;align-items:baseline' },
+      h('span', { class: 'num', style: 'font-size:22px;font-weight:600' }, String(Math.round(eaten.kcal)).replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0')),
+      h('span', { class: 'muted', style: 'font-size:12px' }, `/ ${String(t.kcal).replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0')} kcal · ${eaten.p} / ${t.proteinG} g B`),
+    ),
+    h('div', { class: 'progressline' }, h('div', { style: `width:${pct}%` })),
+    h('div', { class: 'muted', style: 'font-size:12px' }, dayPlan ? 'Ťukni pro zapsání snědeného.' : 'Naplánuj si týden — jídelníček na tvé kalorie a nákupní seznam.'),
+  );
 }
 
 // ---------- hlavní karta ----------
@@ -5291,8 +6065,668 @@ function milestonesCard(state, summary) {
 }
 
 
+// ===== src/app/view_food.js =====
+// Jídlo: dnes (snědeno jedním ťuknutím), týden (plán na cíle z enginu), nákup (sečteno
+// a zaokrouhleno na balení, s akcemi z Lidlu), jídla (makra při tvorbě), akce.
+
+
+
+
+
+
+let sub = 'dnes'; // dnes | tyden | nakup | jidla | akce
+const SUBS = [
+  { id: 'dnes', label: 'Dnes' },
+  { id: 'tyden', label: 'Týden' },
+  { id: 'nakup', label: 'Nákup' },
+  { id: 'jidla', label: 'Jídla' },
+  { id: 'akce', label: 'Akce' },
+];
+
+function renderFood(root) {
+  const state = Store.state;
+  ensureFood(state);
+  const c = ctx(state);
+  clearEl(root);
+
+  const views = { dnes: viewToday, tyden: viewWeek, nakup: viewShopping, jidla: viewMeals, akce: viewDiscounts };
+  root.append(h('div', { class: 'screen' },
+    h('div', { class: 'topbar' },
+      h('h1', { class: 'display' }, 'Jídlo'),
+      c.targets ? h('div', { class: 'muted small num' }, `${fmtKcal(c.targets.kcal)} kcal · ${c.targets.proteinG} g B`) : null,
+    ),
+    h('div', { class: 'subnav' },
+      ...SUBS.map((s) => h('button', {
+        class: `chip plain${sub === s.id ? ' active' : ''}`,
+        onClick: () => { sub = s.id; window.scrollTo(0, 0); Store.onChange?.(); },
+      }, s.label)),
+    ),
+    ...views[sub](state, c),
+  ));
+}
+
+// ---------- kontext ----------
+
+function ctx(state) {
+  const food = state.food;
+  const today = todayISO();
+  const weekStart = weekStartOf(today);
+  const plan = food.plan && food.plan.weekStart === weekStart ? food.plan : null;
+  const feed = food.discounts;
+  const discounted = matchDiscounts({ items: validDiscountItems(feed, today) }, food.customFoods);
+  return { food, today, weekStart, plan, feed, discounted, meals: food.meals, customFoods: food.customFoods, targets: state.targets };
+}
+
+const fmtKcal = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+const fmtPortion = (p) => (p === 1 ? '1×' : `${String(Math.round(p * 100) / 100).replace('.', ',')}×`);
+const slotDef = (id) => FOOD_SLOTS.find((s) => s.id === id);
+const slotTime = (s) => `${s.hour}:${String(s.minute).padStart(2, '0')}`;
+const mealById = (c, id) => c.meals.find((m) => m.id === id) ?? null;
+const SLOT_KINDS = [
+  { id: 'snidane', label: 'Snídaně' }, { id: 'svacina', label: 'Svačina' },
+  { id: 'obed', label: 'Oběd' }, { id: 'vecere', label: 'Večeře' }, { id: null, label: 'Kdykoli' },
+];
+const slotKindLabel = (slot) => SLOT_KINDS.find((k) => k.id === slot)?.label ?? 'Kdykoli';
+
+function macroText(m) {
+  const r = roundMacros(m);
+  return `${fmtKcal(r.kcal)} kcal · ${r.p} g B`;
+}
+
+function dayBadge(totals, targets) {
+  if (!totals || !targets) return null;
+  const kcalOk = Math.abs(totals.kcal - targets.kcal) <= targets.kcal * 0.07;
+  const pOk = totals.p >= targets.proteinG * 0.95;
+  const cls = kcalOk && pOk ? 'ok' : 'warn';
+  const txt = !pOk ? `${totals.p} g B — málo` : !kcalOk ? (totals.kcal > targets.kcal ? 'přes cíl' : 'pod cílem') : 'sedí';
+  return h('span', { class: `badge ${cls}` }, txt);
+}
+
+// ---------- DNES ----------
+
+function viewToday(state, c) {
+  const dayPlan = c.plan?.days?.[c.today] ?? null;
+  const eatenDay = c.food.eaten[c.today] ?? {};
+  const eaten = eatenMacros(dayPlan, eatenDay, c.meals, c.customFoods);
+  const t = c.targets;
+  const out = [];
+
+  if (t) {
+    const kcalPct = Math.min(100, Math.round((eaten.kcal / t.kcal) * 100));
+    const pPct = Math.min(100, Math.round((eaten.p / t.proteinG) * 100));
+    const leftKcal = t.kcal - eaten.kcal;
+    const leftP = t.proteinG - eaten.p;
+    out.push(h('div', { class: 'card stack food-summary' },
+      h('div', { class: 'row between' },
+        h('div', { class: 'label' }, 'Dnes snědeno'),
+        h('span', { class: `badge ${leftP <= 0 ? 'ok' : 'plain'}` }, leftP <= 0 ? 'bílkoviny splněny' : `zbývá ${leftP} g B`),
+      ),
+      h('div', { class: 'row', style: 'gap:22px;align-items:flex-end' },
+        h('div', { class: 'grow' },
+          h('div', { class: 'row', style: 'gap:5px;align-items:baseline' },
+            h('span', { class: 'num', style: 'font-size:30px;font-weight:600' }, fmtKcal(eaten.kcal)),
+            h('span', { class: 'muted', style: 'font-size:12px' }, `/ ${fmtKcal(t.kcal)} kcal`),
+          ),
+          h('div', { class: 'progressline', style: 'margin-top:6px' }, h('div', { style: `width:${kcalPct}%` })),
+        ),
+        h('div', { style: 'min-width:96px' },
+          h('div', { class: 'row', style: 'gap:5px;align-items:baseline' },
+            h('span', { class: 'num', style: 'font-size:22px;font-weight:600' }, String(eaten.p)),
+            h('span', { class: 'muted', style: 'font-size:12px' }, `/ ${t.proteinG} g`),
+          ),
+          h('div', { class: 'progressline ok', style: 'margin-top:6px' }, h('div', { style: `width:${pPct}%` })),
+        ),
+      ),
+      h('div', { class: 'muted', style: 'font-size:12.5px' },
+        leftKcal > 0 ? `Zbývá ${fmtKcal(leftKcal)} kcal. Ťukni na ✓ u toho, co jsi snědl — nic nefotíš, makra jsou spočítaná předem.`
+          : `Cíl dne splněn (${fmtKcal(-leftKcal)} kcal nad). Zbytek dne už jen bílkoviny, když chybí.`),
+    ));
+  }
+
+  if (!dayPlan) {
+    out.push(planCta(c, 'Na dnešek nemáš jídelníček.'));
+  } else {
+    out.push(h('div', { class: 'card stack', style: 'gap:0' },
+      ...FOOD_SLOTS.map((slot) => slotRow(c, slot, dayPlan[slot.id], !!eatenDay[slot.id])),
+    ));
+  }
+
+  // něco navíc — mimo plán, jen kcal a bílkoviny
+  const extra = eatenDay.extra ?? [];
+  out.push(h('div', { class: 'card stack' },
+    h('div', { class: 'row between' },
+      h('div', { class: 'label' }, 'Něco navíc'),
+      h('button', { class: 'btn small', onClick: () => openExtraModal(c.today) }, '+ Přidat'),
+    ),
+    extra.length
+      ? h('div', { class: 'stack', style: 'gap:0' }, ...extra.map((x, i) => h('div', { class: 'history-row' },
+          h('span', { class: 'grow' }, x.name),
+          h('span', { class: 'num muted small' }, `${fmtKcal(x.kcal)} kcal · ${x.p} g B`),
+          h('button', { class: 'icon-btn', 'aria-label': 'Odebrat', onClick: () => Store.mutate((s) => { s.food.eaten[c.today].extra.splice(i, 1); }) }, '×'),
+        )))
+      : h('p', { class: 'muted', style: 'font-size:12.5px;margin:0' }, 'Když sníš něco mimo plán (rohlík, pivo, dort), zapiš jen kcal a bílkoviny — víc není potřeba.'),
+  ));
+
+  return out;
+}
+
+function slotRow(c, slot, entry, eaten) {
+  const meal = entry ? mealById(c, entry.mealId) : null;
+  const macros = meal ? mealMacros(meal, c.customFoods) : null;
+  const portion = entry?.portion ?? 1;
+  return h('div', { class: `food-slot${eaten ? ' done' : ''}${!meal ? ' empty' : ''}` },
+    h('button', {
+      class: `check-btn${eaten ? ' done' : ''}`,
+      'aria-label': eaten ? 'Odznačit' : 'Snědeno',
+      disabled: !meal,
+      onClick: () => Store.mutate((s) => {
+        const day = (s.food.eaten[c.today] ??= {});
+        day[slot.id] = !day[slot.id];
+      }),
+    }, '✓'),
+    h('button', { class: 'food-slot-body', onClick: () => openSlotModal(c, c.today, slot.id) },
+      h('div', { class: 'row between' },
+        h('span', { class: 'label' }, `${slot.label} · ${slotTime(slot)}`),
+        meal ? h('span', { class: 'num muted', style: 'font-size:12px' }, `${fmtKcal(macros.kcal * portion)} kcal · ${Math.round(macros.p * portion)} g B`) : null,
+      ),
+      h('div', { class: 'food-slot-name' }, meal ? meal.name : 'nic naplánováno — ťukni a vyber'),
+      meal && portion !== 1 ? h('div', { class: 'muted', style: 'font-size:12px' }, `${fmtPortion(portion)} porce`) : null,
+    ),
+  );
+}
+
+function planCta(c, lead) {
+  const hasMeals = c.meals.length > 0;
+  return h('div', { class: 'card stack' },
+    h('div', { class: 'label' }, 'Jídelníček na týden'),
+    h('p', { class: 'small', style: 'margin:0' }, `${lead} Plán se skládá z tvých jídel tak, aby každý den seděl na ${c.targets ? `${fmtKcal(c.targets.kcal)} kcal a ${c.targets.proteinG} g bílkovin` : 'tvé cíle'} — a dává přednost tomu, co je zrovna v akci v Lidlu.`),
+    hasMeals
+      ? h('button', { class: 'btn primary big', onClick: () => doPlan(c) }, 'Naplánovat tento týden')
+      : h('div', { class: 'stack', style: 'gap:8px' },
+          h('p', { class: 'muted', style: 'font-size:12.5px;margin:0' }, 'Nemáš zatím žádná jídla. Načti si 14 základních (kuřecí s rýží, ovesná kaše, tvaroh s medem…) a hned je uprav podle sebe.'),
+          h('button', { class: 'btn primary big', onClick: () => { loadStarters(); doPlan(ctx(Store.state)); } }, 'Načíst základní jídla a naplánovat'),
+        ),
+  );
+}
+
+function loadStarters() {
+  Store.mutate((s) => {
+    const have = new Set(s.food.meals.map((m) => m.id));
+    for (const m of starterMeals()) if (!have.has(m.id)) s.food.meals.push(m);
+  }, { rerender: false });
+}
+
+/** Naplánuje týden; sloty, které už jsou dnes snědené, drží. */
+function doPlan(c) {
+  const state = Store.state;
+  ensureFood(state);
+  if (!state.targets) { toast('Cíle výživy ještě nejsou — dokonči onboarding.'); return; }
+  if (!state.food.meals.length) { toast('Nejdřív si ulož nějaká jídla.'); return; }
+  const keep = {};
+  const eatenToday = state.food.eaten[c.today] ?? {};
+  const oldDay = state.food.plan?.weekStart === c.weekStart ? state.food.plan.days?.[c.today] : null;
+  for (const slot of FOOD_SLOTS) if (eatenToday[slot.id] && oldDay?.[slot.id]) (keep[c.today] ??= {})[slot.id] = oldDay[slot.id];
+  const plan = planWeek({ targets: state.targets, meals: state.food.meals, customFoods: state.food.customFoods, weekStart: c.weekStart, discounted: c.discounted, keep });
+  if (!plan) { toast('Z těchhle jídel plán nejde poskládat.'); return; }
+  Store.mutate((s) => { s.food.plan = plan; }, { publish: true });
+  const inAkce = Object.keys(c.discounted).length;
+  toast(inAkce ? `Týden naplánován — ${inAkce} potravin z akce.` : 'Týden naplánován.');
+}
+
+function recomputeDay(s, iso) {
+  const plan = s.food.plan;
+  if (!plan?.days?.[iso]) return;
+  plan.totals[iso] = dayPlanMacros(plan.days[iso], s.food.meals, s.food.customFoods);
+}
+
+// výběr jídla do slotu + porce
+function openSlotModal(c, iso, slotId) {
+  const slot = slotDef(slotId);
+  const kind = slotId.replace(/\d$/, '');
+  const entry = c.plan?.days?.[iso]?.[slotId] ?? null;
+  let portion = entry?.portion ?? 1;
+  let mealId = entry?.mealId ?? null;
+  const target = c.targets ? Math.round(c.targets.kcal * slot.share) : null;
+
+  const ordered = [...c.meals].sort((a, b) => (a.slot === kind ? 0 : a.slot ? 2 : 1) - (b.slot === kind ? 0 : b.slot ? 2 : 1) || a.name.localeCompare(b.name, 'cs'));
+  const list = h('div', { class: 'stack', style: 'gap:0;max-height:44vh;overflow:auto' });
+  const portionRow = h('div', { class: 'row', style: 'gap:6px;flex-wrap:wrap' });
+  const macroLine = h('div', { class: 'muted small num' });
+
+  const refresh = () => {
+    clearEl(list);
+    for (const m of ordered) {
+      const mm = mealMacros(m, c.customFoods);
+      list.append(h('button', {
+        class: `history-row${m.id === mealId ? ' selected' : ''}`,
+        onClick: () => { mealId = m.id; refresh(); },
+      },
+        h('span', { class: `radio${m.id === mealId ? ' on' : ''}` }),
+        h('span', { class: 'grow', style: 'text-align:left' }, m.name),
+        h('span', { class: 'num muted small' }, `${fmtKcal(mm.kcal * portion)} kcal`),
+      ));
+    }
+    clearEl(portionRow);
+    for (const p of [0.75, 1, 1.25, 1.5]) {
+      portionRow.append(h('button', { class: `chip${Math.abs(portion - p) < 0.01 ? ' active' : ''}`, onClick: () => { portion = p; refresh(); } }, fmtPortion(p)));
+    }
+    const m = mealId ? mealById(c, mealId) : null;
+    macroLine.textContent = m ? `${macroText({ ...mealMacros(m, c.customFoods), kcal: mealMacros(m, c.customFoods).kcal * portion, p: mealMacros(m, c.customFoods).p * portion })}${target ? ` · cíl slotu ~${fmtKcal(target)} kcal` : ''}` : '';
+  };
+  refresh();
+
+  const { close } = openModal(
+    h('h3', {}, `${slot.label} · ${fmtDate(iso)}`),
+    list,
+    h('div', { class: 'label', style: 'margin-top:4px' }, 'Porce'),
+    portionRow,
+    macroLine,
+    h('div', { class: 'row', style: 'margin-top:6px' },
+      h('button', { class: 'btn ghost', onClick: () => { setSlot(iso, slotId, null, 1); close(); } }, 'Vynechat'),
+      h('button', { class: 'btn primary grow', onClick: () => { if (!mealId) { toast('Vyber jídlo.'); return; } setSlot(iso, slotId, mealId, portion); close(); } }, 'Uložit'),
+    ),
+  );
+}
+
+function setSlot(iso, slotId, mealId, portion) {
+  Store.mutate((s) => {
+    const ws = weekStartOf(iso);
+    if (!s.food.plan || s.food.plan.weekStart !== ws) s.food.plan = { weekStart: ws, days: {}, totals: {} };
+    const day = (s.food.plan.days[iso] ??= {});
+    if (mealId) day[slotId] = { mealId, portion }; else delete day[slotId];
+    recomputeDay(s, iso);
+  });
+}
+
+function openExtraModal(iso) {
+  let nameIn; let kcalIn; let pIn;
+  const { close } = openModal(
+    h('h3', {}, 'Něco navíc'),
+    h('p', { class: 'small muted' }, 'Stačí odhad. Rohlík se šunkou ≈ 250 kcal / 10 g B, pivo 0,5 l ≈ 200 kcal / 2 g B.'),
+    nameIn = h('input', { type: 'text', placeholder: 'co to bylo' }),
+    h('div', { class: 'row' },
+      kcalIn = numericField(h('input', { class: 'num', type: 'text', inputmode: 'numeric', placeholder: 'kcal' }), { decimals: false }),
+      pIn = numericField(h('input', { class: 'num', type: 'text', inputmode: 'numeric', placeholder: 'g bílkovin' }), { decimals: false }),
+    ),
+    h('button', {
+      class: 'btn primary big',
+      onClick: () => {
+        const kcal = parseNum(kcalIn.value); const p = parseNum(pIn.value) ?? 0;
+        if (kcal == null || kcal < 0) { toast('Doplň kcal.'); return; }
+        Store.mutate((s) => {
+          const day = (s.food.eaten[iso] ??= {});
+          (day.extra ??= []).push({ name: nameIn.value.trim() || 'navíc', kcal: Math.round(kcal), p: Math.round(p) });
+        });
+        close();
+      },
+    }, 'Zapsat'),
+  );
+  setTimeout(() => nameIn.focus(), 50);
+}
+
+// ---------- TÝDEN ----------
+
+function viewWeek(state, c) {
+  if (!c.plan) return [planCta(c, 'Tento týden ještě nemá jídelníček.')];
+  const out = [];
+  out.push(h('div', { class: 'row', style: 'gap:8px' },
+    h('button', { class: 'btn grow', onClick: () => doPlan(c) }, 'Přeplánovat'),
+    h('button', {
+      class: 'btn ghost',
+      onClick: () => {
+        const { close } = openModal(
+          h('h3', {}, 'Smazat plán týdne?'),
+          h('p', { class: 'small' }, 'Jídla zůstanou, zmizí jen rozvrh. Co je zapsané jako snědené, zůstane.'),
+          h('div', { class: 'row' },
+            h('button', { class: 'btn ghost grow', onClick: () => close() }, 'Zpět'),
+            h('button', { class: 'btn danger grow', onClick: () => { Store.mutate((s) => { s.food.plan = null; }); close(); } }, 'Smazat'),
+          ),
+        );
+      },
+    }, 'Smazat'),
+  ));
+  for (const iso of weekDays(c.weekStart)) {
+    const day = c.plan.days[iso] ?? {};
+    const totals = c.plan.totals[iso] ?? dayPlanMacros(day, c.meals, c.customFoods);
+    const isToday = iso === c.today;
+    const past = iso < c.today;
+    out.push(h('div', { class: `card stack${isToday ? ' today-outline' : ''}`, style: past ? 'opacity:0.7' : '' },
+      h('div', { class: 'row between' },
+        h('div', { class: 'label' }, `${fmtDate(iso)}${isToday ? ' · dnes' : ''}`),
+        h('div', { class: 'row', style: 'gap:8px' },
+          h('span', { class: 'num muted', style: 'font-size:12px' }, `${fmtKcal(totals.kcal)} kcal · ${totals.p} g B`),
+          dayBadge(totals, c.targets),
+        ),
+      ),
+      h('div', { class: 'stack', style: 'gap:0' },
+        ...FOOD_SLOTS.map((slot) => {
+          const e = day[slot.id];
+          const meal = e ? mealById(c, e.mealId) : null;
+          return h('button', { class: 'history-row', onClick: () => openSlotModal(c, iso, slot.id) },
+            h('span', { class: 'muted', style: 'font-size:12px;width:78px;text-align:left;flex:none' }, (slot.id === 'svacina2' ? 'Svačina 2' : slot.label)),
+            h('span', { class: 'grow', style: 'text-align:left' }, meal ? meal.name : h('span', { class: 'faint' }, '—')),
+            meal && e.portion !== 1 ? h('span', { class: 'num muted', style: 'font-size:12px' }, fmtPortion(e.portion)) : null,
+          );
+        }),
+      ),
+    ));
+  }
+  return out;
+}
+
+// ---------- NÁKUP ----------
+
+function viewShopping(state, c) {
+  if (!c.plan) return [planCta(c, 'Nákupní seznam vzniká z jídelníčku — ten ještě nemáš.')];
+  const groups = shoppingList(c.plan, c.meals, c.customFoods, c.discounted);
+  const all = groups.flatMap((g) => g.items);
+  const bought = c.food.bought[c.weekStart] ?? {};
+  const inAkce = all.filter((i) => i.discount).length;
+  const done = all.filter((i) => bought[i.foodId]).length;
+  const out = [];
+  out.push(h('div', { class: 'card stack' },
+    h('div', { class: 'row between' },
+      h('div', { class: 'label' }, `Nákup na týden od ${fmtDate(c.weekStart)}`),
+      h('span', { class: 'num muted small' }, `${done} / ${all.length}`),
+    ),
+    h('div', { class: 'muted', style: 'font-size:12.5px' },
+      `${all.length} položek, ${inAkce ? `${inAkce} v akci v Lidlu` : 'nic z toho teď není v akci'}. Množství je sečtené z celého týdne a zaokrouhlené na balení.`),
+    h('div', { class: 'row' },
+      h('button', { class: 'btn grow', onClick: () => copyList(groups, c) }, 'Kopírovat seznam'),
+      done ? h('button', { class: 'btn ghost', onClick: () => Store.mutate((s) => { s.food.bought[c.weekStart] = {}; }) }, 'Odškrtnout vše') : null,
+    ),
+  ));
+  for (const g of groups) {
+    out.push(h('div', { class: 'card stack', style: 'gap:2px' },
+      h('div', { class: 'label', style: 'margin-bottom:4px' }, g.label),
+      ...g.items.map((it) => {
+        const on = !!bought[it.foodId];
+        const qty = it.pieces ? `${it.pieces} ks` : `${it.packs}× ${it.packLabel}`;
+        return h('button', {
+          class: `shop-row${on ? ' done' : ''}`,
+          onClick: () => Store.mutate((s) => { const b = (s.food.bought[c.weekStart] ??= {}); b[it.foodId] = !b[it.foodId]; }, { markDirty: false }),
+        },
+          h('span', { class: `shop-check${on ? ' on' : ''}` }, on ? '✓' : ''),
+          h('span', { class: 'grow', style: 'text-align:left' },
+            h('div', {}, it.name),
+            h('div', { class: 'muted', style: 'font-size:12px' }, `${qty} · ${it.grams} g`),
+          ),
+          it.discount ? h('span', { class: 'badge accent', style: 'flex:none' }, `${fmtPrice(it.discount.price)}${it.discount.validTo ? ` do ${fmtDate(it.discount.validTo)}` : ''}`) : null,
+        );
+      }),
+    ));
+  }
+  return out;
+}
+
+function fmtPrice(p) { return p == null ? 'akce' : `${String(p).replace('.', ',')} Kč`; }
+
+async function copyList(groups, c) {
+  const lines = [`Nákup Fitko — týden od ${fmtDate(c.weekStart)}`];
+  for (const g of groups) {
+    lines.push('', g.label.toUpperCase());
+    for (const it of g.items) lines.push(`- ${it.name}: ${it.pieces ? `${it.pieces} ks` : `${it.packs}× ${it.packLabel}`}${it.discount ? ` (akce ${fmtPrice(it.discount.price)})` : ''}`);
+  }
+  try { await navigator.clipboard.writeText(lines.join('\n')); toast('Seznam zkopírován.'); } catch { toast('Kopírování nejde — otevři seznam v appce.'); }
+}
+
+// ---------- JÍDLA ----------
+
+function viewMeals(state, c) {
+  const out = [];
+  out.push(h('div', { class: 'row', style: 'gap:8px' },
+    h('button', { class: 'btn primary grow', onClick: () => openMealEditor(c, null) }, '+ Nové jídlo'),
+    h('button', { class: 'btn ghost', onClick: () => { loadStarters(); toast('Základní jídla načtena.'); Store.onChange?.(); } }, c.meals.length ? 'Doplnit základní' : 'Načíst základní'),
+  ));
+  if (!c.meals.length) {
+    out.push(h('div', { class: 'card stack' },
+      h('div', { class: 'label' }, 'Zatím žádná jídla'),
+      h('p', { class: 'small muted', style: 'margin:0' }, 'Jídlo = potraviny v gramech. Makra se spočítají jednou při tvorbě; potom už jen ťukáš „snědeno“.'),
+    ));
+    return out;
+  }
+  const byKind = {};
+  for (const m of c.meals) (byKind[m.slot ?? 'any'] ??= []).push(m);
+  for (const k of ['snidane', 'svacina', 'obed', 'vecere', 'any']) {
+    if (!byKind[k]) continue;
+    out.push(h('div', { class: 'card stack', style: 'gap:0' },
+      h('div', { class: 'label', style: 'margin-bottom:6px' }, k === 'any' ? 'Kdykoli' : slotKindLabel(k)),
+      ...byKind[k].sort((a, b) => a.name.localeCompare(b.name, 'cs')).map((m) => {
+        const mm = roundMacros(mealMacros(m, c.customFoods));
+        const share = m.items.reduce((a, it) => a + (c.discounted[it.foodId] ? it.grams : 0), 0) / Math.max(1, m.items.reduce((a, it) => a + it.grams, 0));
+        return h('button', { class: 'history-row', onClick: () => openMealEditor(c, m) },
+          h('span', { class: 'grow', style: 'text-align:left' },
+            h('div', {}, m.name),
+            h('div', { class: 'muted', style: 'font-size:12px' }, `${m.items.length} položek · ${fmtKcal(mm.kcal)} kcal · ${mm.p} g B · ${mm.c} g S · ${mm.f} g T`),
+          ),
+          share >= 0.3 ? h('span', { class: 'badge accent', style: 'flex:none' }, 'v akci') : null,
+        );
+      }),
+    ));
+  }
+  return out;
+}
+
+function openMealEditor(c, existing) {
+  const draft = existing
+    ? { id: existing.id, name: existing.name, slot: existing.slot ?? null, items: existing.items.map((it) => ({ ...it })) }
+    : { id: `m_${Date.now().toString(36)}`, name: '', slot: null, items: [] };
+
+  const nameIn = h('input', { type: 'text', placeholder: 'název jídla', value: draft.name });
+  const slotRow = h('div', { class: 'row', style: 'gap:6px;flex-wrap:wrap' });
+  const itemsBox = h('div', { class: 'stack', style: 'gap:6px' });
+  const footer = h('div', { class: 'num small', style: 'font-weight:600' });
+
+  const custom = () => Store.state.food.customFoods;
+  const refresh = () => {
+    clearEl(slotRow);
+    for (const k of SLOT_KINDS) slotRow.append(h('button', { class: `chip${draft.slot === k.id ? ' active' : ''}`, onClick: () => { draft.slot = k.id; refresh(); } }, k.label));
+    clearEl(itemsBox);
+    draft.items.forEach((it, i) => {
+      const f = foodById(it.foodId, custom());
+      const gIn = numericField(h('input', { class: 'num set-input', type: 'text', inputmode: 'numeric', value: fmtInput(it.grams), style: 'width:74px' }), { decimals: false });
+      gIn.addEventListener('input', () => { it.grams = parseNum(gIn.value) ?? 0; updateFooter(); });
+      itemsBox.append(h('div', { class: 'ing-row' },
+        h('span', { class: 'grow' },
+          h('div', {}, f?.name ?? it.foodId),
+          h('div', { class: 'muted', style: 'font-size:11.5px' }, f ? `${f.kcal} kcal · ${f.p} g B na 100 g${f.pieceG ? ` · 1 ks ≈ ${f.pieceG} g` : ''}` : 'neznámá potravina'),
+        ),
+        gIn, h('span', { class: 'muted small' }, 'g'),
+        h('button', { class: 'icon-btn', 'aria-label': 'Odebrat', onClick: () => { draft.items.splice(i, 1); refresh(); } }, '×'),
+      ));
+    });
+    updateFooter();
+  };
+  const updateFooter = () => {
+    const m = roundMacros(mealMacros(draft, custom()));
+    footer.textContent = draft.items.length ? `Porce: ${fmtKcal(m.kcal)} kcal · ${m.p} g bílkovin · ${m.c} g sacharidů · ${m.f} g tuků` : 'Přidej potraviny — makra se spočítají hned.';
+  };
+  refresh();
+
+  const { close } = openModal(
+    h('h3', {}, existing ? 'Upravit jídlo' : 'Nové jídlo'),
+    nameIn,
+    slotRow,
+    itemsBox,
+    h('button', { class: 'btn', onClick: () => openFoodSearch(c, (food) => { draft.items.push({ foodId: food.id, grams: food.pieceG ?? 100 }); refresh(); }) }, '+ Přidat potravinu'),
+    footer,
+    h('div', { class: 'row', style: 'margin-top:4px' },
+      existing ? h('button', {
+        class: 'btn danger',
+        onClick: () => { Store.mutate((s) => { s.food.meals = s.food.meals.filter((m) => m.id !== existing.id); cleanupPlan(s); }); close(); },
+      }, 'Smazat') : h('button', { class: 'btn ghost', onClick: () => close() }, 'Zrušit'),
+      h('button', {
+        class: 'btn primary grow',
+        onClick: () => {
+          draft.name = nameIn.value.trim();
+          if (!draft.name) { toast('Dej jídlu název.'); return; }
+          draft.items = draft.items.filter((it) => it.grams > 0);
+          if (!draft.items.length) { toast('Přidej aspoň jednu potravinu.'); return; }
+          Store.mutate((s) => {
+            const i = s.food.meals.findIndex((m) => m.id === draft.id);
+            const saved = { id: draft.id, name: draft.name, slot: draft.slot, items: draft.items };
+            if (i >= 0) s.food.meals[i] = saved; else s.food.meals.push(saved);
+            for (const iso of Object.keys(s.food.plan?.days ?? {})) recomputeDay(s, iso);
+          });
+          close();
+        },
+      }, 'Uložit'),
+    ),
+  );
+}
+
+// smazané jídlo nesmí zůstat v plánu
+function cleanupPlan(s) {
+  const ids = new Set(s.food.meals.map((m) => m.id));
+  for (const [iso, day] of Object.entries(s.food.plan?.days ?? {})) {
+    for (const [sid, e] of Object.entries(day)) if (!ids.has(e.mealId)) delete day[sid];
+    recomputeDay(s, iso);
+  }
+}
+
+function openFoodSearch(c, onPick) {
+  const input = h('input', { type: 'text', placeholder: 'hledej potravinu (kuřecí, skyr, rýže…)', autocomplete: 'off' });
+  const results = h('div', { class: 'stack', style: 'gap:0;max-height:46vh;overflow:auto' });
+  const status = h('div', { class: 'muted', style: 'font-size:12px' });
+  let offBusy = false;
+
+  const row = (f, sourceLabel) => h('button', { class: 'history-row', onClick: () => { onPick(f); close(); } },
+    h('span', { class: 'grow', style: 'text-align:left' },
+      h('div', {}, f.name),
+      h('div', { class: 'muted', style: 'font-size:11.5px' }, `${f.kcal} kcal · ${f.p} g B · ${f.c} g S · ${f.f} g T na 100 g${sourceLabel ? ` · ${sourceLabel}` : ''}`),
+    ),
+  );
+
+  const renderLocal = () => {
+    clearEl(results);
+    const q = input.value.trim();
+    const found = searchFoods(q, Store.state.food.customFoods, 14);
+    for (const f of found) results.append(row(f, f.source === 'off' ? 'Open Food Facts' : null));
+    status.textContent = q && !found.length ? 'Nic ve vestavěných — zkus Open Food Facts (etikety výrobků včetně Lidlu).' : q ? '' : 'Vestavěných potravin je 90+, hledá se bez diakritiky.';
+    if (q.length >= 3) results.append(h('button', { class: 'btn ghost', style: 'margin-top:8px', onClick: searchOff }, offBusy ? 'Hledám…' : 'Hledat v Open Food Facts'));
+  };
+
+  const searchOff = async () => {
+    const q = input.value.trim();
+    if (q.length < 3 || offBusy) return;
+    offBusy = true; renderLocal(); status.textContent = 'Hledám v Open Food Facts…';
+    try {
+      const url = (host) => `https://${host}/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=12&fields=code,product_name,brands,quantity,nutriments`;
+      let res = await fetch(url('cz.openfoodfacts.org'));
+      let data = res.ok ? await res.json() : null;
+      if (!data?.products?.length) { res = await fetch(url('world.openfoodfacts.org')); data = res.ok ? await res.json() : null; }
+      const foods = (data?.products ?? []).map(foodFromOpenFoodFacts).filter(Boolean);
+      clearEl(results);
+      if (!foods.length) { status.textContent = 'Open Food Facts nic nenašel (nebo je zrovna nedostupný). Přidej potravinu ručně.'; }
+      else { status.textContent = `${foods.length} výsledků z Open Food Facts — hodnoty z etiket, ověř si je.`; }
+      for (const f of foods) results.append(row(f, 'OFF'));
+      results.append(h('button', { class: 'btn ghost', style: 'margin-top:8px', onClick: () => openManualFood(onPick, close, q) }, 'Přidat ručně'));
+    } catch {
+      status.textContent = 'Open Food Facts teď neodpovídá. Přidej potravinu ručně.';
+      results.append(h('button', { class: 'btn ghost', style: 'margin-top:8px', onClick: () => openManualFood(onPick, close, input.value.trim()) }, 'Přidat ručně'));
+    } finally { offBusy = false; }
+  };
+
+  input.addEventListener('input', renderLocal);
+  const { close } = openModal(h('h3', {}, 'Potravina'), input, status, results,
+    h('button', { class: 'btn ghost small', onClick: () => openManualFood(onPick, close, input.value.trim()) }, 'Zadat ručně z etikety'));
+  renderLocal();
+  setTimeout(() => input.focus(), 50);
+
+  // vybraná OFF potravina se uloží mezi vlastní, ať jde příště najít offline
+  const origPick = onPick;
+  onPick = (f) => {
+    if (f.source === 'off' || f.source === 'manual') {
+      Store.mutate((s) => { if (!s.food.customFoods.some((x) => x.id === f.id)) s.food.customFoods.push(f); }, { rerender: false });
+    }
+    origPick(f);
+  };
+}
+
+function openManualFood(onPick, closeParent, presetName = '') {
+  const nameIn = h('input', { type: 'text', placeholder: 'název', value: presetName });
+  const mk = (ph) => numericField(h('input', { class: 'num', type: 'text', inputmode: 'decimal', placeholder: ph }));
+  const kcalIn = mk('kcal / 100 g'); const pIn = mk('bílkoviny g'); const cIn = mk('sacharidy g'); const fIn = mk('tuky g');
+  const { close } = openModal(
+    h('h3', {}, 'Potravina z etikety'),
+    h('p', { class: 'small muted' }, 'Hodnoty na 100 g (nebo 100 ml) z výživové tabulky.'),
+    nameIn,
+    h('div', { class: 'row' }, kcalIn, pIn),
+    h('div', { class: 'row' }, cIn, fIn),
+    h('button', {
+      class: 'btn primary big',
+      onClick: () => {
+        const name = nameIn.value.trim(); const kcal = parseNum(kcalIn.value);
+        if (!name || kcal == null) { toast('Doplň název a kcal.'); return; }
+        const food = { id: `man_${Date.now().toString(36)}`, name, cat: 'ostatni', kcal: Math.round(kcal), p: parseNum(pIn.value) ?? 0, c: parseNum(cIn.value) ?? 0, f: parseNum(fIn.value) ?? 0, packG: 500, source: 'manual' };
+        Store.mutate((s) => { s.food.customFoods.push(food); }, { rerender: false });
+        close(); closeParent?.(); onPick(food);
+      },
+    }, 'Uložit potravinu'),
+  );
+}
+
+// ---------- AKCE ----------
+
+function viewDiscounts(state, c) {
+  const feed = c.feed;
+  const out = [];
+  const age = feedAgeDays(feed);
+  if (!feed) {
+    out.push(h('div', { class: 'card stack' },
+      h('div', { class: 'label' }, 'Akce v Lidlu'),
+      h('p', { class: 'small', style: 'margin:0' }, 'Akční potraviny se stahují 2× týdně (pondělí a čtvrtek, kdy Lidl mění leták) z kupi.cz přes GitHub — appka sama nikam neleze. První stažení proběhne po nasazení; zatím tu nic není.'),
+      akceInfo.lastError ? h('p', { class: 'muted', style: 'font-size:12px;margin:0' }, `Stav: ${akceInfo.lastError}`) : null,
+    ));
+    return out;
+  }
+  const items = validDiscountItems(feed, c.today);
+  const matchedIds = new Set(Object.keys(c.discounted));
+  const matched = Object.entries(c.discounted).map(([foodId, it]) => ({ ...it, foodId, foodName: foodById(foodId, c.customFoods)?.name }));
+  const rest = items.filter((it) => !matched.some((m) => m.name === it.name)).slice(0, 80);
+
+  out.push(h('div', { class: 'card stack' },
+    h('div', { class: 'row between' },
+      h('div', { class: 'label' }, `Lidl · ${items.length} akčních potravin`),
+      h('span', { class: `badge ${age != null && age > 5 ? 'warn' : 'plain'}` }, age == null ? '—' : age === 0 ? 'dnes' : age === 1 ? 'včera' : `před ${age} dny`),
+    ),
+    h('p', { class: 'muted', style: 'font-size:12.5px;margin:0' },
+      `${matched.length} z nich odpovídá potravinám v tvých jídlech. Plánovač je při skládání týdne upřednostní.`),
+    c.meals.length ? h('button', { class: 'btn primary', onClick: () => doPlan(c) }, 'Naplánovat týden z akcí') : null,
+  ));
+  if (matched.length) {
+    out.push(h('div', { class: 'card stack', style: 'gap:0' },
+      h('div', { class: 'label', style: 'margin-bottom:6px' }, 'Hodí se do tvých jídel'),
+      ...matched.sort((a, b) => (a.foodName ?? '').localeCompare(b.foodName ?? '', 'cs')).map((it) => discountRow(it, it.foodName)),
+    ));
+  }
+  if (rest.length) {
+    out.push(h('div', { class: 'card stack', style: 'gap:0' },
+      h('div', { class: 'label', style: 'margin-bottom:6px' }, 'Ostatní potraviny v akci'),
+      ...rest.map((it) => discountRow(it, null)),
+    ));
+  }
+  return out;
+}
+
+function discountRow(it, foodName) {
+  return h('div', { class: 'history-row' },
+    h('span', { class: 'grow' },
+      h('div', {}, it.name, it.qty ? h('span', { class: 'muted', style: 'font-size:12px' }, ` · ${it.qty}`) : null),
+      h('div', { class: 'muted', style: 'font-size:11.5px' },
+        [foodName ? `= ${foodName}` : null, it.pricePerUnit, it.validTo ? `do ${fmtDate(it.validTo)}` : it.validFrom ? `od ${fmtDate(it.validFrom)}` : null].filter(Boolean).join(' · ')),
+    ),
+    h('span', { class: 'num', style: 'font-weight:600;flex:none' }, fmtPrice(it.price)),
+    it.discountPct ? h('span', { class: 'badge accent', style: 'flex:none' }, `−${it.discountPct} %`) : null,
+  );
+}
+
+
 // ===== src/app/view_settings.js =====
 // Nastavení: profil, priorita, výživa, deload, data (export/import/uložení), návod.
+
+
+
 
 
 
@@ -5310,6 +6744,7 @@ function renderSettings(root) {
     h('p', { class: 'screen-sub' }, 'Cíl, výživa, deload a záloha dat.'),
     profileCard(state),
     nutritionCard(state),
+    notificationsCard(state),
     restCard(state),
     deloadCard(state),
     backupCard(state),
@@ -5388,6 +6823,86 @@ function nutritionCard(state) {
         h('span', { class: 'num muted', style: 'font-size:12.5px' }, l.deltaKcal ? `${fmtSigned(l.deltaKcal)} kcal` : `${l.kcal} kcal`),
       )),
     ) : null,
+  );
+}
+
+// ---------- notifikace ----------
+
+const PUSH_PREFS = [
+  { id: 'workout', label: 'Trénink', hint: 'odpoledne, když jsi 2+ dny necvičil nebo máš rozdělaný trénink' },
+  { id: 'weigh', label: 'Vážení', hint: 'ráno, když poslední vážení je 3+ dny staré' },
+  { id: 'meals', label: 'Jídlo', hint: '45 min po plánovaném jídle, pokud není zapsané' },
+  { id: 'protein', label: 'Bílkoviny', hint: 've 20:00, když ti do cíle chybí víc než 30 g' },
+  { id: 'shopping', label: 'Leták', hint: 'když přijdou nové akce a máš z nich něco v nákupu' },
+];
+
+let notifStatus = null; // { checkedAt, last, error } z fitko-notif.json (zapisuje Action)
+
+function notificationsCard(state) {
+  ensureFood(state);
+  const push = state.push;
+  const on = !!push.subscription;
+  const blocker = pushBlocker();
+
+  if (on && notifStatus === null) {
+    notifStatus = false; // načítá se
+    cloudReadFile('fitko-notif.json').then((r) => { notifStatus = r ?? { none: true }; renderSettings(document.getElementById('app')); });
+  }
+
+  return h('div', { class: 'card stack' },
+    h('div', { class: 'row between' },
+      h('div', { class: 'label' }, 'Notifikace'),
+      h('span', { class: `badge ${on ? 'ok' : 'plain'}` }, on ? 'zapnuto' : 'vypnuto'),
+    ),
+    on
+      ? h('div', { class: 'stack', style: 'gap:8px' },
+          h('p', { class: 'muted', style: 'font-size:12.5px;margin:0' },
+            'Posílá je GitHub každých ~30 minut podle tvé zálohy — jen když je co říct. Ticho 22:00–7:00.'),
+          h('div', { class: 'stack', style: 'gap:4px' },
+            ...PUSH_PREFS.map((p) => h('button', {
+              class: 'history-row',
+              onClick: () => Store.mutate((s) => { s.push.prefs[p.id] = !s.push.prefs[p.id]; }),
+            },
+              h('span', { class: `radio${push.prefs[p.id] ? ' on' : ''}` }),
+              h('span', { class: 'grow', style: 'text-align:left' },
+                h('div', {}, p.label),
+                h('div', { class: 'muted', style: 'font-size:11.5px' }, p.hint),
+              ),
+            )),
+          ),
+          notifStatus && !notifStatus.none
+            ? h('p', { class: notifStatus.error ? 'bad-text' : 'muted', style: 'font-size:12px;margin:0' },
+                notifStatus.error ? `GitHub hlásí: ${notifStatus.error}`
+                  : notifStatus.last ? `Poslední: ${notifStatus.last.title} · ${fmtDate(notifStatus.last.at.slice(0, 10))} ${notifStatus.last.at.slice(11, 16)}`
+                    : `GitHub kontroloval ${notifStatus.checkedAt ? fmtDate(notifStatus.checkedAt.slice(0, 10)) : '—'}, zatím nebylo co poslat.`)
+            : notifStatus?.none
+              ? h('p', { class: 'warn-text', style: 'font-size:12px;margin:0' }, 'GitHub zatím neposlal nic — zkontroluj, že je v repozitáři nastavený secret FITKO_GH_TOKEN (návod níže).')
+              : null,
+          h('div', { class: 'row' },
+            h('button', { class: 'btn small', onClick: async () => { toast((await testLocalNotification()) ? 'Odesláno.' : 'Nepodařilo se zobrazit.'); } }, 'Zkušební'),
+            h('button', {
+              class: 'btn ghost small',
+              onClick: async () => { await unsubscribePush(); Store.mutate((s) => { s.push.subscription = null; s.push.enabledAt = null; }, { publish: true }); toast('Notifikace vypnuty.'); },
+            }, 'Vypnout'),
+          ),
+        )
+      : h('div', { class: 'stack', style: 'gap:8px' },
+          h('p', { class: 'muted', style: 'font-size:12.5px;margin:0' },
+            'Chytré připomínky: trénink, vážení, nezapsané jídlo, málo bílkovin večer, nový leták. Bez serveru — posílá je GitHub podle tvé zálohy.'),
+          blocker ? h('p', { class: 'warn-text', style: 'font-size:12.5px;margin:0' }, blocker) : null,
+          h('button', {
+            class: 'btn primary',
+            disabled: !!blocker || pushInfo.busy,
+            onClick: async () => {
+              const r = await subscribePush();
+              if (!r.ok) { toast(r.reason); renderSettings(document.getElementById('app')); return; }
+              Store.mutate((s) => { s.push.subscription = r.subscription; s.push.enabledAt = new Date().toISOString(); }, { publish: true });
+              toast('Notifikace zapnuty — první přijde, až bude co říct.');
+            },
+          }, 'Zapnout notifikace'),
+          h('p', { class: 'muted', style: 'font-size:11.5px;margin:0' },
+            'Jednorázově: ten samý GitHub token, co používáš na zálohu, vlož i jako secret FITKO_GH_TOKEN v repozitáři (Settings → Secrets → Actions). Bez něj GitHub do zálohy nevidí a nemá z čeho posílat.'),
+        ),
   );
 }
 
@@ -5785,10 +7300,14 @@ function aboutCard() {
 
 
 
+
+
+
 let currentTab = 'today';
 
 const TABS = [
   { id: 'today', label: 'Dnes', icon: 'today', render: renderToday },
+  { id: 'food', label: 'Jídlo', icon: 'food', render: renderFood },
   { id: 'progress', label: 'Progres', icon: 'progress', render: renderProgress },
   { id: 'settings', label: 'Nastavení', icon: 'settings', render: renderSettings },
 ];
@@ -5827,8 +7346,26 @@ function render() {
   requestAnimationFrame(() => window.scrollTo(0, scrollY));
 }
 
-// umožní kartám na Dnes poslat uživatele rovnou do Nastavení
-window.__fitkoGoSettings = () => { currentTab = 'settings'; window.scrollTo(0, 0); render(); };
+// umožní kartám poslat uživatele na jinou záložku (Dnes → Nastavení, Dnes → Jídlo, notifikace → cíl)
+window.__fitkoGoTab = (id) => { if (TABS.some((t) => t.id === id)) { currentTab = id; window.scrollTo(0, 0); render(); } };
+window.__fitkoGoSettings = () => window.__fitkoGoTab('settings');
+
+// Notifikace otevírá appku s #food / #today / #settings — respektujeme to při startu i za běhu.
+function applyHashRoute() {
+  const id = (location.hash || '').replace('#', '');
+  if (id && TABS.some((t) => t.id === id)) { currentTab = id; history.replaceState(null, '', location.pathname + location.search); return true; }
+  return false;
+}
+window.addEventListener('hashchange', () => { if (applyHashRoute()) { window.scrollTo(0, 0); render(); } });
+
+// Akce z Lidlu: stáhnout, když jsou uložené starší než pár hodin (bez rerenderu, jen uložit).
+function refreshDiscountFeed() {
+  const current = Store.state.food?.discounts;
+  refreshDiscounts(current).then((feed) => {
+    if (!feed) return;
+    Store.mutate((s) => { s.food.discounts = feed; }, { rerender: currentTab === 'food', markDirty: false });
+  });
+}
 
 function boot() {
   captureDocument();
@@ -5842,6 +7379,8 @@ function boot() {
     try { navigator.serviceWorker.register('./sw.js'); } catch { /* nepovinné */ }
   }
   initCloud();
+  initPush();
+  applyHashRoute();
   const persisted = loadPersistedState();
   backupState(persisted); // snímek toho, co bylo na disku před spuštěním
   Store.init(persisted);
@@ -5863,6 +7402,11 @@ function boot() {
         toast(`Data obnovena ze zálohy — ${r.state.sessions.length} tréninků.`);
       }
     });
+  }
+
+  if (Store.state.onboarded) {
+    refreshDiscountFeed();
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshDiscountFeed(); });
   }
 
   // Automatická aktualizace: mimo trénink se přepne sama, v tréninku počká na tebe.
