@@ -82,7 +82,8 @@ export function dueNotifications(state, now, feed, memory = {}) {
     const since = last ? daysBetween(last, iso) : 99;
     const todayDone = sessions.some((s) => s.date === iso);
     if (!todayDone && since >= 2) {
-      const unit = engine.WEEK_TEMPLATE[sessions.length % engine.WEEK_TEMPLATE.length];
+      const days = engine.programDays(state);
+      const unit = days[sessions.length % days.length];
       const sets = unit.exercises.reduce((a, e) => a + e.sets, 0);
       const estMin = Math.round((sets * 2.4 + 8) / 5) * 5;
       out.push({

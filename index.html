@@ -1077,7 +1077,7 @@ input.set-input {
 <script>
 (() => {
 'use strict';
-const BUILD_ID = "2026-09-12 18:04";
+const BUILD_ID = "2026-09-13 19:28";
 const VAPID_PUBLIC_KEY = "BD_ok8gw7j2oTGo4onj5L0RKeoBb8CwcRXI6kBmWMQGHidqYlHqA-Mcl8tffN3j8ZxnzX7Fzq_RmG80iWyI6X0M";
 // ===== src/engine/util.js =====
 // Sdílené utility enginu — čisté funkce, žádné závislosti.
@@ -1250,7 +1250,7 @@ const EXERCISES = {
     substitutes: ['hack_squat', 'leg_press'],
   },
   rdl: {
-    id: 'rdl', name: 'Rumunský mrtvý tah', type: 'heavy',
+    id: 'rdl', name: 'Rumunský mrtvý tah', type: 'heavy', key: true,
     muscles: { primary: ['hams_glutes'], secondary: [] }, // vzpřimovače ≠ objem na šířku zad
     repRange: [6, 10], rir: [2, 3], increment: 2.5, incrementRule: 'barbell',
     why: 'Hamstringy přes protažení pod zátěží — nejsilnější hypertrofický podnět pro zadní stehna.',
@@ -1442,6 +1442,80 @@ const EXERCISES = {
     how: 'Krok vpřed, koleno zadní nohy k zemi. Trup vzpřímený, tlač přes patu přední nohy.',
     substitutes: ['bss'],
   },
+
+  // ---------- spodek těla a hýždě (program „Spodek“) ----------
+  hip_thrust: {
+    id: 'hip_thrust', name: 'Hip thrust (osa)', type: 'heavy', key: true,
+    muscles: { primary: ['glutes'], secondary: ['hams_glutes'] },
+    repRange: [6, 10], rir: [2, 3], increment: 2.5, incrementRule: 'barbell',
+    why: 'Nejsilnější cvik na hýždě s nejvyšším napětím v plném stahu — základ programu na spodek.',
+    how: 'Lopatky opřené o lavici, osa (s polstrem) přes boky, chodidla tak, aby v horní poloze byla kolena v 90°. Nahoře brada k hrudníku, pánev podsadit, zadek stáhnout na vteřinu. Dolů kontrolovaně.',
+    substitutes: ['glute_bridge'],
+  },
+  glute_bridge: {
+    id: 'glute_bridge', name: 'Glute bridge (jednoručka)', type: 'secondary',
+    muscles: { primary: ['glutes'], secondary: ['hams_glutes'] },
+    repRange: [10, 15], rir: [1, 2], increment: 2, incrementRule: 'dumbbell',
+    why: 'Stejný pohyb jako hip thrust, ale ze země — bezpečnější pro záda a jde dělat kdekoli.',
+    how: 'Leh na zádech, chodidla na šířku boků, jednoručka přes boky. Zatlač patami, nahoře stáhni zadek a vydrž vteřinu. Bedra neprohýbej.',
+    substitutes: ['hip_thrust'],
+  },
+  goblet_squat: {
+    id: 'goblet_squat', name: 'Goblet dřep (jednoručka)', type: 'secondary',
+    muscles: { primary: ['quads'], secondary: ['glutes'] },
+    repRange: [8, 12], rir: [1, 2], increment: 2, incrementRule: 'dumbbell',
+    why: 'Dřep, který se sám hlídá: jednoručka před hrudníkem drží trup vzpřímený a učí správnou hloubku.',
+    how: 'Jednoručku drž svisle u hrudníku, chodidla mírně ven. Dřepni mezi kolena tak hluboko, jak drží rovná záda, lokty jdou dovnitř kolen. Nahoru přes celé chodidlo.',
+    substitutes: ['leg_press', 'hack_squat'],
+  },
+  sumo_db_squat: {
+    id: 'sumo_db_squat', name: 'Sumo dřep (jednoručka)', type: 'secondary',
+    muscles: { primary: ['glutes'], secondary: ['quads'] },
+    repRange: [10, 15], rir: [1, 2], increment: 2, incrementRule: 'dumbbell',
+    why: 'Široký postoj přesouvá práci z kvadricepsů na hýždě a vnitřní stehna.',
+    how: 'Široký postoj, špičky ven 30–45°, jednoručka visí mezi nohama. Kolena tlač ven ve směru špiček, dole zastav, nahoře stáhni zadek.',
+    substitutes: ['goblet_squat'],
+  },
+  hip_abduction: {
+    id: 'hip_abduction', name: 'Abdukce (stroj)', type: 'isolation', dropset: true,
+    muscles: { primary: ['glutes'], secondary: [] },
+    repRange: [12, 15], rir: [0, 1], increment: 5, incrementRule: 'stack',
+    why: 'Střední hýžďový sval (gluteus medius) — tvar boků a stabilita kolen, nic jiného ho tak přímo nezasáhne.',
+    how: 'Mírný předklon trupu, kolena tlač ven proti odporu až do plného rozsahu, na vteřinu vydrž, zpátky pomalu. Bez švihu.',
+    substitutes: ['cable_kickback'],
+  },
+  cable_kickback: {
+    id: 'cable_kickback', name: 'Zakopávání na kladce (kickback)', type: 'isolation',
+    muscles: { primary: ['glutes'], secondary: ['hams_glutes'] },
+    repRange: [12, 15], rir: [0, 1], increment: 5, incrementRule: 'stack',
+    why: 'Izolace velkého hýžďového svalu v protažení i ve stahu; nízká únava, dobře se zaostřuje na cílový sval.',
+    how: 'Manžeta na kotníku, ruce opřené o stroj, lehký předklon. Nohu veď dozadu a mírně nahoru z hýždě, ne z beder; nahoře vteřinu stáhni. Střídej nohy, počítej na každou.',
+    substitutes: ['glute_bridge'],
+  },
+  step_up: {
+    id: 'step_up', name: 'Výstupy na bednu (jednoručky)', type: 'secondary',
+    muscles: { primary: ['quads'], secondary: ['glutes'] },
+    repRange: [8, 12], rir: [1, 2], increment: 2, incrementRule: 'dumbbell',
+    why: 'Jednostranný cvik na stehna a hýždě šetrný ke kolenům — výška bedny řídí náročnost.',
+    how: 'Bedna po koleno. Celé chodidlo na bedně, vystup tlakem přes patu bez odrazu druhou nohou. Dolů pomalu. Počítej na každou nohu.',
+    substitutes: ['bss', 'lunges'],
+  },
+  back_extension: {
+    id: 'back_extension', name: 'Hyperextenze (hýždě)', type: 'isolation',
+    muscles: { primary: ['hams_glutes'], secondary: ['glutes'] },
+    repRange: [10, 15], rir: [0, 1], increment: 2.5, incrementRule: 'bodyweight',
+    why: 'Zadní řetězec bez zátěže na páteř; s kotoučem na hrudi jde progredovat dlouho.',
+    how: 'Polstr pod pánevními kostmi, špičky mírně ven. Dolů s rovnými zády, nahoru stahem hýždí jen do roviny — nepřepínej. Kotouč u hrudníku = přídavná zátěž.',
+    substitutes: ['rdl'],
+  },
+  leg_raise_floor: {
+    id: 'leg_raise_floor', name: 'Zvedání nohou vleže', type: 'isolation',
+    muscles: { primary: ['abs'], secondary: [] },
+    repRange: [12, 15], rir: [0, 1], increment: 2.5, incrementRule: 'bodyweight',
+    why: 'Spodní břicho bez nářadí; když je snadné, zpomal spouštění nebo přidej kotouč mezi kotníky.',
+    how: 'Leh, dlaně pod zadkem, bedra přitisknutá k zemi. Nohy zvedej propnuté do svislé polohy a spouštěj pomalu těsně nad zem — bedra se nesmí zvednout.',
+    substitutes: ['cable_crunch'],
+  },
 };
 
 // Týdenní šablona: pořadí jednotek a cviků, výchozí počty pracovních sérií.
@@ -1530,6 +1604,223 @@ const VOLUME_LIMITS = {
   startBandLarge: [9, 12], // startovní přímé série velkých partií
 };
 
+// ---------- program z preferencí ----------
+// Stavební bloky dnů. Push/Pull/Legs/Upper/Lower jsou původní šablona (Niklas),
+// „Spodek A/B/C“ je program na hýždě a stehna (Matilda), „Celé tělo“ pro 2–3 dny.
+// `upper` = doplněk horní části pro dny spodku (jen když si ho uživatel zapne).
+
+const DAY_BLOCKS = {
+  push: WEEK_TEMPLATE[0],
+  pull: WEEK_TEMPLATE[1],
+  legs: WEEK_TEMPLATE[2],
+  upper: WEEK_TEMPLATE[3],
+  lower: WEEK_TEMPLATE[4],
+  glutes_a: {
+    unit: 'glutes_a', name: 'Spodek A',
+    exercises: [
+      { exerciseId: 'hip_thrust', sets: 3 },
+      { exerciseId: 'goblet_squat', sets: 3 },
+      { exerciseId: 'rdl', sets: 3 },
+      { exerciseId: 'hip_abduction', sets: 3, dropsetLast: true },
+      { exerciseId: 'cable_crunch', sets: 3 },
+    ],
+    slots: [
+      { kind: 'add_set', exerciseId: 'hip_abduction' },
+      { kind: 'add_exercise', exerciseId: 'glute_bridge', sets: 2 },
+      { kind: 'add_set', exerciseId: 'cable_crunch' },
+    ],
+    upper: [{ exerciseId: 'lat_pulldown', sets: 2 }],
+  },
+  glutes_b: {
+    unit: 'glutes_b', name: 'Spodek B',
+    exercises: [
+      { exerciseId: 'bss', sets: 3 },
+      { exerciseId: 'leg_press', sets: 3 },
+      { exerciseId: 'leg_curl', sets: 3, dropsetLast: true },
+      { exerciseId: 'cable_kickback', sets: 3 },
+      { exerciseId: 'leg_raise_floor', sets: 3 },
+    ],
+    slots: [
+      { kind: 'add_set', exerciseId: 'leg_curl' },
+      { kind: 'add_set', exerciseId: 'cable_kickback' },
+      { kind: 'add_exercise', exerciseId: 'calf_stand', sets: 2 },
+    ],
+    upper: [{ exerciseId: 'face_pull', sets: 2 }],
+  },
+  glutes_c: {
+    unit: 'glutes_c', name: 'Spodek C',
+    exercises: [
+      { exerciseId: 'sumo_db_squat', sets: 3 },
+      { exerciseId: 'hip_thrust', sets: 3 },
+      { exerciseId: 'step_up', sets: 3 },
+      { exerciseId: 'back_extension', sets: 3 },
+      { exerciseId: 'hanging_leg_raise', sets: 2 },
+    ],
+    slots: [
+      { kind: 'add_set', exerciseId: 'hip_thrust' },
+      { kind: 'add_set', exerciseId: 'back_extension' },
+      { kind: 'add_exercise', exerciseId: 'leg_ext', sets: 2 },
+    ],
+    upper: [{ exerciseId: 'cable_row', sets: 2 }, { exerciseId: 'db_press', sets: 2 }],
+  },
+  upper_lite: {
+    unit: 'upper_lite', name: 'Horní (lehce)',
+    exercises: [
+      { exerciseId: 'lat_pulldown', sets: 3 },
+      { exerciseId: 'db_press', sets: 3 },
+      { exerciseId: 'cable_row', sets: 3 },
+      { exerciseId: 'face_pull', sets: 2 },
+      { exerciseId: 'lat_raise', sets: 2 },
+    ],
+    slots: [
+      { kind: 'add_set', exerciseId: 'lat_pulldown' },
+      { kind: 'add_set', exerciseId: 'face_pull' },
+    ],
+  },
+  full_a: {
+    unit: 'full_a', name: 'Celé tělo A',
+    exercises: [
+      { exerciseId: 'squat', sets: 3 },
+      { exerciseId: 'bench', sets: 3 },
+      { exerciseId: 'cable_row', sets: 3 },
+      { exerciseId: 'rdl', sets: 2 },
+      { exerciseId: 'cable_crunch', sets: 2 },
+    ],
+    slots: [
+      { kind: 'add_set', exerciseId: 'cable_row' },
+      { kind: 'add_exercise', exerciseId: 'lat_raise', sets: 2 },
+    ],
+  },
+  full_b: {
+    unit: 'full_b', name: 'Celé tělo B',
+    exercises: [
+      { exerciseId: 'deadlift', sets: 3 },
+      { exerciseId: 'ohp', sets: 3 },
+      { exerciseId: 'lat_pulldown', sets: 3 },
+      { exerciseId: 'leg_press', sets: 2 },
+      { exerciseId: 'hanging_leg_raise', sets: 2 },
+    ],
+    slots: [
+      { kind: 'add_set', exerciseId: 'lat_pulldown' },
+      { kind: 'add_exercise', exerciseId: 'db_curl', sets: 2 },
+    ],
+  },
+  full_c: {
+    unit: 'full_c', name: 'Celé tělo C',
+    exercises: [
+      { exerciseId: 'hip_thrust', sets: 3 },
+      { exerciseId: 'incline_db', sets: 3 },
+      { exerciseId: 'bb_row', sets: 3 },
+      { exerciseId: 'bss', sets: 2 },
+      { exerciseId: 'calf_stand', sets: 2 },
+    ],
+    slots: [
+      { kind: 'add_set', exerciseId: 'bb_row' },
+      { kind: 'add_exercise', exerciseId: 'triceps_pushdown', sets: 2 },
+    ],
+  },
+};
+
+// Pořadí bloků podle počtu dnů a zaměření.
+const PROGRAM_LAYOUTS = {
+  lower: {
+    2: ['glutes_a', 'glutes_b'],
+    3: ['glutes_a', 'glutes_b', 'glutes_c'],
+    4: ['glutes_a', 'upper_lite', 'glutes_b', 'glutes_c'],
+    5: ['glutes_a', 'upper_lite', 'glutes_b', 'glutes_c', 'upper_lite'],
+    6: ['glutes_a', 'upper_lite', 'glutes_b', 'glutes_c', 'upper_lite', 'glutes_a'],
+  },
+  full: {
+    2: ['full_a', 'full_b'],
+    3: ['full_a', 'full_b', 'full_c'],
+    4: ['upper', 'lower', 'upper', 'lower'],
+    5: ['push', 'pull', 'legs', 'upper', 'lower'],
+    6: ['push', 'pull', 'legs', 'push', 'pull', 'legs'],
+  },
+  ppl: {
+    2: ['upper', 'lower'],
+    3: ['push', 'pull', 'legs'],
+    4: ['upper', 'lower', 'upper', 'lower'],
+    5: ['push', 'pull', 'legs', 'upper', 'lower'],
+    6: ['push', 'pull', 'legs', 'push', 'pull', 'legs'],
+  },
+};
+
+// Co nahradit při bolavých kolenou, zádech nebo ramenou (cvik → šetrnější varianta).
+const AVOID_SUBSTITUTES = {
+  knees: { goblet_squat: 'leg_press', squat: 'leg_press', bss: 'glute_bridge', lunges: 'glute_bridge', step_up: 'hip_thrust', leg_ext: 'hip_abduction', hack_squat: 'leg_press', sumo_db_squat: 'hip_thrust' },
+  back: { rdl: 'leg_curl', deadlift: 'hip_thrust', squat: 'leg_press', bb_row: 'chest_row', back_extension: 'leg_curl', goblet_squat: 'leg_press', sumo_db_squat: 'leg_press' },
+  shoulders: { ohp: 'lat_raise', db_press: 'face_pull', bench: 'db_bench', incline_db: 'cable_fly', dips: 'triceps_pushdown', lat_raise: 'face_pull' },
+};
+
+const AVOID_LABELS = { knees: 'kolena', back: 'záda', shoulders: 'ramena' };
+
+const PROGRAM_PREFS_DEFAULT = {
+  days: 5,          // 2–6 tréninků týdně
+  focus: 'ppl',     // ppl (původní Push/Pull/Legs/Upper/Lower) | lower (spodek a hýždě) | full (celé tělo)
+  upperBody: 'full', // u zaměření lower: none | minimal | full
+  avoid: [],        // knees | back | shoulders
+  dislikes: [],     // id cviků, které uživatel nechce
+};
+
+/**
+ * Sestaví týdenní šablonu z preferencí. Čistá funkce: stejné preference → stejný
+ * program. Původní Push/Pull/Legs/Upper/Lower (5 dnů, ppl) vyjde beze změny.
+ */
+function buildProgram(prefs = {}) {
+  const p = { ...PROGRAM_PREFS_DEFAULT, ...prefs };
+  const days = clamp(Math.round(p.days || 5), 2, 6);
+  const layout = (PROGRAM_LAYOUTS[p.focus] ?? PROGRAM_LAYOUTS.ppl)[days];
+  const dislikes = new Set(p.dislikes ?? []);
+  const avoidMaps = (p.avoid ?? []).map((a) => AVOID_SUBSTITUTES[a]).filter(Boolean);
+
+  const substitute = (id, used) => {
+    let cur = id;
+    for (let i = 0; i < 4; i++) {
+      let next = cur;
+      for (const m of avoidMaps) if (m[next]) next = m[next];
+      if (dislikes.has(next)) next = (EXERCISES[next]?.substitutes ?? []).find((s) => !dislikes.has(s) && !avoidMaps.some((m) => m[s])) ?? null;
+      if (next === cur || next == null) { cur = next; break; }
+      cur = next;
+    }
+    if (!cur || !EXERCISES[cur] || used.has(cur)) return null;
+    return cur;
+  };
+
+  return layout.map((key) => {
+    const block = DAY_BLOCKS[key];
+    const used = new Set();
+    const exercises = [];
+    const source = [...block.exercises];
+    if (p.focus === 'lower' && block.upper && p.upperBody !== 'none') source.push(...block.upper);
+    for (const ex of source) {
+      const id = substitute(ex.exerciseId, used);
+      if (!id) continue;
+      used.add(id);
+      exercises.push({ exerciseId: id, sets: ex.sets, dropsetLast: !!(ex.dropsetLast && EXERCISES[id].dropset) });
+    }
+    const slots = block.slots
+      .map((s) => {
+        if (s.kind === 'add_set') return used.has(s.exerciseId) ? { ...s } : null;
+        const id = substitute(s.exerciseId, used);
+        return id ? { ...s, exerciseId: id } : null;
+      })
+      .filter(Boolean);
+    return { unit: block.unit, name: block.name, exercises, slots };
+  });
+}
+
+/** Aktuální program uživatele: vlastní (z onboardingu) nebo původní šablona. */
+function programDays(state) {
+  const days = state?.program?.days;
+  return Array.isArray(days) && days.length ? days : WEEK_TEMPLATE;
+}
+
+/** Jméno jednotky pro zobrazení — i pro jednotky, které v programu už nejsou. */
+function unitName(template, unit) {
+  return template.find((d) => d.unit === unit)?.name ?? DAY_BLOCKS[unit]?.name ?? unit;
+}
+
 // Týdenní objem šablony: přímé série dle primární partie + volitelně 0,5 za sekundární.
 function weeklyVolume(template = WEEK_TEMPLATE, addedSets = {}, { fractional = true } = {}) {
   const out = {};
@@ -1556,8 +1847,12 @@ function sessionVolume(day, addedSets = {}) {
   return out;
 }
 
-function keyExerciseIds() {
-  return Object.values(EXERCISES).filter((e) => e.key).map((e) => e.id);
+// Klíčové cviky programu (sledují se pro deload a PR). Bez šablony = celý katalog.
+function keyExerciseIds(template = null) {
+  if (!template) return Object.values(EXERCISES).filter((e) => e.key).map((e) => e.id);
+  const seen = new Set();
+  for (const day of template) for (const ex of day.exercises) if (EXERCISES[ex.exerciseId]?.key) seen.add(ex.exerciseId);
+  return [...seen];
 }
 
 
@@ -1939,12 +2234,12 @@ function slotKey(unit, exerciseId) {
  * @param addedSets aktuální mapa přidaných sérií { "unit:exerciseId": n }
  * @param enabledExercises množina id slot-cviků, které už v plánu jsou (add_exercise se nabízí jen jednou)
  */
-function pickVolumeSlots(addedSets = {}, enabledExercises = new Set(), maxPicks = 2) {
+function pickVolumeSlots(addedSets = {}, enabledExercises = new Set(), maxPicks = 2, template = WEEK_TEMPLATE) {
   const picks = [];
   const addedThisCycle = {}; // partie → přidané série v tomto výběru
-  const current = weeklyVolume(WEEK_TEMPLATE, addedSets);
+  const current = weeklyVolume(template, addedSets);
 
-  for (const day of WEEK_TEMPLATE) {
+  for (const day of template) {
     for (const slot of day.slots) {
       if (picks.length >= maxPicks) break;
       const def = EXERCISES[slot.exerciseId];
@@ -1990,35 +2285,150 @@ const RATE_BANDS_PCT_WK = {
   lean: [0.15, 0.25],
 };
 
-const KCAL_MIN = 2200;
+// Hubnutí: lehké tempo drží sílu a náladu, běžné je klasických −0,5 % týdně.
+const CUT_BANDS_PCT_WK = {
+  light: [-0.40, -0.25],
+  normal: [-0.60, -0.40],
+};
+
+// Udržování: váha se smí hýbat jen v šumu.
+const MAINTAIN_BAND_PCT_WK = [-0.15, 0.15];
+
 const KCAL_MAX = 5500;
 const MIN_WEIGHINS_14D = 6; // min. vážení za 14 dní (≈3×/týden)
+const KCAL_PER_KG = 7700;   // energie 1 kg tělesného tuku
 
 function mifflinStJeor({ weightKg, heightCm, age, sex = 'm' }) {
   const base = 10 * weightKg + 6.25 * heightCm - 5 * age;
   return sex === 'm' ? base + 5 : base - 161;
 }
 
-// Startovní cíle lean bulku. Jen výchozí bod — dál řídí weeklyAdjustment.
-function initialTargets(profile, weightKg) {
+// Násobek BMR podle počtu silových tréninků týdně (zbytek dne sedavý).
+// 5 dnů = 1,7 jako dosud, ať se původní cíle nezmění.
+function activityFactor(trainingDaysPerWeek = 5) {
+  const table = { 0: 1.3, 1: 1.4, 2: 1.45, 3: 1.55, 4: 1.6, 5: 1.7, 6: 1.75, 7: 1.8 };
+  return table[clamp(Math.round(trainingDaysPerWeek), 0, 7)];
+}
+
+function bmi(weightKg, heightCm) {
+  const m = heightCm / 100;
+  return +(weightKg / (m * m)).toFixed(1);
+}
+
+// Pásma WHO: under < 18,5 · normal < 25 · over < 30 · obese
+function bmiBand(value) {
+  if (value < 18.5) return 'under';
+  if (value < 25) return 'normal';
+  if (value < 30) return 'over';
+  return 'obese';
+}
+
+/** Zdravé rozmezí váhy pro výšku (BMI 18,5 až 24,9), zaokrouhleno na 0,5 kg. */
+function healthyWeightRange(heightCm) {
+  const m2 = (heightCm / 100) ** 2;
+  return [Math.round(18.5 * m2 * 2) / 2, Math.round(24.9 * m2 * 2) / 2];
+}
+
+/** Nejnižší cílová váha, kterou appka pustí: BMI 18,5 (zaokrouhleno nahoru na 0,5 kg). */
+function minGoalWeightKg(heightCm) {
+  return Math.ceil(18.5 * (heightCm / 100) ** 2 * 2) / 2;
+}
+
+/** Směr cíle z profilu: lose | maintain | gain (do 1 kg rozdílu = udržování). */
+function goalKind(profile, weightKg = profile.weightKg) {
+  if (profile.goal === 'maintain') return 'maintain';
+  const delta = profile.goalWeightKg - weightKg;
+  if (Math.abs(delta) < 1) return 'maintain';
+  return delta < 0 ? 'lose' : 'gain';
+}
+
+/** Odhad udržovacího příjmu. */
+function maintenanceKcal(profile, weightKg = profile.weightKg) {
+  return mifflinStJeor({ ...profile, weightKg }) * activityFactor(profile.trainingDays?.length ?? 5);
+}
+
+/**
+ * Pod tohle kalorie nikdy neklesnou: zhruba bazální metabolismus, nikdy méně než
+ * 1 200 kcal (ženy) / 1 500 kcal (muži). Hubnutí pod BMR ničí sílu i hormony.
+ */
+function kcalFloor(profile, weightKg = profile.weightKg) {
   const bmr = mifflinStJeor({ ...profile, weightKg });
-  const kcal = roundToStep(bmr * 1.7 + 350, 50);
+  return roundToStep(Math.max(profile.sex === 'f' ? 1200 : 1500, bmr * 1.05), 50);
+}
+
+function proteinPerKg(phase) {
+  return phase === 'cut' ? 2.0 : phase === 'minicut' ? 2.1 : 1.8;
+}
+
+/**
+ * Startovní cíle podle směru cíle. Jen výchozí bod — dál řídí weeklyAdjustment.
+ *  - gain:  udržení + 350 kcal, tempo podle priority (lean bulk jako dosud)
+ *  - lose:  udržení − deficit spočítaný z tempa (střed pásma × váha × 7 700 kcal / 7),
+ *           nikdy pod kcalFloor
+ *  - maintain: udržení, pásmo ±0,15 %
+ */
+function initialTargets(profile, weightKg) {
+  const kind = goalKind(profile, weightKg);
+  const maint = maintenanceKcal(profile, weightKg);
+  if (kind === 'gain') {
+    return {
+      phase: 'bulk',
+      kcal: roundToStep(maint + 350, 50),
+      proteinG: Math.round(proteinPerKg('bulk') * weightKg),
+      rateBandPctWk: RATE_BANDS_PCT_WK[profile.priority ?? 'balanced'],
+    };
+  }
+  if (kind === 'lose') {
+    const band = CUT_BANDS_PCT_WK[profile.pace ?? 'light'] ?? CUT_BANDS_PCT_WK.light;
+    const midPct = -(band[0] + band[1]) / 2 / 100;
+    const deficit = (midPct * weightKg * KCAL_PER_KG) / 7;
+    return {
+      phase: 'cut',
+      kcal: Math.max(kcalFloor(profile, weightKg), roundToStep(maint - deficit, 50)),
+      proteinG: Math.round(proteinPerKg('cut') * weightKg),
+      rateBandPctWk: band,
+    };
+  }
   return {
-    phase: 'bulk',
-    kcal,
-    proteinG: Math.round(1.8 * weightKg),
-    rateBandPctWk: RATE_BANDS_PCT_WK[profile.priority ?? 'balanced'],
+    phase: 'maintain',
+    kcal: roundToStep(maint, 50),
+    proteinG: Math.round(proteinPerKg('maintain') * weightKg),
+    rateBandPctWk: MAINTAIN_BAND_PCT_WK,
+  };
+}
+
+/** Dosažení cílové váhy podle 7denního průměru (s tolerancí 0,2 kg). */
+function goalReached(phase, avgKg, goalKg) {
+  if (avgKg == null || goalKg == null) return false;
+  if (phase === 'cut') return avgKg <= goalKg + 0.2;
+  if (phase === 'bulk') return avgKg >= goalKg - 0.2;
+  return false;
+}
+
+/**
+ * Cíle udržování po dosažení cíle: udržovací příjem odhadnutý z pozorovaného tempa
+ * (příjem − tempo × 1 100 kcal), jinak z rovnice. Bílkoviny 1,8 g/kg.
+ */
+function maintainTargets(profile, weightKg, currentKcal = null, observedRateKgWk = null) {
+  const est = currentKcal != null && observedRateKgWk != null
+    ? currentKcal - (observedRateKgWk * KCAL_PER_KG) / 7
+    : maintenanceKcal(profile, weightKg);
+  return {
+    phase: 'maintain',
+    kcal: roundToStep(clamp(est, kcalFloor(profile, weightKg), KCAL_MAX), 50),
+    proteinG: Math.round(proteinPerKg('maintain') * weightKg),
+    rateBandPctWk: MAINTAIN_BAND_PCT_WK,
   };
 }
 
 /**
  * Týdenní korekce kalorií podle 14denního trendu váhy.
- * @param input { targets, weighIns: [{date, kg}], weeksOnPlan }
+ * @param input { targets, weighIns: [{date, kg}], weeksOnPlan, today, kcalMin }
  * @returns { newKcal, deltaKcal, ratePctWk, reason }
  */
 const STALE_WEIGHIN_DAYS = 5;
 
-function weeklyAdjustment({ targets, weighIns = [], weeksOnPlan = 0, today = null }) {
+function weeklyAdjustment({ targets, weighIns = [], weeksOnPlan = 0, today = null, kcalMin = 1200 }) {
   const noChange = (reason) => ({ newKcal: targets.kcal, deltaKcal: 0, ratePctWk: null, reason });
 
   if (weeksOnPlan < 3) return noChange('too_early'); // glykogen/voda prvních 2 týdnů
@@ -2048,7 +2458,7 @@ function weeklyAdjustment({ targets, weighIns = [], weeksOnPlan = 0, today = nul
   const off = ratePctWk < lo ? lo - ratePctWk : ratePctWk - hi;
   const magnitude = off > 0.15 ? 150 : 100;
   const delta = ratePctWk < lo ? magnitude : -magnitude;
-  const newKcal = Math.min(KCAL_MAX, Math.max(KCAL_MIN, targets.kcal + delta));
+  const newKcal = Math.min(KCAL_MAX, Math.max(kcalMin, targets.kcal + delta));
   return {
     newKcal, deltaKcal: newKcal - targets.kcal, ratePctWk,
     reason: ratePctWk < lo ? 'too_slow' : 'too_fast',
@@ -2087,13 +2497,13 @@ function miniCutCheck({ waistSeries = [], weightSeries = [], heightCm }) {
 }
 
 // Cíle mini-cutu: −0,5 % BW/týden, protein 2,1 g/kg, 6–8 týdnů.
-function miniCutTargets(currentTargets, weightKg, observedRateKgWk = null) {
+function miniCutTargets(currentTargets, weightKg, observedRateKgWk = null, kcalMin = 1500) {
   // Udržovací příjem odhadem z pozorovaného tempa (7700 kcal ≈ 1 kg), jinak z aktuálních kalorií −350.
   const surplusPerDay = observedRateKgWk != null ? (observedRateKgWk * 7700) / 7 : 350;
   const maintenance = currentTargets.kcal - surplusPerDay;
   return {
     phase: 'minicut',
-    kcal: Math.max(KCAL_MIN, roundToStep(maintenance - 550, 50)),
+    kcal: Math.max(kcalMin, roundToStep(maintenance - 550, 50)),
     proteinG: Math.round(2.1 * weightKg),
     rateBandPctWk: [-0.6, -0.4],
     durationWeeks: [6, 8],
@@ -2127,12 +2537,14 @@ function currentAvgWeight(weighIns) {
 }
 
 /**
- * Projekce data dosažení cílové váhy z 28denního trendu.
- * @returns { etaDate, rateKgWk, status: 'ok'|'stalled'|'losing'|'need_more_data'|'reached' }
+ * Projekce data dosažení cílové váhy z 28denního trendu — podle SMĚRU cíle.
+ * @param direction 'gain' | 'lose' | 'maintain' (maintain = žádná projekce, jen trend)
+ * @returns { etaDate, rateKgWk, status: 'ok'|'stalled'|'losing'|'gaining'|'maintaining'|'need_more_data'|'stale'|'reached' }
+ *   losing = váha klesá, ačkoli má růst; gaining = váha roste, ačkoli má klesat
  */
 const STALE_DAYS = 10;
 
-function projectGoalDate({ weighIns = [], goalKg, today = null }) {
+function projectGoalDate({ weighIns = [], goalKg, today = null, direction = 'gain' }) {
   const series = weighIns.map((w) => ({ date: w.date, value: w.kg }));
   const avgNow = currentAvgWeight(weighIns);
   if (avgNow == null) return { etaDate: null, rateKgWk: null, status: 'need_more_data' };
@@ -2144,16 +2556,25 @@ function projectGoalDate({ weighIns = [], goalKg, today = null }) {
       return { etaDate: null, rateKgWk: null, status: 'stale', lastWeighIn: latest };
     }
   }
-  if (avgNow >= goalKg) return { etaDate: null, rateKgWk: null, status: 'reached' };
-
   const perDay = seriesTrendPerDay(series, 28, 8);
-  if (perDay == null) return { etaDate: null, rateKgWk: null, status: 'need_more_data' };
+  const rateKgWk = perDay == null ? null : +(perDay * 7).toFixed(3);
 
-  const rateKgWk = +(perDay * 7).toFixed(3);
-  if (rateKgWk < -0.02) return { etaDate: null, rateKgWk, status: 'losing' };
-  if (rateKgWk < 0.05) return { etaDate: null, rateKgWk, status: 'stalled' };
+  if (direction === 'maintain') {
+    return { etaDate: null, rateKgWk, status: rateKgWk == null ? 'need_more_data' : 'maintaining' };
+  }
+  const lose = direction === 'lose';
+  if (lose ? avgNow <= goalKg : avgNow >= goalKg) return { etaDate: null, rateKgWk, status: 'reached' };
+  if (rateKgWk == null) return { etaDate: null, rateKgWk: null, status: 'need_more_data' };
 
-  const days = Math.round(((goalKg - avgNow) / rateKgWk) * 7);
+  if (lose) {
+    if (rateKgWk > 0.02) return { etaDate: null, rateKgWk, status: 'gaining' };
+    if (rateKgWk > -0.05) return { etaDate: null, rateKgWk, status: 'stalled' };
+  } else {
+    if (rateKgWk < -0.02) return { etaDate: null, rateKgWk, status: 'losing' };
+    if (rateKgWk < 0.05) return { etaDate: null, rateKgWk, status: 'stalled' };
+  }
+
+  const days = Math.round((Math.abs(goalKg - avgNow) / Math.abs(rateKgWk)) * 7);
   const lastDate = [...weighIns].sort((a, b) => a.date.localeCompare(b.date)).at(-1).date;
   return { etaDate: addDays(lastDate, days), rateKgWk, status: 'ok' };
 }
@@ -2179,20 +2600,41 @@ function gainQuality({ weighIns = [], waistSeries = [] }) {
 }
 
 /**
+ * Kvalita hubnutí: váha dolů + pas dolů = tuk; moc rychle (přes 1 % váhy týdně) = i svaly.
+ * @returns { quality: 'good_cut'|'ok_cut'|'too_fast'|'stalled'|'gaining'|'need_more_data', waistRateCmMo, weightRateKgWk }
+ */
+function cutQuality({ weighIns = [], waistSeries = [], weightKg = null }) {
+  const weightPerDay = seriesTrendPerDay(weighIns.map((w) => ({ date: w.date, value: w.kg })), 28, 8);
+  if (weightPerDay == null) return { quality: 'need_more_data', waistRateCmMo: null, weightRateKgWk: null };
+  const weightRateKgWk = +(weightPerDay * 7).toFixed(3);
+  const waistPerDay = seriesTrendPerDay(waistSeries.map((w) => ({ date: w.date, value: w.cm })), 56, 4);
+  const waistRateCmMo = waistPerDay == null ? null : +(waistPerDay * 30.44).toFixed(2);
+  const ref = weightKg ?? currentAvgWeight(weighIns) ?? 70;
+
+  if (weightRateKgWk > 0.05) return { quality: 'gaining', waistRateCmMo, weightRateKgWk };
+  if (weightRateKgWk > -0.05) return { quality: 'stalled', waistRateCmMo, weightRateKgWk };
+  if (-weightRateKgWk > ref * 0.01) return { quality: 'too_fast', waistRateCmMo, weightRateKgWk };
+  if (waistRateCmMo != null && waistRateCmMo <= -0.3) return { quality: 'good_cut', waistRateCmMo, weightRateKgWk };
+  return { quality: 'ok_cut', waistRateCmMo, weightRateKgWk };
+}
+
+/**
  * Poctivý plán k cílové váze — VŽDY spočítaný z aktuálních čísel uživatele
  * (žádné natvrdo psané scénáře). Tempa: lean bulk dle priority (science.md §7),
  * růst svalů dle tréninkového věku, cut −0,5 % BW/týden.
  * @returns { mode: 'gain'|'cut'|'there', months, etaIso, absEtaIso,
  *            muscleLo, muscleHi, fatLo, fatHi, needsCut }
  */
-function honestPlan({ startWeightKg, goalWeightKg, priority = 'balanced', trainingAgeMonths = 0, fromIso }) {
+function honestPlan({ startWeightKg, goalWeightKg, priority = 'balanced', pace = 'light', trainingAgeMonths = 0, fromIso }) {
   const delta = goalWeightKg - startWeightKg;
   if (Math.abs(delta) <= 0.5) {
     return { mode: 'there', months: 0, etaIso: fromIso, absEtaIso: fromIso, muscleLo: 0, muscleHi: 0, fatLo: 0, fatHi: 0, needsCut: false };
   }
 
   if (delta < 0) {
-    const ratePerMonth = 0.005 * startWeightKg * 4.345; // −0,5 % BW/týden
+    const band = CUT_BANDS_PCT_WK[pace] ?? CUT_BANDS_PCT_WK.light;
+    const pctWk = -(band[0] + band[1]) / 2 / 100;
+    const ratePerMonth = pctWk * startWeightKg * 4.345;
     const months = Math.max(1, Math.ceil(-delta / ratePerMonth));
     const etaIso = addDays(fromIso, Math.round(months * 30.44));
     return { mode: 'cut', months, etaIso, absEtaIso: etaIso, muscleLo: 0, muscleHi: 0, fatLo: +(-delta).toFixed(1), fatHi: +(-delta).toFixed(1), needsCut: false };
@@ -2250,12 +2692,25 @@ const STRENGTH_ANCHORS = {
   squat: [100, 120, 140, 160],
   deadlift: [120, 150, 180, 200],
   ohp: [50, 60, 70, 80],
+  hip_thrust: [40, 60, 80, 100, 120],
+  rdl: [40, 60, 80, 100],
 };
 
-// Váhové checkpointy po 1 kg 7denního průměru.
-function nextWeightMilestone(avg7, startKg, goalKg) {
-  if (avg7 == null) return { targetKg: Math.floor(startKg) + 1 };
-  const next = Math.floor(avg7) + 1;
+/** Cviky, u kterých se sleduje síla (graf e1RM): klíčové cviky programu. */
+function strengthLifts(template = null) {
+  const ids = template ? keyExerciseIds(template) : Object.keys(STRENGTH_ANCHORS);
+  return ids.length ? ids : Object.keys(STRENGTH_ANCHORS);
+}
+
+// Váhové checkpointy po 1 kg 7denního průměru — podle směru cíle.
+function nextWeightMilestone(avg7, startKg, goalKg, direction = 'gain') {
+  if (direction === 'maintain') return null;
+  const base = avg7 ?? startKg;
+  if (direction === 'lose') {
+    const next = Math.ceil(base) - 1;
+    return next < goalKg ? null : { targetKg: next };
+  }
+  const next = Math.floor(base) + 1;
   return next > goalKg ? null : { targetKg: next };
 }
 
@@ -2296,9 +2751,10 @@ function detectPR(previousBest, session) {
   return { isPR: sessionBest > previousBest + 0.1, e1rm: sessionBest };
 }
 
-// Týden „drží streak“ při ≥4/5 dokončených trénincích; deload týdny streak nepřerušují.
+// Týden „drží streak“ při ≥ 75 % plánovaných tréninků (5 → 4, 3 → 3, 2 → 2);
+// deload týdny streak nepřerušují.
 function weekKeepsStreak(completedSessions, plannedSessions = 5) {
-  return completedSessions >= Math.min(4, plannedSessions);
+  return completedSessions >= Math.max(1, Math.ceil(plannedSessions * 0.75));
 }
 
 // Délka streaku v týdnech: [{completed, planned, isCurrentWeek?}], nejnovější první.
@@ -2327,12 +2783,15 @@ function streakWeeks(weeklyLog = []) {
 
 
 const DEFAULT_PROFILE = {
+  name: '',
   weightKg: 85,
   heightCm: 186,
   age: 21,
   sex: 'm',
   goalWeightKg: 95,
-  priority: 'balanced', // mass | balanced | lean
+  goal: null,           // null = podle cílové váhy | 'maintain' = držet váhu
+  priority: 'balanced', // nabírání: mass | balanced | lean
+  pace: 'light',        // hubnutí: light | normal
   trainingDays: [1, 2, 3, 4, 5], // Po–Pá (0 = neděle)
   trainingAgeMonths: 0,
 };
@@ -2356,14 +2815,14 @@ function estimateWorkingLoad(exDef, reportedWeightKg, reportedReps) {
  * Sestaví výchozí stavy cviků.
  * @param reportedLifts { [exerciseId]: {weightKg, reps} | null } — jen ★ cviky, null = „nevím“
  */
-function buildInitialExerciseStates(reportedLifts = {}) {
+function buildInitialExerciseStates(reportedLifts = {}, template = WEEK_TEMPLATE) {
   const states = {};
   const inPlan = new Set();
-  for (const day of WEEK_TEMPLATE) for (const ex of day.exercises) inPlan.add(ex.exerciseId);
+  for (const day of template) for (const ex of day.exercises) inPlan.add(ex.exerciseId);
 
   for (const id of inPlan) {
     const def = EXERCISES[id];
-    const sets = Math.max(...WEEK_TEMPLATE.flatMap((d) =>
+    const sets = Math.max(...template.flatMap((d) =>
       d.exercises.filter((e) => e.exerciseId === id).map((e) => e.sets)));
     const reported = reportedLifts[id];
     if (reported && def.incrementRule !== 'bodyweight') {
@@ -3718,7 +4177,20 @@ function migrate(state) {
 // ---------- plán a předpisy ----------
 
 function nextUnitDay(state) {
-  return WEEK_TEMPLATE[state.sessions.length % WEEK_TEMPLATE.length];
+  const days = programDays(state);
+  return days[state.sessions.length % days.length];
+}
+
+// Fáze výživy pro zobrazení.
+const PHASE_LABELS = { bulk: 'lean bulk', cut: 'hubnutí', maintain: 'udržování', minicut: 'mini-cut' };
+function phaseLabel(phase) { return PHASE_LABELS[phase] ?? phase ?? '—'; }
+
+// Směr cíle: hubnutí / udržování / nabírání — řídí projekce, milníky i texty.
+function goalDirection(state) {
+  const phase = state.targets?.phase;
+  if (phase === 'cut') return 'lose';
+  if (phase === 'maintain') return 'maintain';
+  return goalKind(state.profile) === 'lose' ? 'lose' : goalKind(state.profile) === 'maintain' ? 'maintain' : 'gain';
 }
 
 // Seznam cviků jednotky vč. zapnutých slot cviků a přidaných sérií.
@@ -3802,9 +4274,9 @@ function fmtRest(seconds) {
   return s === 0 ? `${m}:00` : `${m}:${String(s).padStart(2, '0')}`;
 }
 
-// Pozice v pětidenním cyklu (nezávislá na dni v týdnu) — 1..5.
+// Pozice v cyklu programu (nezávislá na dni v týdnu) — 1..délka programu.
 function cyclePosition(state) {
-  return (state.sessions.length % WEEK_TEMPLATE.length) + 1;
+  return (state.sessions.length % programDays(state).length) + 1;
 }
 
 // ---------- trénink ----------
@@ -3826,7 +4298,7 @@ function buildEntry(state, exerciseId, sets, dropsetLast, swappedFrom = null) {
 }
 
 function buildWorkout(state, { unit = null, date = null } = {}) {
-  const day = unit ? WEEK_TEMPLATE.find((d) => d.unit === unit) ?? nextUnitDay(state) : nextUnitDay(state);
+  const day = unit ? programDays(state).find((d) => d.unit === unit) ?? nextUnitDay(state) : nextUnitDay(state);
   const entries = unitExerciseList(state, day)
     .map((item) => buildEntry(state, item.exerciseId, item.sets, item.dropsetLast));
   return {
@@ -3933,7 +4405,7 @@ function weeksBetween(fromISO, toISO) {
 }
 
 function keyRegressions(state) {
-  return keyExerciseIds().filter((id) => {
+  return keyExerciseIds(programDays(state)).filter((id) => {
     const exState = state.exercises[id];
     if (!exState || exState.status !== 'active') return false;
     const p = computeNextPrescription(EXERCISES[id], exState, recentPerformances(state, id));
@@ -3984,7 +4456,7 @@ function evaluateOffers(state) {
       progressingShare: progressingShare(state),
     });
     if (check.offer) {
-      const picks = pickVolumeSlots(state.addedSets, new Set(state.enabledSlotExercises), 2);
+      const picks = pickVolumeSlots(state.addedSets, new Set(state.enabledSlotExercises), 2, programDays(state));
       state.offers.volume = picks.length ? { picks } : null;
     } else {
       state.offers.volume = null;
@@ -4004,7 +4476,7 @@ function evaluateOffers(state) {
 
 function acceptDeload(state) {
   state.deload.active = true;
-  state.deload.sessionsLeft = WEEK_TEMPLATE.length;
+  state.deload.sessionsLeft = programDays(state).length;
   state.offers.deload = null;
 }
 
@@ -4030,8 +4502,8 @@ function acceptVolume(state) {
 
 function acceptMinicut(state) {
   const avgW = currentAvgWeight(state.weighIns) ?? state.profile.weightKg;
-  const proj = projectGoalDate({ weighIns: state.weighIns, goalKg: state.profile.goalWeightKg });
-  state.targets = miniCutTargets(state.targets, avgW, proj.rateKgWk);
+  const proj = projectGoalDate({ weighIns: state.weighIns, goalKg: state.profile.goalWeightKg, direction: 'gain' });
+  state.targets = miniCutTargets(state.targets, avgW, proj.rateKgWk, kcalFloor(state.profile, avgW));
   state.minicutEndDate = addDays(todayISO(), 49);
   state.offers.minicut = null;
   state.nutritionLog.push({ date: todayISO(), kcal: state.targets.kcal, deltaKcal: 0, reason: 'minicut_start' });
@@ -4042,20 +4514,29 @@ function acceptMinicut(state) {
 function dailyMaintenance(state) {
   if (!state.onboarded || !state.targets) return;
   const today = todayISO();
+  const avgW = currentAvgWeight(state.weighIns);
 
   // konec mini-cutu → zpět do bulku s cíli podle aktuální váhy
   if (state.targets.phase === 'minicut' && state.minicutEndDate && today > state.minicutEndDate) {
-    const avgW = currentAvgWeight(state.weighIns) ?? state.profile.weightKg;
-    state.targets = initialTargets(state.profile, avgW);
+    state.targets = initialTargets(state.profile, avgW ?? state.profile.weightKg);
     state.minicutEndDate = null;
     state.nutritionLog.push({ date: today, kcal: state.targets.kcal, deltaKcal: 0, reason: 'bulk_resume' });
   }
 
-  // týdenní korekce kalorií podle trendu (max 1× za 6 dní)
+  // cílová váha dosažena (7denní průměr) → udržování; kalorie z pozorovaného tempa
+  if ((state.targets.phase === 'cut' || state.targets.phase === 'bulk') && goalReached(state.targets.phase, avgW, state.profile.goalWeightKg)) {
+    const proj = projectGoalDate({ weighIns: state.weighIns, goalKg: state.profile.goalWeightKg, today, direction: state.targets.phase === 'cut' ? 'lose' : 'gain' });
+    state.targets = maintainTargets(state.profile, avgW, state.targets.kcal, proj.rateKgWk);
+    state.profile.goal = 'maintain';
+    state.nutritionLog.push({ date: today, kcal: state.targets.kcal, deltaKcal: 0, reason: 'goal_reached' });
+  }
+
+  // týdenní korekce kalorií podle trendu (max 1× za 6 dní); nikdy pod bezpečné minimum
   const lastAdjust = state.nutritionLog.at(-1)?.date ?? null;
   if (!lastAdjust || daysBetween(lastAdjust, today) >= 6) {
     const weeksOnPlan = Math.floor(daysBetween(state.profile.startDate, today) / 7) + 1;
-    const result = weeklyAdjustment({ targets: state.targets, weighIns: state.weighIns, weeksOnPlan, today });
+    const kcalMin = kcalFloor(state.profile, avgW ?? state.profile.weightKg);
+    const result = weeklyAdjustment({ targets: state.targets, weighIns: state.weighIns, weeksOnPlan, today, kcalMin });
     if (result.deltaKcal !== 0) {
       state.targets.kcal = result.newKcal;
       state.nutritionLog.push({ date: today, kcal: result.newKcal, deltaKcal: result.deltaKcal, reason: result.reason });
@@ -4064,14 +4545,28 @@ function dailyMaintenance(state) {
     }
   }
 
-  // protein sleduje aktuální váhu
-  const avgW = currentAvgWeight(state.weighIns);
-  if (avgW) {
-    const gPerKg = state.targets.phase === 'minicut' ? 2.1 : 1.8;
-    state.targets.proteinG = Math.round(gPerKg * avgW);
-  }
+  // protein sleduje aktuální váhu a fázi
+  if (avgW) state.targets.proteinG = Math.round(proteinPerKg(state.targets.phase) * avgW);
 
   evaluateOffers(state);
+}
+
+/**
+ * Změna cílové váhy v Nastavení: když se tím změní směr (hubnutí ↔ nabírání ↔ udržování),
+ * cíle výživy se přepočítají z aktuální váhy. Jinak zůstanou, jak je engine doladil.
+ */
+function applyGoalChange(state, goalWeightKg) {
+  state.profile.goalWeightKg = goalWeightKg;
+  state.profile.goal = null;
+  const avgW = currentAvgWeight(state.weighIns) ?? state.profile.weightKg;
+  const kind = goalKind(state.profile, avgW);
+  const current = state.targets?.phase;
+  const family = current === 'minicut' ? 'gain' : current === 'bulk' ? 'gain' : current === 'cut' ? 'lose' : 'maintain';
+  if (!state.targets || kind !== family) {
+    state.targets = initialTargets(state.profile, avgW);
+    state.minicutEndDate = null;
+    state.nutritionLog.push({ date: todayISO(), kcal: state.targets.kcal, deltaKcal: 0, reason: 'goal_changed' });
+  }
 }
 
 // ---------- tělo ----------
@@ -4119,10 +4614,11 @@ function weeklyStreakLog(state) {
   const weeks = [];
   let cursor = currentWeek;
   const firstWeek = weekKey(state.sessions[0].date);
+  const planned = state.profile.trainingDays?.length || 5;
   while (cursor >= firstWeek && weeks.length < 200) {
     weeks.push({
       completed: counts.get(cursor) ?? 0,
-      planned: 5,
+      planned,
       isCurrentWeek: cursor === currentWeek,
     });
     cursor = addDays(cursor, -7);
@@ -4153,12 +4649,16 @@ function trainingAgeMonthsNow(state) {
 
 function progressSummary(state) {
   const avg7 = currentAvgWeight(state.weighIns);
+  const direction = goalDirection(state);
   return {
     avg7,
-    projection: projectGoalDate({ weighIns: state.weighIns, goalKg: state.profile.goalWeightKg, today: todayISO() }),
-    quality: gainQuality({ weighIns: state.weighIns, waistSeries: state.waist }),
+    direction,
+    projection: projectGoalDate({ weighIns: state.weighIns, goalKg: state.profile.goalWeightKg, today: todayISO(), direction }),
+    quality: direction === 'lose'
+      ? cutQuality({ weighIns: state.weighIns, waistSeries: state.waist, weightKg: avg7 })
+      : gainQuality({ weighIns: state.weighIns, waistSeries: state.waist }),
     composition: gainComposition({ weighIns: state.weighIns, trainingAgeMonths: trainingAgeMonthsNow(state) }),
-    weightMilestone: nextWeightMilestone(avg7, state.profile.weightKg, state.profile.goalWeightKg),
+    weightMilestone: nextWeightMilestone(avg7, state.profile.weightKg, state.profile.goalWeightKg, direction),
     streak: streakWeeks(weeklyStreakLog(state)),
   };
 }
@@ -4234,7 +4734,7 @@ function sessionRecap(state, session) {
   return {
     date: session.date,
     unit: session.unit,
-    unitName: WEEK_TEMPLATE.find((d) => d.unit === session.unit)?.name ?? session.unit,
+    unitName: unitName(programDays(state), session.unit),
     deload: session.deload,
     durationMin: session.durationMin,
     workSets,
@@ -4265,26 +4765,42 @@ function weeklyReview(state) {
   const summary = progressSummary(state);
   const lines = [];
 
-  lines.push(`Tréninky: ${sessions.length}/5${sessions.some((s) => s.deload) ? ' (deload)' : ''}.`);
+  const planned = state.profile.trainingDays?.length || 5;
+  lines.push(`Tréninky: ${sessions.length}/${planned}${sessions.some((s) => s.deload) ? ' (deload)' : ''}.`);
   if (prs.length) {
     const names = prs.map((p) => EXERCISES[p.exerciseId].name).join(', ');
     lines.push(`Nová osobní maxima: ${names}. Slušná práce.`);
   }
 
   const p = summary.projection;
+  const rate = p.rateKgWk == null ? '' : Math.abs(p.rateKgWk).toFixed(2).replace('.', ',');
+  const dir = summary.direction;
   if (p.status === 'ok') {
-    lines.push(`Váha roste ${p.rateKgWk.toFixed(2).replace('.', ',')} kg/týden — tímhle tempem ${state.profile.goalWeightKg} kg ${fmtEta(p.etaDate)}.`);
+    lines.push(dir === 'lose'
+      ? `Váha klesá ${rate} kg/týden — tímhle tempem ${state.profile.goalWeightKg} kg ${fmtEta(p.etaDate)}.`
+      : `Váha roste ${rate} kg/týden — tímhle tempem ${state.profile.goalWeightKg} kg ${fmtEta(p.etaDate)}.`);
   } else if (p.status === 'stalled') {
-    lines.push('Váha stojí. Jestli se pravidelně vážíš, engine v pondělí přidá kalorie — drž příjem.');
+    lines.push(dir === 'lose'
+      ? 'Váha stojí. Jestli se pravidelně vážíš, engine v pondělí ubere kalorie — drž porce.'
+      : 'Váha stojí. Jestli se pravidelně vážíš, engine v pondělí přidá kalorie — drž příjem.');
   } else if (p.status === 'losing') {
     lines.push('Váha klesá — na bulk málo jíš. Zkontroluj kalorie.');
+  } else if (p.status === 'gaining') {
+    lines.push('Váha roste — na hubnutí jíš víc, než myslíš. Zkontroluj porce a věci navíc.');
+  } else if (p.status === 'maintaining') {
+    lines.push(`Váha drží (trend ${p.rateKgWk >= 0 ? '+' : '−'}${rate} kg/týden) — přesně to je cíl.`);
+  } else if (p.status === 'reached') {
+    lines.push('Cílová váha je tady. Engine přepnul na udržování.');
   } else if (p.status === 'need_more_data') {
     lines.push('Na trend váhy potřebuju víc vážení — stačí 3×/týden ráno.');
   }
 
-  if (summary.quality.quality === 'lean_gain') lines.push('Pas drží — přírůstek vypadá čistě.');
-  if (summary.quality.quality === 'too_fast') lines.push(`Pas roste ${String(summary.quality.waistRateCmMo).replace('.', ',')} cm/měsíc — tempo je moc, engine ubírá kalorie.`);
-  if (summary.composition.muscleShareNote === 'mostly_fat') {
+  const q = summary.quality.quality;
+  if (q === 'lean_gain') lines.push('Pas drží — přírůstek vypadá čistě.');
+  if (q === 'too_fast' && dir !== 'lose') lines.push(`Pas roste ${String(summary.quality.waistRateCmMo).replace('.', ',')} cm/měsíc — tempo je moc, engine ubírá kalorie.`);
+  if (q === 'good_cut') lines.push('Pas jde dolů — hubneš tuk, ne svaly.');
+  if (q === 'too_fast' && dir === 'lose') lines.push('Hubneš přes 1 % váhy týdně — to už bere i svaly. Engine přidá kalorie.');
+  if (dir === 'gain' && summary.composition.muscleShareNote === 'mostly_fat') {
     lines.push('Poctivě: tímhle tempem nabíráš hlavně tuk, ne svaly. Strop svalů je '
       + `${summary.composition.muscleBandKgMo[1].toFixed(1).replace('.', ',')} kg/měsíc.`);
   }
@@ -4300,9 +4816,10 @@ function fmtEta(iso) {
 
 // ---------- onboarding ----------
 
-function completeOnboarding(state, { profile, lifts, waistCm }) {
+function completeOnboarding(state, { profile, lifts, waistCm, programPrefs = null }) {
   state.profile = { ...state.profile, ...profile, startDate: todayISO() };
-  state.exercises = buildInitialExerciseStates(lifts);
+  if (programPrefs) state.program = { prefs: programPrefs, days: buildProgram(programPrefs) };
+  state.exercises = buildInitialExerciseStates(lifts, programDays(state));
   state.targets = initialTargets(state.profile, state.profile.weightKg);
   upsertWeighIn(state, state.profile.weightKg);
   if (waistCm) upsertWaist(state, waistCm);
@@ -5144,7 +5661,7 @@ function heroCard(state) {
   return h('div', { class: 'today-hero stack' },
     h('div', { class: 'row between' },
       h('span', { class: 'label' }, state.deload.active ? `Deload — zbývá ${state.deload.sessionsLeft}` : 'Další trénink'),
-      h('span', { class: 'label' }, `${cyclePos}. z ${WEEK_TEMPLATE.length} v cyklu`),
+      h('span', { class: 'label' }, `${cyclePos}. z ${programDays(state).length} v cyklu`),
     ),
     h('div', { class: 'display unit-name' }, day.name),
     h('div', { class: 'muted small' },
@@ -5228,7 +5745,7 @@ function weekStrip(state) {
     h('div', { class: 'weekstrip' }, cells),
     h('p', { class: 'muted', style: 'font-size:12px' },
       restDays.length
-        ? `Volno: ${restDays.join(', ')}. Pořadí Push → Pull → Legs → Upper → Lower jede podle odcvičených tréninků, ne podle dne — když jeden vynecháš, jen se posune.`
+        ? `Volno: ${restDays.join(', ')}. Pořadí ${programDays(state).map((d) => d.name).join(' → ')} jede podle odcvičených tréninků, ne podle dne — když jeden vynecháš, jen se posune.`
         : 'Trénink máš naplánovaný na každý den v týdnu.'),
   );
 }
@@ -5315,10 +5832,7 @@ function offerCard(title, tone, text, buttons) {
 function nutritionNotice(state) {
   const last = state.nutritionLog.at(-1);
   if (!last || last.deltaKcal === 0 || daysBetween(last.date, todayISO()) > 2) return null;
-  const cutting = state.targets?.phase === 'minicut';
-  const why = last.reason === 'too_slow'
-    ? (cutting ? 'hubneš rychleji, než je zdrávo' : 'váha roste pomaleji, než má')
-    : (cutting ? 'hubneš pomaleji, než má' : 'váha roste rychleji, než má');
+  const why = adjustReasonText(last.reason, state.targets?.phase);
   return h('div', { class: 'card row between' },
     h('div', {},
       h('div', { class: 'label' }, 'Výživa upravena'),
@@ -5427,7 +5941,7 @@ function bodyCard(state, summary) {
   return h('div', { class: 'card stack' },
     h('div', { class: 'row between' },
       h('div', { class: 'label' }, 'Tělo a jídlo'),
-      t ? h('span', { class: `badge ${t.phase === 'minicut' ? 'warn' : 'accent'}` }, t.phase === 'minicut' ? 'mini-cut' : 'lean bulk') : null,
+      t ? h('span', { class: `badge ${t.phase === 'minicut' ? 'warn' : 'accent'}` }, phaseLabel(t.phase)) : null,
     ),
     h('p', { class: 'muted', style: 'font-size:12.5px' }, 'Ráno se zvaž a zapiš — kalorie si appka ladí sama podle trendu.'),
     t ? h('div', { class: 'row', style: 'gap:22px' },
@@ -5896,12 +6410,14 @@ function statTile(value, label) {
 
 
 
-let selectedLift = 'bench';
+let selectedLift = null;
 
 function renderProgress(root) {
   const state = Store.state;
   clearEl(root);
   const summary = progressSummary(state);
+  const lifts = strengthLifts(programDays(state));
+  if (!selectedLift || !lifts.includes(selectedLift)) selectedLift = lifts[0];
 
   root.append(h('div', { class: 'screen' },
     h('div', { class: 'topbar' },
@@ -5978,26 +6494,44 @@ function weightCard(state, summary) {
 }
 
 const QUALITY_TEXT = {
-  lean_gain: { tone: 'ok', text: 'Váha roste a pas drží — přírůstek vypadá čistě. Přesně takhle.' },
-  ok_gain: { tone: 'ok', text: 'Váha roste, pas mírně taky — v normě lean bulku.' },
-  too_fast: { tone: 'warn', text: 'Pas roste přes 1 cm/měsíc — tempo je moc a jde do tuku. Engine ubírá kalorie.' },
-  maintaining: { tone: 'plain', text: 'Váha se drží — na bulk je potřeba jíst víc. Sleduj úpravy kalorií.' },
-  losing: { tone: 'warn', text: 'Váha klesá. Jestli neběží mini-cut, chybí ti jídlo.' },
-  need_more_data: { tone: 'plain', text: 'Na hodnocení kvality přírůstku potřebuju pravidelnou váhu a pas.' },
+  lean_gain: { tone: 'ok', badge: 'čistý gain', text: 'Váha roste a pas drží — přírůstek vypadá čistě. Přesně takhle.' },
+  ok_gain: { tone: 'ok', badge: 'v normě', text: 'Váha roste, pas mírně taky — v normě lean bulku.' },
+  too_fast: { tone: 'warn', badge: 'moc rychle', text: 'Pas roste přes 1 cm/měsíc — tempo je moc a jde do tuku. Engine ubírá kalorie.' },
+  maintaining: { tone: 'plain', badge: '—', text: 'Váha se drží — na bulk je potřeba jíst víc. Sleduj úpravy kalorií.' },
+  losing: { tone: 'warn', badge: '—', text: 'Váha klesá. Jestli neběží mini-cut, chybí ti jídlo.' },
+  need_more_data: { tone: 'plain', badge: '—', text: 'Na hodnocení kvality přírůstku potřebuju pravidelnou váhu a pas.' },
+};
+
+// Hubnutí má vlastní hodnocení: tuk jde dolů s pasem, moc rychlé tempo bere svaly.
+const CUT_QUALITY_TEXT = {
+  good_cut: { tone: 'ok', badge: 'tuk dolů', text: 'Váha i pas klesají — hubneš tuk a síla v tréninku ti to potvrdí.' },
+  ok_cut: { tone: 'ok', badge: 'v pásmu', text: 'Váha klesá zdravým tempem. Měř pas 1× týdně, ať je vidět, že jde dolů tuk.' },
+  too_fast: { tone: 'warn', badge: 'moc rychle', text: 'Hubneš přes 1 % váhy týdně — to už bere i svaly. Engine přidá kalorie.' },
+  stalled: { tone: 'plain', badge: 'stojí', text: 'Váha stojí. Prvních 14 dní je to normální (voda), pak engine ubere kalorie.' },
+  gaining: { tone: 'warn', badge: 'roste', text: 'Váha roste. Zkontroluj porce a „něco navíc“ — často to jsou nápoje a dochucovadla.' },
+  need_more_data: { tone: 'plain', badge: '—', text: 'Na hodnocení potřebuju pravidelnou váhu (3× týdně ráno) a pas.' },
 };
 
 function honestyCard(state, summary) {
   const p = summary.projection;
-  const q = QUALITY_TEXT[summary.quality.quality];
+  const lose = summary.direction === 'lose';
+  const q = (lose ? CUT_QUALITY_TEXT : QUALITY_TEXT)[summary.quality.quality];
   const comp = summary.composition;
   const lines = [];
+  const rate = p.rateKgWk == null ? '' : Math.abs(p.rateKgWk).toFixed(2).replace('.', ',');
 
   if (p.status === 'ok') {
-    lines.push(`Tímhle tempem (${p.rateKgWk.toFixed(2).replace('.', ',')} kg/týden) vychází ${state.profile.goalWeightKg} kg na ${fmtDate(p.etaDate)} ${p.etaDate.slice(0, 4)}.`);
+    lines.push(`Tímhle tempem (${lose ? '−' : '+'}${rate} kg/týden) vychází ${state.profile.goalWeightKg} kg na ${fmtDate(p.etaDate)} ${p.etaDate.slice(0, 4)}.`);
   } else if (p.status === 'stalled') {
-    lines.push('Váha stagnuje — projekce k cíli teď neexistuje. Engine přidá kalorie, drž příjem.');
+    lines.push(lose
+      ? 'Váha stagnuje — projekce k cíli teď neexistuje. Engine ubere kalorie, drž porce.'
+      : 'Váha stagnuje — projekce k cíli teď neexistuje. Engine přidá kalorie, drž příjem.');
   } else if (p.status === 'losing') {
     lines.push('Váha klesá — od cíle se vzdaluješ (pokud neběží mini-cut, je to problém příjmu).');
+  } else if (p.status === 'gaining') {
+    lines.push('Váha roste — od cíle se vzdaluješ. Engine ubere kalorie; zkontroluj porce a věci navíc.');
+  } else if (p.status === 'maintaining') {
+    lines.push(`Udržování: trend ${p.rateKgWk >= 0 ? '+' : '−'}${rate} kg/týden. Cíl je držet váhu v šumu ±0,15 % týdně.`);
   } else if (p.status === 'stale') {
     lines.push(`Poslední vážení je z ${fmtDate(p.lastWeighIn)} — projekci nemůžu spočítat z ležatých dat. `
       + 'Zvaž se ráno a čísla se rozjedou.');
@@ -6019,9 +6553,7 @@ function honestyCard(state, summary) {
   return h('div', { class: 'card stack' },
     h('div', { class: 'row between' },
       h('div', { class: 'label' }, 'Poctivá projekce'),
-      q ? h('span', { class: `badge ${q.tone}` }, summary.quality.quality === 'lean_gain' ? 'čistý gain'
-        : summary.quality.quality === 'too_fast' ? 'moc rychle'
-        : summary.quality.quality === 'ok_gain' ? 'v normě' : '—') : null,
+      q ? h('span', { class: `badge ${q.tone}` }, q.badge) : null,
     ),
     ...lines.map((l) => h('p', { class: 'small' }, l)),
     q ? h('p', { class: 'muted small' }, q.text) : null,
@@ -6072,14 +6604,14 @@ function historyCard(state) {
 // obrazovka tréninku — jen se uloží pod zvoleným datem.
 function backfillModal(state) {
   let dateInput;
-  let unit = 'push';
+  let unit = programDays(state)[0].unit;
   const { close } = openModal(
     h('h3', {}, 'Zapsat dřívější trénink'),
     h('p', { class: 'muted small' }, 'Vyber, co jsi cvičil a kdy. Pak sérii po sérii zapíšeš stejně jako v tréninku.'),
     h('div', { class: 'stack', style: 'gap:6px' },
       h('span', { class: 'label' }, 'Co'),
       h('div', { class: 'row', style: 'flex-wrap:wrap;gap:6px' },
-        ...WEEK_TEMPLATE.map((d) => {
+        ...programDays(state).filter((d, i, arr) => arr.findIndex((x) => x.unit === d.unit) === i).map((d) => {
           const chip = h('button', {
             class: `chip${d.unit === unit ? ' active' : ''}`,
             onClick: () => {
@@ -6114,8 +6646,10 @@ function backfillModal(state) {
 
 // ---------- síla ----------
 
+const LIFT_SHORT = { bench: 'Bench', squat: 'Dřep', deadlift: 'Mrtvý tah', ohp: 'Tlaky', bb_row: 'Přítahy', pullup: 'Shyby', hip_thrust: 'Hip thrust', rdl: 'RDL' };
+
 function strengthCard(state) {
-  const lifts = Object.keys(STRENGTH_ANCHORS);
+  const lifts = strengthLifts(programDays(state));
   const series = e1rmSeries(state, selectedLift);
   const best = state.bestE1rms[selectedLift] ?? null;
   const milestone = nextStrengthMilestone(selectedLift, best);
@@ -6129,7 +6663,7 @@ function strengthCard(state) {
       ...lifts.map((id) => h('button', {
         class: `chip${selectedLift === id ? ' active' : ''}`,
         onClick: () => { selectedLift = id; Store.onChange?.(); },
-      }, EXERCISES[id].name.split(' ')[0])),
+      }, LIFT_SHORT[id] ?? EXERCISES[id].name.split(' ')[0])),
     ),
     series.length >= 2
       ? lineChart({ series: [{ kind: 'line', points: series }], height: 150, yUnit: ' kg', yFmt: (v) => String(Math.round(v)) })
@@ -6178,10 +6712,20 @@ function waistCard(state, summary) {
 // změna cíle v Nastavení je okamžitě přepíše.
 function phaseRows(state, avg7) {
   const p = state.profile;
+  if (goalDirection(state) === 'maintain') {
+    return [h('div', { class: 'milestone hit' },
+      h('span', { class: 'm-flag' }, '✓'),
+      h('div', { class: 'grow' },
+        h('div', { style: 'font-weight:600;font-size:14.5px' }, 'Udržování'),
+        h('div', { class: 'muted', style: 'font-size:12.5px' }, 'váha v pásmu ±0,15 % týdně — teď rozhoduje síla, pas a zrcadlo'),
+      ),
+    )];
+  }
   const plan = honestPlan({
     startWeightKg: avg7 ?? p.weightKg,
     goalWeightKg: p.goalWeightKg,
     priority: p.priority,
+    pace: p.pace,
     trainingAgeMonths: trainingAgeMonthsNow(state),
     fromIso: todayISO(),
   });
@@ -6196,9 +6740,10 @@ function phaseRows(state, avg7) {
     return [row(`${p.goalWeightKg} kg`, 'cílová váha dosažena — teď rozhoduje pas a zrcadlo', true)];
   }
   if (plan.mode === 'cut') {
+    const band = CUT_BANDS_PCT_WK[p.pace] ?? CUT_BANDS_PCT_WK.light;
     return [
-      row(`${p.goalWeightKg} kg`, `~${fmtMonthYear(plan.etaIso)} při −0,5 % týdně`, false),
-      row('Břišáky', 'řez je odhaluje — hlídej trend pasu', false),
+      row(`${p.goalWeightKg} kg`, `~${fmtMonthYear(plan.etaIso)} při ${String(Math.abs(band[0])).replace('.', ',')} až ${String(Math.abs(band[1])).replace('.', ',')} % váhy týdně`, false),
+      row('Síla drží', 'hubnutí v tomhle tempu bere tuk, ne svaly — hlídej pas a výkon v tréninku', false),
     ];
   }
   const out = [
@@ -6222,14 +6767,14 @@ function milestonesCard(state, summary) {
     h('div', { class: 'label' }, 'Milníky'),
     wm && avg7 != null && honestPlan({
       startWeightKg: avg7, goalWeightKg: state.profile.goalWeightKg,
-      priority: state.profile.priority, trainingAgeMonths: 0, fromIso: todayISO(),
+      priority: state.profile.priority, pace: state.profile.pace, trainingAgeMonths: 0, fromIso: todayISO(),
     }).mode !== 'there' ? h('div', { class: 'stack', style: 'gap:5px' },
       h('div', { class: 'row between' },
         h('span', { class: 'small' }, `Váha → ${wm.targetKg} kg`),
         h('span', { class: 'num small muted' }, `${fmtKg(avg7, true)} / ${wm.targetKg}`),
       ),
       h('div', { class: 'progressline' },
-        h('div', { style: `width:${Math.min(100, Math.max(3, Math.round((1 - (wm.targetKg - avg7)) * 100)))}%` })),
+        h('div', { style: `width:${Math.min(100, Math.max(3, Math.round((1 - Math.abs(wm.targetKg - avg7)) * 100)))}%` })),
     ) : null,
     h('hr', { class: 'rule' }),
     ...phaseRows(state, avg7),
@@ -6941,15 +7486,33 @@ function renderSettings(root) {
 
 const PRIORITY_LABELS = { mass: 'Hmota', balanced: 'Vyvážené', lean: 'Řez' };
 
+const PACE_LABELS = { light: 'Lehce (−0,25 až −0,4 %/týden)', normal: 'Běžně (−0,4 až −0,6 %/týden)' };
+const BMI_BAND_LABELS = { under: 'pod normou', normal: 'v normě', over: 'nadváha', obese: 'obezita' };
+
 function profileCard(state) {
   const p = state.profile;
+  const avg7 = currentAvgWeight(state.weighIns) ?? p.weightKg;
+  const direction = goalDirection(state);
+  const b = bmi(avg7, p.heightCm);
+  const band = bmiBand(b);
+  const [lo, hi] = healthyWeightRange(p.heightCm);
+  const minGoal = minGoalWeightKg(p.heightCm);
   let goalInput;
   return h('div', { class: 'card stack' },
-    h('div', { class: 'label' }, 'Profil a cíl'),
+    h('div', { class: 'row between' },
+      h('div', { class: 'label' }, `Profil a cíl${p.name ? ` · ${p.name}` : ''}`),
+      h('span', { class: 'badge accent' }, direction === 'lose' ? 'hubnutí' : direction === 'maintain' ? 'udržování' : 'nabírání'),
+    ),
     h('div', { class: 'row between' },
       h('span', { class: 'small muted' }, 'Výchozí stav'),
-      h('span', { class: 'num small' }, `${fmtKg(p.weightKg, true)} kg · ${p.heightCm} cm · ${p.age} let`),
+      h('span', { class: 'num small' }, `${fmtKg(p.weightKg, true)} kg · ${p.heightCm} cm · ${p.age} let · ${p.sex === 'f' ? 'žena' : 'muž'}`),
     ),
+    h('div', { class: 'row between' },
+      h('span', { class: 'small muted' }, 'BMI (7denní průměr)'),
+      h('span', { class: `num small ${band === 'normal' ? 'ok-text' : 'warn-text'}`, style: 'font-weight:600' }, `${String(b).replace('.', ',')} · ${BMI_BAND_LABELS[band]}`),
+    ),
+    h('p', { class: 'muted', style: 'font-size:12px;margin:0' },
+      `Zdravé pásmo pro ${p.heightCm} cm je ${fmtKg(lo, true)} až ${fmtKg(hi, true)} kg (BMI 18,5 až 25). Cíl pod ${fmtKg(minGoal, true)} kg appka nepustí.`),
     h('div', { class: 'row' },
       h('span', { class: 'small muted grow' }, 'Cílová váha'),
       goalInput = h('input', { class: 'num set-input', type: 'text', inputmode: 'decimal', value: fmtInput(p.goalWeightKg), style: 'width:76px' }),
@@ -6957,12 +7520,14 @@ function profileCard(state) {
         class: 'btn small',
         onClick: () => {
           const v = parseNum(goalInput.value);
-          if (v == null || v < 50 || v > 180) { toast('Tohle jako cíl nedává smysl.'); return; }
-          Store.mutate((s) => { s.profile.goalWeightKg = v; }, { publish: true });
+          if (v == null || v < 30 || v > 250) { toast('Tohle jako cíl nedává smysl.'); return; }
+          if (v < minGoal) { toast(`Pod ${fmtKg(minGoal)} je BMI pod 18,5 — to není zdravý cíl.`); return; }
+          Store.mutate((s) => applyGoalChange(s, v), { publish: true });
+          toast(goalKind({ ...p, goalWeightKg: v }, avg7) === 'lose' ? 'Cíl uložen — hubnutí.' : goalKind({ ...p, goalWeightKg: v }, avg7) === 'gain' ? 'Cíl uložen — nabírání.' : 'Cíl uložen — udržování.');
         },
       }, 'Uložit'),
     ),
-    h('div', { class: 'stack', style: 'gap:6px' },
+    direction === 'gain' ? h('div', { class: 'stack', style: 'gap:6px' },
       h('span', { class: 'small muted' }, 'Priorita (řídí tempo výživy)'),
       h('div', { class: 'row' },
         ...Object.entries(PRIORITY_LABELS).map(([id, label]) => h('button', {
@@ -6973,38 +7538,64 @@ function profileCard(state) {
           }, { publish: true }),
         }, label)),
       ),
-    ),
+    ) : null,
+    direction === 'lose' ? h('div', { class: 'stack', style: 'gap:6px' },
+      h('span', { class: 'small muted' }, 'Tempo hubnutí'),
+      h('div', { class: 'row', style: 'flex-wrap:wrap;gap:6px' },
+        ...Object.entries(PACE_LABELS).map(([id, label]) => h('button', {
+          class: `chip${(p.pace ?? 'light') === id ? ' active' : ''}`,
+          onClick: () => Store.mutate((s) => {
+            s.profile.pace = id;
+            if (s.targets && s.targets.phase === 'cut') s.targets.rateBandPctWk = CUT_BANDS_PCT_WK[id];
+          }, { publish: true }),
+        }, label)),
+      ),
+    ) : null,
   );
 }
 
 // ---------- výživa ----------
 
-const ADJUST_REASONS = {
-  too_slow: 'váha rostla pomalu → přidáno',
-  too_fast: 'váha rostla rychle → ubráno',
-  on_track: 'tempo v pásmu',
-  minicut_start: 'start mini-cutu',
-  bulk_resume: 'návrat do bulku',
-};
+// Důvod úpravy kalorií srozumitelně — podle fáze (v hubnutí znamená „too_slow“
+// rychlejší pokles, než je pásmo, protože pásmo je záporné).
+function adjustReasonText(reason, phase) {
+  const losing = phase === 'cut' || phase === 'minicut';
+  const keeping = phase === 'maintain';
+  const map = {
+    too_slow: losing ? 'hubneš rychleji, než je zdrávo → přidáno' : keeping ? 'váha klesala → přidáno' : 'váha rostla pomalu → přidáno',
+    too_fast: losing ? 'hubneš pomaleji, než má → ubráno' : keeping ? 'váha rostla → ubráno' : 'váha rostla rychle → ubráno',
+    on_track: 'tempo v pásmu',
+    minicut_start: 'start mini-cutu',
+    bulk_resume: 'návrat do bulku',
+    goal_reached: 'cíl dosažen → udržování',
+    goal_changed: 'nový cíl → přepočet',
+  };
+  return map[reason] ?? reason;
+}
 
 function nutritionCard(state) {
   const t = state.targets;
   if (!t) return null;
   const log = state.nutritionLog.slice(-4).reverse();
+  const floor = kcalFloor(state.profile, currentAvgWeight(state.weighIns) ?? state.profile.weightKg);
   return h('div', { class: 'card stack' },
     h('div', { class: 'row between' },
       h('div', { class: 'label' }, 'Výživa'),
-      h('span', { class: `badge ${t.phase === 'minicut' ? 'warn' : 'accent'}` }, t.phase === 'minicut' ? 'mini-cut' : 'lean bulk'),
+      h('span', { class: `badge ${t.phase === 'minicut' ? 'warn' : 'accent'}` }, phaseLabel(t.phase)),
     ),
     h('div', { class: 'row between' },
       h('span', { class: 'small muted' }, 'Denní cíl'),
       h('span', { class: 'num small', style: 'font-weight:600' }, `${t.kcal} kcal · ${t.proteinG} g bílkovin`),
     ),
     h('p', { class: 'muted', style: 'font-size:12.5px' },
-      'Kalorie koriguje engine sám podle 14denního trendu váhy (±100–150 kcal/týden). K tomu kreatin 3–5 g denně.'),
+      t.phase === 'cut'
+        ? `Kalorie koriguje engine sám podle 14denního trendu váhy (±100–150 kcal/týden), nikdy pod ${floor} kcal (tvůj bazální metabolismus). Bílkoviny 2 g/kg drží svaly.`
+        : t.phase === 'maintain'
+          ? 'Udržování: kalorie se hýbou jen, když váha vyjede z pásma ±0,15 % týdně. Bílkoviny 1,8 g/kg.'
+          : 'Kalorie koriguje engine sám podle 14denního trendu váhy (±100–150 kcal/týden). K tomu kreatin 3–5 g denně.'),
     log.length ? h('div', { class: 'stack', style: 'gap:4px' },
       ...log.map((l) => h('div', { class: 'row between' },
-        h('span', { class: 'muted', style: 'font-size:12.5px' }, `${fmtDate(l.date)} · ${ADJUST_REASONS[l.reason] ?? l.reason}`),
+        h('span', { class: 'muted', style: 'font-size:12.5px' }, `${fmtDate(l.date)} · ${adjustReasonText(l.reason, t.phase)}`),
         h('span', { class: 'num muted', style: 'font-size:12.5px' }, l.deltaKcal ? `${fmtSigned(l.deltaKcal)} kcal` : `${l.kcal} kcal`),
       )),
     ) : null,
@@ -7345,7 +7936,7 @@ function deloadCard(state) {
       onClick: () => {
         const { close } = openModal(
           h('h3', {}, 'Spustit deload týden?'),
-          h('p', { class: 'muted small' }, '5 tréninků na −50 % sérií a −25 % zátěže, žádné série do selhání.'),
+          h('p', { class: 'muted small' }, `${programDays(state).length} tréninků na −50 % sérií a −25 % zátěže, žádné série do selhání.`),
           h('div', { class: 'row' },
             h('button', { class: 'btn primary grow', onClick: () => { Store.mutate((s) => acceptDeload(s), { publish: true }); close(); } }, 'Spustit'),
             h('button', { class: 'btn grow', onClick: () => close() }, 'Zpět'),

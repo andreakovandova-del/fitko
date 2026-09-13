@@ -169,9 +169,9 @@ Aktualizuje se po každém commitu.
 - [x] R2 zvuk pauzy
 - [x] R3 nákupní seznam
 - [x] R12 build skript
-- [ ] R4 výživa
-- [ ] R5 projekce a texty
-- [ ] R6 program z profilu + nové cviky
+- [x] R4 výživa
+- [x] R5 projekce a texty
+- [x] R6 program z profilu + nové cviky
 - [ ] R9 barvy
 - [ ] R7 dva uživatelé
 - [ ] R8 recepty a krabičky
