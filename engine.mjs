@@ -2256,3 +2256,63 @@ export function parsePackGrams(q) {
   const v = parseFloat(m[1].replace(',', '.'));
   return m[2] === 'kg' || m[2] === 'l' ? Math.round(v * 1000) : Math.round(v);
 }
+
+
+// ===== src/engine/household.js =====
+// Domácnost: dva lidé, dva telefony, jeden gist. Každý má vlastní zálohu
+// (fitko-zaloha.json = Niklas, fitko-zaloha-matilda.json = Matilda) a k tomu
+// společný soubor domácnosti (vaření do krabiček, nákup, cíle obou pro plánování).
+// Slučování je čistá funkce: novější záznam vyhrává po částech, nikdy se nepřepíše celek.
+
+export const USERS = {
+  niklas: { id: 'niklas', name: 'Niklas', short: 'N' },
+  matilda: { id: 'matilda', name: 'Matilda', short: 'M' },
+};
+export const USER_ORDER = ['niklas', 'matilda'];
+export const HOUSEHOLD_FILE = 'fitko-domacnost.json';
+
+export function backupFileFor(userId) {
+  return userId === 'niklas' ? 'fitko-zaloha.json' : `fitko-zaloha-${userId}.json`;
+}
+
+export function notifFileFor(userId) {
+  return userId === 'niklas' ? 'fitko-notif.json' : `fitko-notif-${userId}.json`;
+}
+
+/** Je tenhle gist záloha Fitka? (kterýkoli ze souborů domácnosti) */
+export function isFitkoGist(gist) {
+  return !!gist?.files && Object.keys(gist.files).some((n) => /^fitko-(zaloha|domacnost)/.test(n));
+}
+
+export function emptyHousehold() {
+  return {
+    version: 1,
+    updatedAt: null,
+    members: {},        // userId → { name, sex, kcal, proteinG, phase, weightKg, updatedAt }
+    cook: {},           // weekStart → plán vaření týdne { updatedAt, ... }
+    bought: {},         // weekStart → { updatedAt, items: { foodId: true } }
+    prefs: { updatedAt: null, cookDays: [0, 3], mealsFromBoxes: ['obed', 'vecere'] },
+    customRecipes: [],  // vlastní/AI recepty { id, updatedAt, ... }
+    proposals: {},      // weekStart → návrh týdne od AI { createdAt, ... }
+  };
+}
+
+const newer = (a, b) => ((b?.updatedAt ?? '') > (a?.updatedAt ?? '') ? b : a);
+
+/** Sloučí dvě verze domácnosti: po klíčích vyhrává novější updatedAt. */
+export function mergeHousehold(local, remote) {
+  const base = emptyHousehold();
+  const a = { ...base, ...(local ?? {}) };
+  const b = { ...base, ...(remote ?? {}) };
+  const out = emptyHousehold();
+  for (const key of new Set([...Object.keys(a.members ?? {}), ...Object.keys(b.members ?? {})])) out.members[key] = newer(a.members?.[key], b.members?.[key]);
+  for (const key of new Set([...Object.keys(a.cook ?? {}), ...Object.keys(b.cook ?? {})])) out.cook[key] = newer(a.cook?.[key], b.cook?.[key]);
+  for (const key of new Set([...Object.keys(a.bought ?? {}), ...Object.keys(b.bought ?? {})])) out.bought[key] = newer(a.bought?.[key], b.bought?.[key]);
+  for (const key of new Set([...Object.keys(a.proposals ?? {}), ...Object.keys(b.proposals ?? {})])) out.proposals[key] = newer(a.proposals?.[key], b.proposals?.[key]);
+  out.prefs = newer(a.prefs ?? base.prefs, b.prefs ?? base.prefs);
+  const recipes = new Map();
+  for (const r of [...(a.customRecipes ?? []), ...(b.customRecipes ?? [])]) if (r?.id) recipes.set(r.id, newer(recipes.get(r.id), r));
+  out.customRecipes = [...recipes.values()];
+  out.updatedAt = [a.updatedAt, b.updatedAt].filter(Boolean).sort().at(-1) ?? null;
+  return out;
+}

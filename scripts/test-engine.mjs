@@ -127,4 +127,18 @@ t('honestPlan hubnutí podle tempa', () => {
   assert.ok(plan.months >= 2 && plan.months <= 4, `měsíce ${plan.months}`);
 });
 
+
+t('domácnost: slučování po částech, novější vyhrává', () => {
+  const a = { ...e.emptyHousehold(), updatedAt: '2026-09-13T10:00:00Z', members: { niklas: { kcal: 3600, updatedAt: '2026-09-13T10:00:00Z' } }, cook: { '2026-09-14': { updatedAt: '2026-09-13T09:00:00Z', x: 1 } } };
+  const b = { ...e.emptyHousehold(), updatedAt: '2026-09-13T11:00:00Z', members: { matilda: { kcal: 1700, updatedAt: '2026-09-13T11:00:00Z' } }, cook: { '2026-09-14': { updatedAt: '2026-09-13T10:30:00Z', x: 2 } } };
+  const m = e.mergeHousehold(a, b);
+  assert.equal(m.members.niklas.kcal, 3600);
+  assert.equal(m.members.matilda.kcal, 1700);
+  assert.equal(m.cook['2026-09-14'].x, 2);
+  assert.equal(m.updatedAt, '2026-09-13T11:00:00Z');
+  assert.equal(e.backupFileFor('niklas'), 'fitko-zaloha.json');
+  assert.equal(e.backupFileFor('matilda'), 'fitko-zaloha-matilda.json');
+  assert.ok(e.isFitkoGist({ files: { 'fitko-zaloha-matilda.json': {} } }));
+});
+
 console.log(process.exitCode ? '\nNĚKTERÉ TESTY SELHALY' : '\nvšechny testy prošly');

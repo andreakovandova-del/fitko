@@ -173,7 +173,7 @@ Aktualizuje se po každém commitu.
 - [x] R5 projekce a texty
 - [x] R6 program z profilu + nové cviky
 - [ ] R9 barvy
-- [ ] R7 dva uživatelé
+- [x] R7 dva uživatelé
 - [ ] R8 recepty a krabičky
 - [ ] R10 AI návrh týdne
 - [ ] R11 fotky

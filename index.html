@@ -842,6 +842,32 @@ input.set-input {
   pointer-events: none;
 }
 .onb h2 { font-size: 21px; }
+
+/* ---------- lidé: barva osoby (Niklas = signální oranž, Matilda = fialová) ---------- */
+:root { --p-niklas: var(--accent); --p-matilda: #b884f5; }
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) { --p-matilda: #7b47c9; } }
+:root[data-theme="light"] { --p-matilda: #7b47c9; }
+.person-niklas { --person: var(--p-niklas); }
+.person-matilda { --person: var(--p-matilda); }
+.person-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 9px; border-radius: 999px;
+  font-size: 11.5px; font-weight: 700; letter-spacing: 0.04em;
+  color: var(--person, var(--muted));
+  background: color-mix(in srgb, var(--person, var(--muted)) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--person, var(--muted)) 35%, transparent);
+}
+.who-card {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 10px;
+  padding: 22px 12px; color: var(--text);
+}
+.who-card.selected { border-color: var(--person); box-shadow: var(--card-shadow), 0 0 0 2px color-mix(in srgb, var(--person) 40%, transparent); }
+.who-avatar {
+  width: 56px; height: 56px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-family: var(--font-display); font-weight: 700; font-size: 26px;
+  color: #fff; background: var(--person);
+}
 .onb .display.hero { font-size: 38px; letter-spacing: -0.01em; }
 
 .scale-row { display: flex; gap: 6px; }
@@ -1077,7 +1103,7 @@ input.set-input {
 <script>
 (() => {
 'use strict';
-const BUILD_ID = "2026-09-13 19:28";
+const BUILD_ID = "2026-09-13 19:38";
 const VAPID_PUBLIC_KEY = "BD_ok8gw7j2oTGo4onj5L0RKeoBb8CwcRXI6kBmWMQGHidqYlHqA-Mcl8tffN3j8ZxnzX7Fzq_RmG80iWyI6X0M";
 // ===== src/engine/util.js =====
 // Sdílené utility enginu — čisté funkce, žádné závislosti.
@@ -3339,6 +3365,66 @@ function parsePackGrams(q) {
 }
 
 
+// ===== src/engine/household.js =====
+// Domácnost: dva lidé, dva telefony, jeden gist. Každý má vlastní zálohu
+// (fitko-zaloha.json = Niklas, fitko-zaloha-matilda.json = Matilda) a k tomu
+// společný soubor domácnosti (vaření do krabiček, nákup, cíle obou pro plánování).
+// Slučování je čistá funkce: novější záznam vyhrává po částech, nikdy se nepřepíše celek.
+
+const USERS = {
+  niklas: { id: 'niklas', name: 'Niklas', short: 'N' },
+  matilda: { id: 'matilda', name: 'Matilda', short: 'M' },
+};
+const USER_ORDER = ['niklas', 'matilda'];
+const HOUSEHOLD_FILE = 'fitko-domacnost.json';
+
+function backupFileFor(userId) {
+  return userId === 'niklas' ? 'fitko-zaloha.json' : `fitko-zaloha-${userId}.json`;
+}
+
+function notifFileFor(userId) {
+  return userId === 'niklas' ? 'fitko-notif.json' : `fitko-notif-${userId}.json`;
+}
+
+/** Je tenhle gist záloha Fitka? (kterýkoli ze souborů domácnosti) */
+function isFitkoGist(gist) {
+  return !!gist?.files && Object.keys(gist.files).some((n) => /^fitko-(zaloha|domacnost)/.test(n));
+}
+
+function emptyHousehold() {
+  return {
+    version: 1,
+    updatedAt: null,
+    members: {},        // userId → { name, sex, kcal, proteinG, phase, weightKg, updatedAt }
+    cook: {},           // weekStart → plán vaření týdne { updatedAt, ... }
+    bought: {},         // weekStart → { updatedAt, items: { foodId: true } }
+    prefs: { updatedAt: null, cookDays: [0, 3], mealsFromBoxes: ['obed', 'vecere'] },
+    customRecipes: [],  // vlastní/AI recepty { id, updatedAt, ... }
+    proposals: {},      // weekStart → návrh týdne od AI { createdAt, ... }
+  };
+}
+
+const newer = (a, b) => ((b?.updatedAt ?? '') > (a?.updatedAt ?? '') ? b : a);
+
+/** Sloučí dvě verze domácnosti: po klíčích vyhrává novější updatedAt. */
+function mergeHousehold(local, remote) {
+  const base = emptyHousehold();
+  const a = { ...base, ...(local ?? {}) };
+  const b = { ...base, ...(remote ?? {}) };
+  const out = emptyHousehold();
+  for (const key of new Set([...Object.keys(a.members ?? {}), ...Object.keys(b.members ?? {})])) out.members[key] = newer(a.members?.[key], b.members?.[key]);
+  for (const key of new Set([...Object.keys(a.cook ?? {}), ...Object.keys(b.cook ?? {})])) out.cook[key] = newer(a.cook?.[key], b.cook?.[key]);
+  for (const key of new Set([...Object.keys(a.bought ?? {}), ...Object.keys(b.bought ?? {})])) out.bought[key] = newer(a.bought?.[key], b.bought?.[key]);
+  for (const key of new Set([...Object.keys(a.proposals ?? {}), ...Object.keys(b.proposals ?? {})])) out.proposals[key] = newer(a.proposals?.[key], b.proposals?.[key]);
+  out.prefs = newer(a.prefs ?? base.prefs, b.prefs ?? base.prefs);
+  const recipes = new Map();
+  for (const r of [...(a.customRecipes ?? []), ...(b.customRecipes ?? [])]) if (r?.id) recipes.set(r.id, newer(recipes.get(r.id), r));
+  out.customRecipes = [...recipes.values()];
+  out.updatedAt = [a.updatedAt, b.updatedAt].filter(Boolean).sort().at(-1) ?? null;
+  return out;
+}
+
+
 // ===== src/app/ui.js =====
 // DOM helpery — žádný framework, jen disciplína.
 
@@ -3474,14 +3560,50 @@ function icon(name) {
 }
 
 
+// ===== src/app/user.js =====
+// Kdo appku na tomhle telefonu používá. Každý telefon = jeden člověk; data každého
+// žijí zvlášť (v telefonu i v záloze), společná je jen domácnost (vaření, nákup).
+
+const USER_KEY = 'fitko-user';
+let activeUser = null;
+
+function currentUser() { return activeUser; }
+function userInfo(id = activeUser) { return USERS[id] ?? null; }
+function otherUser(id = activeUser) { return USER_ORDER.find((u) => u !== id) ?? null; }
+
+function setCurrentUser(id) {
+  activeUser = USERS[id] ? id : null;
+  try { if (activeUser) localStorage.setItem(USER_KEY, activeUser); else localStorage.removeItem(USER_KEY); } catch { /* noop */ }
+}
+
+// Klíč úložiště pro tohohle uživatele; Niklas drží původní názvy (starší instalace).
+function userKey(base, id = activeUser) {
+  return !id || id === 'niklas' ? base : `${base}-${id}`;
+}
+
+function initUser() {
+  let id = '';
+  try { id = localStorage.getItem(USER_KEY) ?? ''; } catch { /* noop */ }
+  if (USERS[id]) { activeUser = id; return id; }
+  // Starší instalace bez volby uživatele: data v telefonu patří prvnímu uživateli.
+  try {
+    const raw = localStorage.getItem('fitko-state-v1');
+    if (raw && JSON.parse(raw)?.onboarded) { setCurrentUser('niklas'); return 'niklas'; }
+  } catch { /* noop */ }
+  return null;
+}
+
+
 // ===== src/app/storage.js =====
 // Úložiště: localStorage (rychlé, per zařízení) + samo-publikace artifactu (trvalé, přežije
 // i ztrátu telefonu — stav je vložený přímo v HTML stránky). Publikace RELOADUJE otevřený
 // pohled, proto se volá jen na bezpečných hranicích (konec tréninku, onboarding, vážení),
 // nikdy uprostřed zápisu série. Záloha: export/import JSON.
 
-const STORAGE_KEY = 'fitko-state-v1';
-const BACKUP_KEY = 'fitko-state-backup-v1';
+const STATE_BASE_KEY = 'fitko-state-v1';
+const BACKUP_BASE_KEY = 'fitko-state-backup-v1';
+const stateKey = () => userKey(STATE_BASE_KEY);
+const backupKey = () => userKey(BACKUP_BASE_KEY);
 const STATE_SCRIPT_RE = /(<script type="application\/json" id="fitko-state">)[\s\S]*?(<\/script>)/;
 
 let originalHtml = null; // snímek dokumentu před prvním renderem — šablona pro publish
@@ -3534,13 +3656,13 @@ function loadPersistedState() {
 
   let local = null;
   if (storageInfo.localOk) {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(stateKey());
     if (raw) {
       try {
         local = JSON.parse(raw);
       } catch {
         // Poškozený zápis nesmíme přepsat — uschováme ho stranou k případné záchraně.
-        try { localStorage.setItem(`fitko-state-damaged-${Date.now()}`, raw); } catch { /* plno */ }
+        try { localStorage.setItem(`${userKey('fitko-state-damaged')}-${Date.now()}`, raw); } catch { /* plno */ }
         storageInfo.damagedFound = true;
         local = null;
       }
@@ -3570,14 +3692,14 @@ function loadPersistedState() {
 function backupState(state) {
   if (!storageInfo.localOk || !state?.sessions?.length) return;
   try {
-    localStorage.setItem(BACKUP_KEY, JSON.stringify({ savedAt: new Date().toISOString(), state }));
+    localStorage.setItem(backupKey(), JSON.stringify({ savedAt: new Date().toISOString(), state }));
   } catch { /* plné úložiště — záloha není kritická */ }
 }
 
 function readBackup() {
   if (!storageInfo.localOk) return null;
   try {
-    const parsed = JSON.parse(localStorage.getItem(BACKUP_KEY) ?? 'null');
+    const parsed = JSON.parse(localStorage.getItem(backupKey()) ?? 'null');
     return parsed?.state?.profile && Array.isArray(parsed.state.sessions) ? parsed : null;
   } catch { return null; }
 }
@@ -3588,7 +3710,7 @@ function saveLocal(state, { force = false } = {}) {
   // (Selhalo načtení, jiné okno v onboardingu, chyba při startu… data mají přednost.)
   if (!force && hadStoredData && !state?.sessions?.length) return;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    localStorage.setItem(stateKey(), JSON.stringify(state));
     if (state?.sessions?.length) { hadStoredData = true; storageInfo.hadStoredData = true; }
   } catch { storageInfo.localOk = false; }
 }
@@ -3624,12 +3746,18 @@ function scanStoredStates() {
 }
 
 // Vědomé smazání všeho uživatelem — jediná cesta, jak pojistku obejít.
+// Maže jen data TOHOHLE uživatele (druhý člověk na stejném telefonu o nic nepřijde)
+// a nastavení zálohy; volba uživatele zůstává.
 function wipeAllData() {
   hadStoredData = false;
   storageInfo.hadStoredData = false;
   try {
+    const other = otherUser();
     for (const key of Object.keys(localStorage)) {
-      if (key.startsWith('fitko-')) localStorage.removeItem(key);
+      if (!key.startsWith('fitko-') || key === USER_KEY) continue;
+      if (other && key.includes(`-${other}`)) continue;
+      if (activeUser !== 'niklas' && /^fitko-state(-backup)?-v1$/.test(key)) continue; // data Niklase
+      localStorage.removeItem(key);
     }
   } catch { /* noop */ }
 }
@@ -3657,7 +3785,7 @@ async function publishState(state) {
 
 async function exportJSON(state) {
   const data = JSON.stringify(state, null, 2);
-  const filename = `fitko-zaloha-${(state.updatedAt ?? '').slice(0, 10) || 'export'}.json`;
+  const filename = `fitko-zaloha-${currentUser() ?? 'export'}-${(state.updatedAt ?? '').slice(0, 10) || 'export'}.json`;
   const ns = await downloadsNs;
   if (ns) {
     try {
@@ -3690,8 +3818,10 @@ function parseImportedJSON(text) {
 const TOKEN_KEY = 'fitko-gh-token';
 const GIST_KEY = 'fitko-gh-gist';
 const SYNC_KEY = 'fitko-gh-lastsync';
-const FILENAME = 'fitko-zaloha.json';
+const REMOTE_SESSIONS_KEY = 'fitko-gh-remote-sessions'; // kolik tréninků měla záloha tohohle uživatele, když jsme ji naposled viděli
 const DEBOUNCE_MS = 8000;
+// Soubor zálohy tohohle uživatele v gistu (Niklas = původní název, Matilda = s příponou).
+const backupFile = () => backupFileFor(currentUser() ?? 'niklas');
 
 const cloudInfo = { enabled: false, syncing: false, lastSync: null, lastError: null };
 
@@ -3718,6 +3848,7 @@ function disableCloud() {
   lsDel(TOKEN_KEY);
   lsDel(GIST_KEY);
   lsDel(SYNC_KEY);
+  lsDel(userKey(REMOTE_SESSIONS_KEY));
   cloudInfo.enabled = false;
   cloudInfo.lastSync = null;
   cloudInfo.lastError = null;
@@ -3742,33 +3873,54 @@ async function api(path, options = {}) {
   return res.json();
 }
 
-/** Nahraje aktuální stav do privátního gistu (poprvé ho založí). */
-async function cloudBackup(state) {
-  if (!cloudEnabled() || cloudInfo.syncing) return { ok: false, reason: 'off' };
-  // POJISTKA: stav bez tréninků nikdy nepřepíše existující zálohu na GitHubu.
-  // (Nenačtená data, rozdělaný onboarding v druhém okně, chyba při startu…)
-  if (!state?.sessions?.length && ls(GIST_KEY)) {
-    cloudInfo.lastError = null;
-    return { ok: false, reason: 'prázdný stav — záloha ponechána' };
-  }
-  cloudInfo.syncing = true;
+async function readGistFile(gist, name) {
+  const file = gist.files?.[name];
+  if (!file) return null;
+  const content = file.truncated && file.raw_url ? await (await fetch(file.raw_url)).text() : file.content;
+  return content;
+}
+
+/** Zapíše libovolné soubory do gistu domácnosti (založí ho, když ještě není). */
+async function cloudWriteFiles(filesObj, { allowCreate = true } = {}) {
+  if (!cloudEnabled()) return { ok: false, reason: 'off' };
+  const files = Object.fromEntries(Object.entries(filesObj).map(([name, data]) => [name, { content: JSON.stringify(data, null, 1) }]));
   try {
-    const files = { [FILENAME]: { content: JSON.stringify(state, null, 1) } };
     const id = ls(GIST_KEY);
     let gist;
     if (id) {
       gist = await api(`/gists/${id}`, { method: 'PATCH', body: JSON.stringify({ files }) });
     } else {
+      if (!allowCreate) return { ok: false, reason: 'gist ještě není' };
       gist = await api('/gists', {
         method: 'POST',
-        body: JSON.stringify({ description: 'Fitko — automatická záloha tréninků', public: false, files }),
+        body: JSON.stringify({ description: 'Fitko — automatická záloha (oba telefony + domácnost)', public: false, files }),
       });
       lsSet(GIST_KEY, gist.id);
     }
+    return { ok: true, gistId: gist.id };
+  } catch (err) {
+    return { ok: false, reason: err?.message ?? String(err) };
+  }
+}
+
+/** Nahraje aktuální stav tohohle uživatele do gistu (poprvé ho založí). */
+async function cloudBackup(state) {
+  if (!cloudEnabled() || cloudInfo.syncing) return { ok: false, reason: 'off' };
+  // POJISTKA: stav bez tréninků nikdy nepřepíše zálohu, ve které tréninky byly.
+  // (Nenačtená data, rozdělaný onboarding v druhém okně, chyba při startu…)
+  if (!state?.sessions?.length && Number(ls(userKey(REMOTE_SESSIONS_KEY)) || 0) > 0) {
+    cloudInfo.lastError = null;
+    return { ok: false, reason: 'prázdný stav — záloha ponechána' };
+  }
+  cloudInfo.syncing = true;
+  try {
+    const r = await cloudWriteFiles({ [backupFile()]: state });
+    if (!r.ok) throw new Error(r.reason);
     cloudInfo.lastSync = new Date().toISOString();
     cloudInfo.lastError = null;
     lsSet(SYNC_KEY, cloudInfo.lastSync);
-    return { ok: true, gistId: gist.id };
+    lsSet(userKey(REMOTE_SESSIONS_KEY), String(state?.sessions?.length ?? 0));
+    return { ok: true, gistId: r.gistId };
   } catch (err) {
     cloudInfo.lastError = err?.message ?? String(err);
     return { ok: false, reason: cloudInfo.lastError };
@@ -3777,68 +3929,62 @@ async function cloudBackup(state) {
   }
 }
 
+/** Najde gist domácnosti na účtu (podle kteréhokoli souboru Fitka) a zapamatuje si ho. */
+async function findFitkoGist() {
+  if (ls(GIST_KEY)) return api(`/gists/${ls(GIST_KEY)}`);
+  const list = await api('/gists?per_page=100');
+  const found = list.find(isFitkoGist);
+  if (!found) return null;
+  lsSet(GIST_KEY, found.id);
+  return api(`/gists/${found.id}`);
+}
+
 /**
- * Najde už existující zálohu na účtu (po přeinstalaci telefonu / novém zařízení),
- * aby se nezaložil druhý prázdný gist a ten původní nezůstal nedosažitelný.
- * @returns { ok, gistId, sessions } — sessions = kolik tréninků záloha obsahuje
+ * Najde už existující zálohu na účtu (po přeinstalaci telefonu / novém zařízení /
+ * druhý telefon domácnosti), aby se nezaložil druhý gist a ten původní nezůstal
+ * nedosažitelný.
+ * @returns { ok, gistId, sessions, found } — sessions = kolik tréninků má záloha TOHOHLE uživatele
  */
 async function adoptExistingBackup() {
   if (!cloudEnabled()) return { ok: false, reason: 'Nejdřív vlož token' };
   try {
-    if (ls(GIST_KEY)) {
-      const known = await api(`/gists/${ls(GIST_KEY)}`);
-      const c = known.files?.[FILENAME]?.content;
-      const st = c ? JSON.parse(c) : null;
-      return { ok: true, gistId: known.id, sessions: st?.sessions?.length ?? 0 };
-    }
-    const list = await api('/gists?per_page=100');
-    const found = list.find((g) => g.files && g.files[FILENAME]);
-    if (!found) return { ok: true, gistId: null, sessions: 0 };
-    lsSet(GIST_KEY, found.id);
-    const gist = await api(`/gists/${found.id}`);
-    const content = gist.files?.[FILENAME]?.content;
-    const state = content ? JSON.parse(content) : null;
-    return { ok: true, gistId: found.id, sessions: state?.sessions?.length ?? 0 };
+    const gist = await findFitkoGist();
+    if (!gist) return { ok: true, gistId: null, sessions: 0, found: false };
+    const content = await readGistFile(gist, backupFile());
+    const st = content ? JSON.parse(content) : null;
+    const sessions = st?.sessions?.length ?? 0;
+    if (st) lsSet(userKey(REMOTE_SESSIONS_KEY), String(sessions));
+    return { ok: true, gistId: gist.id, sessions, found: !!st };
   } catch (err) {
     return { ok: false, reason: err?.message ?? String(err) };
   }
 }
 
-/** Stáhne poslední zálohu z GitHubu (najde gist i po přeinstalaci telefonu). */
+/** Stáhne poslední zálohu tohohle uživatele z GitHubu (najde gist i po přeinstalaci telefonu). */
 async function cloudRestore() {
   if (!cloudEnabled()) return { ok: false, reason: 'Nejdřív zapni zálohu tokenem' };
   try {
-    let id = ls(GIST_KEY);
-    if (!id) {
-      const list = await api('/gists?per_page=100');
-      const found = list.find((g) => g.files && g.files[FILENAME]);
-      if (!found) return { ok: false, reason: 'Na GitHubu zatím žádná záloha není' };
-      id = found.id;
-      lsSet(GIST_KEY, id);
-    }
-    const gist = await api(`/gists/${id}`);
-    const file = gist.files?.[FILENAME];
-    if (!file) return { ok: false, reason: 'Záloha v gistu chybí' };
-    const content = file.truncated && file.raw_url
-      ? await (await fetch(file.raw_url)).text()
-      : file.content;
+    const gist = await findFitkoGist();
+    if (!gist) return { ok: false, reason: 'Na GitHubu zatím žádná záloha není' };
+    const content = await readGistFile(gist, backupFile());
+    if (!content) return { ok: false, reason: `Pro ${userInfo()?.name ?? 'tebe'} v záloze zatím nic není`, empty: true };
     const state = JSON.parse(content);
     if (!state?.profile || !Array.isArray(state.sessions)) return { ok: false, reason: 'Záloha je poškozená' };
+    lsSet(userKey(REMOTE_SESSIONS_KEY), String(state.sessions.length));
     return { ok: true, state, updatedAt: gist.updated_at };
   } catch (err) {
     return { ok: false, reason: err?.message ?? String(err) };
   }
 }
 
-/** Přečte vedlejší soubor z gistu (např. fitko-notif.json, který zapisuje GitHub Action). */
+/** Přečte vedlejší soubor z gistu (fitko-notif.json od GitHub Action, fitko-domacnost.json…). */
 async function cloudReadFile(name) {
-  if (!cloudEnabled() || !ls(GIST_KEY)) return null;
+  if (!cloudEnabled()) return null;
   try {
-    const gist = await api(`/gists/${ls(GIST_KEY)}`);
-    const file = gist.files?.[name];
-    if (!file) return null;
-    const content = file.truncated && file.raw_url ? await (await fetch(file.raw_url)).text() : file.content;
-    return JSON.parse(content);
+    const gist = await findFitkoGist();
+    if (!gist) return null;
+    const content = await readGistFile(gist, name);
+    return content ? JSON.parse(content) : null;
   } catch { return null; }
 }
 
@@ -3859,6 +4005,108 @@ function flushCloudBackup(state) {
   pending = null;
   return cloudBackup(state);
 }
+
+
+// ===== src/app/household.js =====
+// Společná data domácnosti (vaření do krabiček, nákup, cíle obou lidí). Kopie žije
+// v telefonu, pravda je v gistu (fitko-domacnost.json). Sloučení po částech podle
+// času změny — dva telefony se nepřepisují, jen doplňují.
+
+const HH_KEY = 'fitko-household-v1';
+const HH_DEBOUNCE_MS = 6000;
+
+const Household = {
+  state: null,
+  dirty: false,
+  syncing: false,
+  lastSync: null,
+  lastError: null,
+  timer: null,
+
+  init() {
+    let local = null;
+    try { local = JSON.parse(localStorage.getItem(HH_KEY) ?? 'null'); } catch { local = null; }
+    this.state = mergeHousehold(emptyHousehold(), local ?? {});
+    try { this.dirty = localStorage.getItem(`${HH_KEY}-dirty`) === '1'; } catch { /* noop */ }
+  },
+
+  saveLocal() {
+    try {
+      localStorage.setItem(HH_KEY, JSON.stringify(this.state));
+      localStorage.setItem(`${HH_KEY}-dirty`, this.dirty ? '1' : '0');
+    } catch { /* plno */ }
+  },
+
+  mutate(fn, { rerender = true } = {}) {
+    const result = fn(this.state);
+    this.state.updatedAt = new Date().toISOString();
+    this.dirty = true;
+    this.saveLocal();
+    this.schedulePush();
+    if (rerender) Store.onChange?.();
+    return result;
+  },
+
+  schedulePush() {
+    if (!cloudEnabled()) return;
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = setTimeout(() => { this.timer = null; this.push(); }, HH_DEBOUNCE_MS);
+  },
+
+  async push() {
+    if (!cloudEnabled() || this.syncing) return;
+    this.syncing = true;
+    try {
+      const r = await cloudWriteFiles({ [HOUSEHOLD_FILE]: this.state }, { allowCreate: false });
+      if (r.ok) { this.dirty = false; this.lastSync = new Date().toISOString(); this.lastError = null; this.saveLocal(); }
+      else this.lastError = r.reason;
+    } finally { this.syncing = false; }
+  },
+
+  /** Stáhne domácnost z gistu a sloučí; když máme nezapsané změny, pošle je. */
+  async pull({ rerender = true } = {}) {
+    if (!cloudEnabled()) return;
+    const remote = await cloudReadFile(HOUSEHOLD_FILE);
+    if (remote) {
+      const merged = mergeHousehold(this.state, remote);
+      const changed = JSON.stringify(merged) !== JSON.stringify(this.state);
+      if (changed) { this.state = merged; this.saveLocal(); if (rerender) Store.onChange?.(); }
+      this.lastSync = new Date().toISOString();
+    }
+    if (this.dirty) await this.push();
+  },
+
+  /** Moje cíle výživy pro druhého (plánování krabiček počítá s oběma). */
+  publishMember(state) {
+    const me = currentUser();
+    if (!me || !state?.targets || !state.onboarded) return;
+    const m = {
+      name: state.profile.name || userInfo(me)?.name,
+      sex: state.profile.sex,
+      kcal: state.targets.kcal,
+      proteinG: state.targets.proteinG,
+      phase: state.targets.phase,
+      weightKg: currentAvgWeight(state.weighIns) ?? state.profile.weightKg,
+    };
+    const prev = this.state.members[me];
+    if (prev && ['name', 'sex', 'kcal', 'proteinG', 'phase', 'weightKg'].every((k) => prev[k] === m[k])) return;
+    this.mutate((hh) => { hh.members[me] = { ...m, updatedAt: new Date().toISOString() }; }, { rerender: false });
+  },
+
+  /** Členové domácnosti k plánování: já vždy z aktuálního stavu, druhý z domácnosti. */
+  members(state) {
+    const me = currentUser();
+    const out = {};
+    for (const id of USER_ORDER) {
+      if (id === me && state?.targets) {
+        out[id] = { id, name: state.profile.name || USERS[id].name, kcal: state.targets.kcal, proteinG: state.targets.proteinG, phase: state.targets.phase, me: true };
+      } else if (this.state.members[id]) {
+        out[id] = { id, ...this.state.members[id], me: false };
+      }
+    }
+    return out;
+  },
+};
 
 
 // ===== src/app/updater.js =====
@@ -4157,6 +4405,7 @@ const Store = {
     if (publish) this.state.pendingPublish = false;
     else if (markDirty) this.state.pendingPublish = true;
     saveLocal(this.state, { force });
+    Household.publishMember(this.state);
     // Automatická záloha na GitHub: na hranicích (konec tréninku, onboarding…) hned,
     // jinak se shlukne a odešle po pár vteřinách klidu.
     // Na stejné hranici vzniká i lokální snímek — po dokončeném tréninku tak
@@ -5351,26 +5600,103 @@ function lineChart(cfg) {
 
 
 // ===== src/app/view_onboarding.js =====
-// Onboarding: profil → aktuální výkony → pas → priorita → poctivý plán. Pod 3 minuty.
+// Onboarding: kdo jsi → tvoje čísla → cíl a tempo → trénink (preference → program)
+// → co teď zvedáš → pas → poctivý plán. Nic tu není naoko: z každé odpovědi se
+// opravdu staví program, kalorie a cíle. Pod 4 minuty.
 
-
-
-const LIFT_IDS = ['bench', 'squat', 'deadlift', 'ohp', 'bb_row', 'pullup'];
-
-const draft = {
-  step: 0,
-  profile: { weightKg: 85, heightCm: 186, age: 21, goalWeightKg: 95, priority: 'balanced' },
-  lifts: Object.fromEntries(LIFT_IDS.map((id) => [id, { weightKg: '', reps: '' }])),
-  waistCm: '',
+// Předvyplnění podle uživatele — dá se všechno přepsat.
+const PRESETS = {
+  niklas: {
+    profile: { sex: 'm', age: 21, heightCm: 186, weightKg: 85, goalWeightKg: 95, pace: 'light', priority: 'balanced' },
+    trainingDays: [1, 2, 3, 4, 5],
+    program: { days: 5, focus: 'ppl', upperBody: 'full', avoid: [], dislikes: [] },
+  },
+  matilda: {
+    profile: { sex: 'f', age: 20, heightCm: 165, weightKg: 53, goalWeightKg: 51, pace: 'light', priority: 'balanced' },
+    trainingDays: [2, 4],
+    program: { days: 2, focus: 'lower', upperBody: 'minimal', avoid: [], dislikes: [] },
+  },
 };
+
+const DEFAULT_TRAINING_DAYS = { 2: [2, 4], 3: [1, 3, 5], 4: [1, 2, 4, 5], 5: [1, 2, 3, 4, 5], 6: [1, 2, 3, 4, 5, 6] };
+const DAY_CHIPS = [[1, 'Po'], [2, 'Út'], [3, 'St'], [4, 'Čt'], [5, 'Pá'], [6, 'So'], [0, 'Ne']];
+
+let draft = null;
+
+function newDraft(userId) {
+  const p = PRESETS[userId] ?? PRESETS.niklas;
+  return {
+    step: 0,
+    userId,
+    profile: { name: USERS[userId]?.name ?? '', goal: null, trainingAgeMonths: 0, ...p.profile },
+    trainingDays: [...p.trainingDays],
+    program: { ...p.program, avoid: [...p.program.avoid], dislikes: [...p.program.dislikes] },
+    lifts: {},
+    waistCm: '',
+  };
+}
+
+function programPrefs() {
+  return { ...draft.program, days: draft.trainingDays.length || draft.program.days };
+}
+
+function currentProgram() {
+  return buildProgram(programPrefs());
+}
+
+// ---------- Kdo jsi? ----------
+
+function renderWho(root) {
+  clearEl(root);
+  let tokenInput;
+  let chosen = null;
+  const buttons = USER_ORDER.map((id) => {
+    const btn = h('button', {
+      class: `card who-card person-${id}`,
+      onClick: () => { chosen = id; for (const b of buttons) b.classList.toggle('selected', b === btn); },
+    },
+      h('span', { class: 'who-avatar' }, USERS[id].short),
+      h('span', { class: 'display', style: 'font-size:24px' }, USERS[id].name),
+    );
+    return btn;
+  });
+  root.append(h('div', { class: 'onb' },
+    h('div', { class: 'display', style: 'font-size:26px' }, 'Fitko'),
+    h('h2', {}, 'Kdo jsi?'),
+    h('p', { class: 'muted small' }, 'Každý má v appce vlastní tréninky, váhu a kalorie. Jídlo, vaření a nákup jsou společné.'),
+    h('div', { class: 'row', style: 'gap:10px' }, ...buttons),
+    h('div', { class: 'stack', style: 'gap:6px' },
+      h('span', { class: 'label' }, 'Token zálohy (nepovinné)'),
+      tokenInput = h('input', { type: 'text', placeholder: 'ghp_… stejný jako na druhém telefonu', autocapitalize: 'off', autocorrect: 'off', spellcheck: false }),
+      h('p', { class: 'muted', style: 'font-size:12px;margin:0' }, 'S tokenem appka najde tvoji zálohu a stáhne ji. Bez něj začneš od začátku a zálohu zapneš v Nastavení.'),
+    ),
+    h('div', { class: 'row onb-actions' },
+      h('button', {
+        class: 'btn primary grow',
+        onClick: () => {
+          if (!chosen) { toast('Vyber, kdo jsi.'); return; }
+          const token = tokenInput.value.trim();
+          if (token && token.length < 20) { toast('Token vypadá krátký.'); return; }
+          chooseUser(chosen, token);
+        },
+      }, 'Pokračovat'),
+    ),
+  ));
+}
+
+// ---------- kroky ----------
 
 function renderOnboarding(root) {
   clearEl(root);
-  const steps = [stepProfile, stepLifts, stepWaist, stepPriority, stepHonest];
+  if (!draft || draft.userId !== currentUser()) draft = newDraft(currentUser());
+  const steps = [stepProfile, stepGoal, stepTraining, stepLifts, stepWaist, stepHonest];
   root.append(h('div', { class: 'onb' },
     h('div', { class: 'row between' },
       h('div', { class: 'display', style: 'font-size:26px' }, 'Fitko'),
-      h('div', { class: 'label' }, `${draft.step + 1} / ${steps.length}`),
+      h('div', { class: 'row', style: 'gap:8px' },
+        h('span', { class: `person-chip person-${draft.userId}` }, draft.profile.name || USERS[draft.userId]?.name),
+        h('div', { class: 'label' }, `${draft.step + 1} / ${steps.length}`),
+      ),
     ),
     steps[draft.step](),
   ));
@@ -5403,7 +5729,10 @@ function validateProfile() {
   if (hcm == null || hcm < 120 || hcm > 230) { toast('Doplň výšku v cm.'); return false; }
   if (a == null || a < 10 || a > 100) { toast('Doplň věk.'); return false; }
   if (g == null || g < 30 || g > 250) { toast('Doplň cílovou váhu v kg.'); return false; }
+  const minGoal = minGoalWeightKg(hcm);
+  if (g < minGoal) { toast(`Cíl pod ${fmtKg(minGoal)} je BMI pod 18,5 — to není zdravé. Nejníž ${fmtKg(minGoal)}.`); return false; }
   p.weightKg = w; p.heightCm = hcm; p.age = a; p.goalWeightKg = g;
+  p.name = String(p.name ?? '').trim() || USERS[draft.userId]?.name || '';
   return true;
 }
 
@@ -5422,27 +5751,208 @@ function numField(label, value, onInput, { placeholder = '', suffix = '' } = {})
   );
 }
 
+function chipRow(options, isActive, onPick, { wrap = true } = {}) {
+  return h('div', { class: 'row', style: `gap:6px${wrap ? ';flex-wrap:wrap' : ''}` },
+    ...options.map(([id, label]) => h('button', {
+      class: `chip${isActive(id) ? ' active' : ''}`,
+      onClick: () => onPick(id),
+    }, label)),
+  );
+}
+
+// ----- 1) čísla -----
+
 function stepProfile() {
   const p = draft.profile;
+  const bmiLine = h('p', { class: 'muted', style: 'font-size:12.5px;margin:0' });
+  const refreshBmi = () => {
+    const w = parseNum(p.weightKg); const hcm = parseNum(p.heightCm); const g = parseNum(p.goalWeightKg);
+    if (!w || !hcm) { bmiLine.textContent = ''; return; }
+    const b = bmi(w, hcm);
+    const [lo, hi] = healthyWeightRange(hcm);
+    let text = `BMI ${String(b).replace('.', ',')} (${BMI_BAND_LABELS[bmiBand(b)]}). Zdravé pásmo pro ${hcm} cm je ${fmtKg(lo, true)} až ${fmtKg(hi, true)} kg.`;
+    if (g && g < minGoalWeightKg(hcm)) text += ` Cíl ${fmtKg(g)} je pod BMI 18,5 — nejníž appka pustí ${fmtKg(minGoalWeightKg(hcm))}.`;
+    else if (g && g < lo + 1 && g < w) text += ' Cíl je u spodní hranice zdravé váhy — níž appka nepůjde.';
+    bmiLine.textContent = text;
+  };
+  const field = (label, key, suffix) => numField(label, p[key], (v) => { p[key] = parseNum(v); refreshBmi(); }, { suffix });
+  refreshBmi();
   return h('div', { class: 'stack', style: 'gap:16px;flex:1' },
     h('h2', {}, 'Tvoje čísla'),
-    h('p', { class: 'muted small' }, 'Předvyplněno ze zadání — uprav, jestli něco nesedí.'),
-    h('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:12px' },
-      numField('Váha', p.weightKg, (v) => { p.weightKg = parseNum(v); }, { suffix: 'kg' }),
-      numField('Výška', p.heightCm, (v) => { p.heightCm = parseNum(v); }, { suffix: 'cm' }),
-      numField('Věk', p.age, (v) => { p.age = parseNum(v); }, { suffix: 'let' }),
-      numField('Cílová váha', p.goalWeightKg, (v) => { p.goalWeightKg = parseNum(v); }, { suffix: 'kg' }),
+    h('p', { class: 'muted small' }, 'Předvyplněno — uprav, jestli něco nesedí. Z toho se počítají kalorie i program.'),
+    h('label', { class: 'stack', style: 'gap:5px' },
+      h('span', { class: 'label' }, 'Jméno'),
+      h('input', { type: 'text', value: p.name, onInput: (e) => { p.name = e.target.value; } }),
     ),
+    h('div', { class: 'stack', style: 'gap:5px' },
+      h('span', { class: 'label' }, 'Pohlaví (kvůli výpočtu metabolismu)'),
+      chipRow([['m', 'Muž'], ['f', 'Žena']], (id) => p.sex === id, (id) => { p.sex = id; rerender(); }),
+    ),
+    h('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:12px' },
+      field('Váha', 'weightKg', 'kg'),
+      field('Výška', 'heightCm', 'cm'),
+      field('Věk', 'age', 'let'),
+      field('Cílová váha', 'goalWeightKg', 'kg'),
+    ),
+    bmiLine,
     nav({ validate: validateProfile }),
   );
 }
 
+// ----- 2) cíl a tempo -----
+
+const PRIORITIES = [
+  { id: 'mass', title: 'Hmota především', desc: '+0,30–0,35 % váhy týdně. Nejrychlejší cesta na cílovou váhu, počítej s trochou tuku navíc.' },
+  { id: 'balanced', title: 'Vyvážené', desc: '+0,25–0,30 % týdně. Doporučené tempo — většina přírůstku jde do svalů.', recommended: true },
+  { id: 'lean', title: 'Řez především', desc: '+0,15–0,25 % týdně. Pomalejší váha, nejčistší gain, břišáky nejdřív.' },
+];
+
+const PACES = [
+  { id: 'light', title: 'Lehce', desc: '−0,25 až −0,4 % váhy týdně. Malý deficit, síla v tréninku drží, hlad skoro necítíš.', recommended: true },
+  { id: 'normal', title: 'Běžně', desc: '−0,4 až −0,6 % týdně. Klasické tempo, přesnější porce, bílkoviny 2 g/kg.' },
+];
+
+function optionCards(options, isActive, onPick) {
+  return options.map((o) => {
+    const selected = isActive(o.id);
+    return h('button', {
+      class: 'card', style: `text-align:left;display:flex;gap:12px;align-items:flex-start;width:100%${selected ? ';border-color:var(--accent)' : ''}`,
+      onClick: () => onPick(o.id),
+    },
+      h('span', { class: `radio${selected ? ' on' : ''}`, style: 'margin-top:2px' }),
+      h('div', { class: 'grow' },
+        h('div', { class: 'row between' },
+          h('span', { style: 'font-weight:700' }, o.title),
+          o.recommended ? h('span', { class: 'badge accent' }, 'doporučeno') : null,
+        ),
+        h('div', { class: 'muted small', style: 'margin-top:3px' }, o.desc),
+      ),
+    );
+  });
+}
+
+function stepGoal() {
+  const p = draft.profile;
+  const kind = goalKind(p);
+  const delta = Math.abs(p.goalWeightKg - p.weightKg);
+  const kgText = `${String(Math.round(delta * 10) / 10).replace('.', ',')} kg`;
+  const head = kind === 'lose' ? `Hubnutí: ${fmtKg(p.weightKg, true)} → ${fmtKg(p.goalWeightKg)} (−${kgText})`
+    : kind === 'gain' ? `Nabírání: ${fmtKg(p.weightKg, true)} → ${fmtKg(p.goalWeightKg)} (+${kgText})`
+      : `Udržování: ${fmtKg(p.weightKg)}`;
+  const body = [];
+  if (kind === 'lose') {
+    body.push(h('p', { class: 'muted small' }, 'Kalorie se nastaví pod udržovací příjem a každý týden se doladí podle trendu váhy. Nikdy neklesnou pod tvůj bazální metabolismus.'));
+    body.push(...optionCards(PACES, (id) => (p.pace ?? 'light') === id, (id) => { p.pace = id; rerender(); }));
+  } else if (kind === 'gain') {
+    body.push(h('p', { class: 'muted small' }, `Váha ${p.goalWeightKg} kg a břišáky můžou jít proti sobě. Priorita řídí tempo výživy; kdykoli ji změníš v nastavení.`));
+    body.push(...optionCards(PRIORITIES, (id) => p.priority === id, (id) => { p.priority = id; rerender(); }));
+  } else {
+    body.push(h('p', { class: 'muted small' }, 'Kalorie na udržení; engine je pohne jen, když váha vyjede z pásma ±0,15 % týdně. Tvar těla pak dělá trénink.'));
+  }
+  return h('div', { class: 'stack', style: 'gap:12px;flex:1' },
+    h('h2', {}, head),
+    ...body,
+    kind !== 'maintain' ? h('button', {
+      class: `chip${p.goal === 'maintain' ? ' active' : ''}`, style: 'align-self:flex-start',
+      onClick: () => { p.goal = p.goal === 'maintain' ? null : 'maintain'; rerender(); },
+    }, 'Vlastně chci jen držet váhu') : null,
+    nav(),
+  );
+}
+
+// ----- 3) trénink -----
+
+const FOCUS_OPTIONS = [
+  { id: 'lower', title: 'Spodek a hýždě', desc: 'Hip thrust, dřepy, RDL, abdukce, zakopávání. Horní část jen podle tvého výběru.' },
+  { id: 'full', title: 'Celé tělo', desc: 'Každý trénink nohy, tlak i tah. Nejlepší pro 2–3 dny v týdnu.' },
+  { id: 'ppl', title: 'Push · Pull · Legs', desc: 'Klasický split na 5 dnů (Push / Pull / Legs / Upper / Lower), pro 3–4 dny Upper/Lower.' },
+];
+
+const UPPER_OPTIONS = [['none', 'Bez horní části'], ['minimal', 'Minimum na držení těla'], ['full', 'I samostatný den']];
+const EXPERIENCE_OPTIONS = [[0, 'Začínám'], [6, 'Do roka'], [18, '1–2 roky'], [36, 'Déle']];
+
+function stepTraining() {
+  const pr = draft.program;
+  const program = currentProgram();
+  const daysCount = draft.trainingDays.length;
+  return h('div', { class: 'stack', style: 'gap:14px;flex:1' },
+    h('h2', {}, 'Jak chceš trénovat?'),
+    h('p', { class: 'muted small' }, 'Z tohohle se skládá program. Dole ho vidíš hned — cvik, který nechceš, vyškrtni.'),
+    h('div', { class: 'stack', style: 'gap:5px' },
+      h('span', { class: 'label' }, 'Kolikrát týdně'),
+      chipRow([[2, '2×'], [3, '3×'], [4, '4×'], [5, '5×'], [6, '6×']], (n) => daysCount === n, (n) => {
+        draft.trainingDays = [...DEFAULT_TRAINING_DAYS[n]];
+        pr.days = n;
+        rerender();
+      }),
+    ),
+    h('div', { class: 'stack', style: 'gap:5px' },
+      h('span', { class: 'label' }, 'Které dny'),
+      chipRow(DAY_CHIPS, (d) => draft.trainingDays.includes(d), (d) => {
+        if (draft.trainingDays.includes(d)) { if (draft.trainingDays.length > 2) draft.trainingDays = draft.trainingDays.filter((x) => x !== d); else toast('Aspoň dva dny.'); }
+        else if (draft.trainingDays.length < 6) draft.trainingDays = [...draft.trainingDays, d].sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7));
+        else toast('Nejvýš šest dnů.');
+        pr.days = draft.trainingDays.length;
+        rerender();
+      }, { wrap: false }),
+    ),
+    h('div', { class: 'stack', style: 'gap:8px' },
+      h('span', { class: 'label' }, 'Zaměření'),
+      ...optionCards(FOCUS_OPTIONS, (id) => pr.focus === id, (id) => { pr.focus = id; rerender(); }),
+    ),
+    pr.focus === 'lower' ? h('div', { class: 'stack', style: 'gap:5px' },
+      h('span', { class: 'label' }, 'Horní část těla'),
+      chipRow(UPPER_OPTIONS, (id) => pr.upperBody === id, (id) => { pr.upperBody = id; rerender(); }),
+    ) : null,
+    h('div', { class: 'stack', style: 'gap:5px' },
+      h('span', { class: 'label' }, 'Bolí tě něco? (cviky se nahradí šetrnějšími)'),
+      chipRow(Object.entries(AVOID_LABELS), (id) => pr.avoid.includes(id), (id) => {
+        pr.avoid = pr.avoid.includes(id) ? pr.avoid.filter((x) => x !== id) : [...pr.avoid, id];
+        rerender();
+      }),
+    ),
+    h('div', { class: 'stack', style: 'gap:5px' },
+      h('span', { class: 'label' }, 'Zkušenost s posilovnou'),
+      chipRow(EXPERIENCE_OPTIONS, (m) => draft.profile.trainingAgeMonths === m, (m) => { draft.profile.trainingAgeMonths = m; rerender(); }),
+    ),
+    h('div', { class: 'card stack', style: 'gap:10px' },
+      h('div', { class: 'row between' },
+        h('div', { class: 'label' }, `Tvůj program · ${program.length}× týdně`),
+        pr.dislikes.length ? h('button', { class: 'btn ghost small', onClick: () => { pr.dislikes = []; rerender(); } }, 'Vrátit vyškrtnuté') : null,
+      ),
+      ...program.map((day) => h('div', { class: 'stack', style: 'gap:5px' },
+        h('div', { style: 'font-weight:700;font-size:14.5px' }, day.name),
+        h('div', { class: 'row', style: 'flex-wrap:wrap;gap:5px' },
+          ...day.exercises.map((ex) => h('button', {
+            class: 'chip plain', style: 'font-size:12px;padding:4px 9px',
+            title: 'Vyškrtnout',
+            onClick: () => { if (!pr.dislikes.includes(ex.exerciseId)) pr.dislikes.push(ex.exerciseId); rerender(); toast(`${EXERCISES[ex.exerciseId].name} vyškrtnuto — nahrazeno, nebo vynecháno.`); },
+          }, `${EXERCISES[ex.exerciseId].name} ×${ex.sets}`, h('span', { class: 'faint' }, ' ✕'))),
+        ),
+      )),
+      h('p', { class: 'muted', style: 'font-size:12px;margin:0' }, 'Pořadí jede podle odcvičených tréninků, ne podle dne. Cviky jdou vyměnit i v tréninku.'),
+    ),
+    nav({ validate: () => { if (draft.trainingDays.length < 2) { toast('Vyber aspoň dva dny.'); return false; } return true; } }),
+  );
+}
+
+// ----- 4) co teď zvedáš -----
+
+function liftIdsFor(program) {
+  const ids = [...keyExerciseIds(program)];
+  for (const day of program) for (const ex of day.exercises.slice(0, 2)) if (!ids.includes(ex.exerciseId)) ids.push(ex.exerciseId);
+  return ids.slice(0, 6);
+}
+
 function stepLifts() {
+  const program = currentProgram();
+  const ids = liftIdsFor(program);
+  for (const id of ids) draft.lifts[id] ??= { weightKg: '', reps: '' };
   return h('div', { class: 'stack', style: 'gap:12px;flex:1' },
     h('h2', {}, 'Co teď zvedáš?'),
     h('p', { class: 'muted small' },
       'Poslední pracovní série — váha × opakování. Co nevíš, nech prázdné: váhu najdeme spolu na prvním tréninku.'),
-    ...LIFT_IDS.map((id) => liftRow(id)),
+    ...ids.map((id) => liftRow(id)),
     nav(),
   );
 }
@@ -5450,11 +5960,11 @@ function stepLifts() {
 function liftRow(id) {
   const lift = draft.lifts[id];
   const def = EXERCISES[id];
-  const isPullup = id === 'pullup';
+  const bodyweight = def.incrementRule === 'bodyweight';
   return h('div', { class: 'card row', style: 'gap:8px' },
     h('div', { class: 'grow' },
       h('div', { style: 'font-weight:600;font-size:14.5px' }, def.name),
-      isPullup ? h('div', { class: 'muted', style: 'font-size:12px' }, 'do kg dej PŘÍDAVNOU zátěž — jen vlastní tělo = 0') : null,
+      bodyweight ? h('div', { class: 'muted', style: 'font-size:12px' }, 'do kg dej PŘÍDAVNOU zátěž — jen vlastní tělo = 0') : null,
     ),
     h('div', { class: 'row', style: 'gap:6px' },
       numericField(h('input', {
@@ -5472,71 +5982,55 @@ function liftRow(id) {
   );
 }
 
+// ----- 5) pas -----
+
 function stepWaist() {
+  const lose = goalKind(draft.profile) === 'lose';
   return h('div', { class: 'stack', style: 'gap:14px;flex:1' },
     h('h2', {}, 'Obvod pasu'),
     h('p', { class: 'muted small' },
-      'Nejlevnější měřák kvality bulku: váha ↑ + pas drží = svaly. Měř v úrovni pupku, ráno nalačno, volný výdech, pásmo vodorovně. Nepovinné, ale bez něj nepoznám svaly od tuku.'),
-    numField('Pas', draft.waistCm, (v) => { draft.waistCm = v; }, { placeholder: 'např. 84', suffix: 'cm' }),
+      lose
+        ? 'Nejlevnější měřák hubnutí: váha ↓ + pas ↓ = tuk, váha ↓ + pas drží = spíš voda a svaly. Měř v úrovni pupku, ráno nalačno, volný výdech. Nepovinné.'
+        : 'Nejlevnější měřák kvality bulku: váha ↑ + pas drží = svaly. Měř v úrovni pupku, ráno nalačno, volný výdech, pásmo vodorovně. Nepovinné, ale bez něj nepoznám svaly od tuku.'),
+    numField('Pas', draft.waistCm, (v) => { draft.waistCm = v; }, { placeholder: 'např. 70', suffix: 'cm' }),
     nav({
       nextLabel: 'Pokračovat',
       validate: () => {
         if (String(draft.waistCm ?? '').trim() === '') return true; // nepovinné pole
         const cm = parseNum(draft.waistCm);
-        if (cm == null || cm < 40 || cm > 200) { toast('Pas zadej v cm — třeba 84,5.'); return false; }
+        if (cm == null || cm < 40 || cm > 200) { toast('Pas zadej v cm — třeba 70,5.'); return false; }
         return true;
       },
     }),
   );
 }
 
-const PRIORITIES = [
-  { id: 'mass', title: 'Hmota především', desc: '+0,30–0,35 % váhy týdně. Nejrychlejší cesta na cílovou váhu, počítej s trochou tuku navíc.' },
-  { id: 'balanced', title: 'Vyvážené', desc: '+0,25–0,30 % týdně. Doporučené tempo — většina přírůstku jde do svalů.', recommended: true },
-  { id: 'lean', title: 'Řez především', desc: '+0,15–0,25 % týdně. Pomalejší váha, nejčistší gain, břišáky nejdřív.' },
-];
-
-function stepPriority() {
-  return h('div', { class: 'stack', style: 'gap:12px;flex:1' },
-    h('h2', {}, 'Až se cíle porvou — co vyhrává?'),
-    h('p', { class: 'muted small' }, `Váha ${draft.profile.goalWeightKg} kg a břišáky můžou jít proti sobě. Priorita řídí tempo výživy; kdykoli ji změníš v nastavení.`),
-    ...PRIORITIES.map((p) => {
-      const selected = draft.profile.priority === p.id;
-      return h('button', {
-        class: 'card', style: `text-align:left;display:flex;gap:12px;align-items:flex-start;width:100%${selected ? ';border-color:var(--accent)' : ''}`,
-        onClick: () => { draft.profile.priority = p.id; rerender(); },
-      },
-        h('span', { class: `radio${selected ? ' on' : ''}`, style: 'margin-top:2px' }),
-        h('div', { class: 'grow' },
-          h('div', { class: 'row between' },
-            h('span', { style: 'font-weight:700' }, p.title),
-            p.recommended ? h('span', { class: 'badge accent' }, 'doporučeno') : null,
-          ),
-          h('div', { class: 'muted small', style: 'margin-top:3px' }, p.desc),
-        ),
-      );
-    }),
-    nav(),
-  );
-}
+// ----- 6) poctivý plán -----
 
 function stepHonest() {
-  const p = draft.profile;
-  // vše se počítá živě z hodnot, které uživatel právě zadal
+  const p = { ...draft.profile, trainingDays: draft.trainingDays };
+  const kind = goalKind(p);
+  const targets = initialTargets(p, p.weightKg);
+  const program = currentProgram();
   const plan = honestPlan({
     startWeightKg: p.weightKg, goalWeightKg: p.goalWeightKg,
-    priority: p.priority, trainingAgeMonths: 0, fromIso: todayISO(),
+    priority: p.priority, pace: p.pace, trainingAgeMonths: p.trainingAgeMonths ?? 0, fromIso: todayISO(),
   });
   const kgr = (a, b) => `~${String(a).replace('.', ',')}–${String(b).replace('.', ',')} kg`;
+  const dayNames = draft.trainingDays.map((d) => CZ_DAYS[d]).join(', ');
   let message;
+  let headline;
   const rows = [];
-  if (plan.mode === 'there') {
-    message = 'Na cílové váze už jsi — teď rozhoduje pas a zrcadlo. Appka ti nebude lhát: pojede z tvých skutečných dat.';
-  } else if (plan.mode === 'cut') {
-    message = 'Jdeš dolů. Appka ti nebude lhát: tempo −0,5 % váhy týdně udrží svaly a odhalí břišáky.';
-    rows.push(honestRow(`${p.goalWeightKg} kg na váze`, `~${fmtMonthYear(plan.etaIso)}`));
-    rows.push(honestRow('Viditelné břišáky', 'řez je odhalí — hlídej pas'));
+  if (kind === 'maintain' || plan.mode === 'there') {
+    headline = `Držet ${fmtKg(p.weightKg)} a tvarovat`;
+    message = 'Váha je, kde má být — teď rozhoduje trénink, pas a zrcadlo. Appka ti nebude lhát: pojede z tvých skutečných dat.';
+  } else if (kind === 'lose') {
+    headline = `${fmtKg(p.goalWeightKg)} · síla drží`;
+    message = `Jdeš dolů o ${String(Math.round((p.weightKg - p.goalWeightKg) * 10) / 10).replace('.', ',')} kg. Tempo ${p.pace === 'normal' ? '−0,4 až −0,6' : '−0,25 až −0,4'} % týdně bere tuk, ne svaly. Kalorie nikdy neklesnou pod tvůj bazální metabolismus.`;
+    rows.push(honestRow(`${fmtKg(p.goalWeightKg)} na váze`, `~${fmtMonthYear(plan.etaIso)}`));
+    if (p.goalWeightKg <= healthyWeightRange(p.heightCm)[0] + 1) rows.push(honestRow('Pozor', 'cíl je u spodní hranice zdravé váhy — níž appka nepůjde'));
   } else {
+    headline = `${p.goalWeightKg} kg + viditelné břišáky`;
     message = plan.months <= 7
       ? 'Cíl je v poctivém dosahu. Appka ti přesto nebude lhát — povede tě tempem, které dává svaly, ne tuk.'
       : 'Poctivě: tohle není projekt na pár týdnů. Appka ti nebude lhát — projekce pojede z tvých dat a subcíle podle skutečného tempa.';
@@ -5544,17 +6038,19 @@ function stepHonest() {
     rows.push(honestRow('Z toho svaly', kgr(plan.muscleLo, plan.muscleHi)));
     rows.push(honestRow('Viditelné břišáky', plan.needsCut ? `po mini-cutu, ~${fmtMonthYear(plan.absEtaIso)}` : 'můžou přijít spolu s váhou'));
   }
+  rows.push(honestRow('Denní cíl na start', `${targets.kcal} kcal · ${targets.proteinG} g bílkovin`));
+  rows.push(honestRow('Program', `${program.length}× týdně (${dayNames}): ${program.map((d) => d.name).join(' · ')}`));
   return h('div', { class: 'stack', style: 'gap:14px;flex:1' },
     h('div', { class: 'label' }, 'Cíl'),
-    h('div', { class: 'display hero' }, `${p.goalWeightKg} kg + viditelné břišáky`),
+    h('div', { class: 'display hero' }, headline),
     h('div', { class: 'card stack' },
       h('div', { class: 'label warn-text' }, 'Poctivě — spočítáno z tvých čísel'),
       h('p', { class: 'small' }, message),
-      rows.length ? h('hr', { class: 'rule' }) : null,
+      h('hr', { class: 'rule' }),
       ...rows,
     ),
     h('p', { class: 'muted small' },
-      'Program: 5× týdně Push / Pull / Legs / Upper / Lower, dvojitá progrese, reaktivní deloady, výživa řízená trendem váhy. Každé pravidlo má zdroj.'),
+      'Dvojitá progrese s RIR, reaktivní deloady, výživa řízená trendem váhy. Každé pravidlo má zdroj. Všechno jde později změnit v Nastavení.'),
     nav({
       nextLabel: 'Jdeme na to',
       onNext: () => {
@@ -5563,15 +6059,15 @@ function stepHonest() {
         for (const [id, lift] of Object.entries(draft.lifts)) {
           const w = parseNum(lift.weightKg);
           const r = parseInt(lift.reps, 10);
-          if (w != null && !Number.isNaN(r) && r > 0) {
-            lifts[id] = { weightKg: w, reps: r };
-          }
+          if (w != null && !Number.isNaN(r) && r > 0) lifts[id] = { weightKg: w, reps: r };
         }
         Store.mutate((s) => completeOnboarding(s, {
-          profile: draft.profile,
+          profile: { ...draft.profile, trainingDays: [...draft.trainingDays] },
           lifts,
           waistCm: parseNum(draft.waistCm),
+          programPrefs: programPrefs(),
         }), { publish: true });
+        draft = null;
         toast('Plán je připravený.');
       },
     }),
@@ -5579,8 +6075,8 @@ function stepHonest() {
 }
 
 function honestRow(label, value) {
-  return h('div', { class: 'row between' },
-    h('span', { class: 'muted small' }, label),
+  return h('div', { class: 'row between', style: 'align-items:flex-start' },
+    h('span', { class: 'muted small', style: 'flex:none' }, label),
     h('span', { class: 'small', style: 'font-weight:600;text-align:right' }, value),
   );
 }
@@ -5604,7 +6100,9 @@ function renderToday(root) {
   root.append(h('div', { class: 'screen' },
     h('div', { class: 'topbar' },
       h('h1', { class: 'display' }, 'Fitko'),
-      h('div', { class: 'muted small' }, fmtDateFull(todayISO())),
+      h('div', { class: 'muted small', style: 'text-align:right' },
+        h('span', { class: `person-chip person-${currentUser()}` }, state.profile.name || userInfo()?.name || ''),
+        ` ${fmtDateFull(todayISO())}`),
     ),
     updateCard(),
     backupWarning(state),
@@ -7752,10 +8250,15 @@ function backupCard(state) {
                 ? `${fmtDate(cloudInfo.lastSync.slice(0, 10))} ${cloudInfo.lastSync.slice(11, 16)}`
                 : 'čeká na první změnu'),
           ),
+          h('div', { class: 'row between' },
+            h('span', { class: 'small muted' }, 'Domácnost (vaření, nákup)'),
+            h('span', { class: `num small ${Household.lastError ? 'bad-text' : ''}`, style: 'font-weight:600' },
+              Household.lastError ? 'chyba' : Household.dirty ? 'čeká na odeslání' : Household.lastSync ? `${fmtDate(Household.lastSync.slice(0, 10))} ${Household.lastSync.slice(11, 16)}` : '—'),
+          ),
           cloudInfo.lastError
             ? h('p', { class: 'bad-text', style: 'font-size:12.5px' }, `Chyba: ${cloudInfo.lastError}`)
             : h('p', { class: 'muted', style: 'font-size:12.5px' },
-                'Ukládá se samo po každém zápisu. Na novém telefonu appka data najde a stáhne sama.'),
+                `Ukládá se samo po každém zápisu do souboru ${backupFile()}. Na druhém telefonu stačí stejný token — každý má svou zálohu, jídlo a nákup jsou společné.`),
           h('button', {
             class: 'btn primary',
             onClick: async () => {
@@ -7785,9 +8288,9 @@ function backupCard(state) {
       // VYPNUTO: jedno pole a jedno tlačítko
       : h('div', { class: 'stack', style: 'gap:8px' },
           h('p', { class: 'muted', style: 'font-size:12.5px' },
-            'Zapni a appka po každém zápisu sama uloží tréninky do tvého privátního gistu. '
+            'Zapni a appka po každém zápisu sama uloží tréninky do privátního gistu. '
             + 'Token si vyrob na github.com/settings/tokens (classic) s právem „gist" — '
-            + 'zůstane jen v tomhle telefonu.'),
+            + 'zůstane jen v telefonu. Na druhém telefonu vlož ten samý: každý má vlastní zálohu, jídlo a nákup jsou společné.'),
           tokenInput = h('input', {
             type: 'text', placeholder: 'ghp_… (vlož token)',
             autocapitalize: 'off', autocorrect: 'off', spellcheck: false,
@@ -7802,7 +8305,7 @@ function backupCard(state) {
               const found = await adoptExistingBackup();
               if (!found.ok) { toast(`Nepovedlo se: ${found.reason}`); disableCloud(); Store.onChange?.(); return; }
               const mine = Store.state.sessions?.length ?? 0;
-              if (found.sessions > mine) {
+              if (found.found && found.sessions > mine) {
                 const { close } = openModal(
                   h('h3', {}, 'Na GitHubu už záloha je'),
                   h('p', { class: 'small' },
@@ -7964,9 +8467,10 @@ function recoveryModal() {
           ...found.map((f) => h('div', { class: 'row between' },
             h('div', { class: 'grow' },
               h('div', { class: 'small', style: 'font-weight:600' },
-                f.key === 'fitko-state-v1' ? 'Hlavní data'
-                  : f.key === 'fitko-state-backup-v1' ? 'Automatická záloha'
-                  : f.key.startsWith('fitko-state-damaged') ? 'Poškozený zápis' : f.key),
+                f.key === stateKey() ? 'Hlavní data'
+                  : f.key === backupKey() ? 'Automatická záloha'
+                  : f.key.startsWith('fitko-state-damaged') ? 'Poškozený zápis'
+                  : /^fitko-state(-backup)?-v1(-\w+)?$/.test(f.key) ? `Data: ${f.key.replace(/^fitko-state(-backup)?-v1-?/, '') || 'Niklas'}` : f.key),
               h('div', { class: 'muted', style: 'font-size:12px' },
                 f.readable
                   ? `${plural(f.sessions)}${f.lastDate ? ` · poslední ${fmtDate(f.lastDate)}` : ''} · ${f.sizeKb} kB`
@@ -8033,8 +8537,27 @@ function importModal() {
 // ---------- o appce ----------
 
 function aboutCard() {
+  const me = currentUser();
+  const other = otherUser();
   return h('div', { class: 'card stack' },
     h('div', { class: 'label' }, 'O appce'),
+    h('div', { class: 'row between' },
+      h('span', { class: 'small muted' }, 'Tenhle telefon používá'),
+      h('span', { class: `person-chip person-${me}` }, userInfo()?.name ?? '—'),
+    ),
+    other ? h('button', {
+      class: 'btn ghost small', style: 'align-self:flex-start',
+      onClick: () => {
+        const { close } = openModal(
+          h('h3', {}, `Přepnout na ${USERS[other].name}?`),
+          h('p', { class: 'muted small' }, `Data ${userInfo()?.name} zůstanou v telefonu i v záloze. Appka se načte znovu jako ${USERS[other].name}.`),
+          h('div', { class: 'row' },
+            h('button', { class: 'btn primary grow', onClick: () => { setCurrentUser(other); location.reload(); } }, 'Přepnout'),
+            h('button', { class: 'btn grow', onClick: () => close() }, 'Zpět'),
+          ),
+        );
+      },
+    }, `Přepnout na ${USERS[other].name}`) : null,
     h('p', { class: 'muted', style: 'font-size:12.5px' },
       'Fitko — osobní tréninkový deník na míru. Engine: dvojitá progrese s RIR, reaktivní deloady, '
       + 'výživa řízená trendem váhy, poctivé projekce. Každé pravidlo má zdroj v meta-analýzách '
@@ -8131,14 +8654,20 @@ function goTab(id) {
   render();
 }
 
-let lastMode = null; // onboarding | workout | tabs — při změně režimu se roluje nahoru
+let lastMode = null; // who | onboarding | workout | tabs — při změně režimu se roluje nahoru
 
 function render() {
   const root = document.getElementById('app');
   const state = Store.state;
-  const mode = !state.onboarded ? 'onboarding' : state.activeWorkout ? 'workout' : 'tabs';
+  const mode = !currentUser() ? 'who' : !state.onboarded ? 'onboarding' : state.activeWorkout ? 'workout' : 'tabs';
   const scrollY = mode === lastMode ? root.scrollTop : 0;
   lastMode = mode;
+
+  if (mode === 'who') {
+    ensureTabbar(false);
+    renderWho(root);
+    return;
+  }
 
   if (mode === 'onboarding') {
     ensureTabbar(false);
@@ -8182,20 +8711,8 @@ function refreshDiscountFeed() {
   });
 }
 
-function boot() {
-  captureDocument();
-  initCapabilities();
-
-  // trvalé úložiště (instalovaná home-screen appka je přesně heuristika, na kterou to prohlížeče schválí)
-  try { navigator.storage?.persist?.(); } catch { /* nepovinné */ }
-
-  // offline režim — jen ve standalone buildu (marker: link rel=manifest)
-  if ('serviceWorker' in navigator && document.querySelector('link[rel="manifest"]')) {
-    try { navigator.serviceWorker.register('./sw.js'); } catch { /* nepovinné */ }
-  }
-  initCloud();
-  initPush();
-  applyHashRoute();
+// Načte data zvoleného uživatele a rozjede appku (po startu i po volbě „Já jsem“).
+function startUser() {
   const persisted = loadPersistedState();
   backupState(persisted); // snímek toho, co bylo na disku před spuštěním
   Store.init(persisted);
@@ -8220,17 +8737,71 @@ function boot() {
   }
 
   if (Store.state.onboarded) refreshDiscountFeed();
-  document.addEventListener('visibilitychange', () => { if (!document.hidden && Store.state.onboarded) refreshDiscountFeed(); });
+  Household.pull({ rerender: true });
+  render();
+}
+
+// Volba uživatele na novém telefonu. S tokenem se nejdřív zkusí najít jeho záloha.
+async function chooseUser(id, token = '') {
+  setCurrentUser(id);
+  if (token) {
+    setCloudToken(token);
+    toast('Hledám zálohu na GitHubu…');
+    const found = await adoptExistingBackup();
+    if (!found.ok) { toast(`Záloha nejde načíst: ${found.reason}`); disableCloud(); }
+    else if (found.found) {
+      const r = await cloudRestore();
+      if (r.ok) {
+        Store.init(r.state);
+        Store.onChange = render;
+        Store.mutate(() => {}, { force: true, rerender: false });
+        toast(`Vítej zpátky, ${userInfo(id)?.name}. Data jsou stažená.`);
+        startUser();
+        return;
+      }
+    }
+  }
+  startUser();
+}
+
+function boot() {
+  captureDocument();
+  initCapabilities();
+
+  // trvalé úložiště (instalovaná home-screen appka je přesně heuristika, na kterou to prohlížeče schválí)
+  try { navigator.storage?.persist?.(); } catch { /* nepovinné */ }
+
+  // offline režim — jen ve standalone buildu (marker: link rel=manifest)
+  if ('serviceWorker' in navigator && document.querySelector('link[rel="manifest"]')) {
+    try { navigator.serviceWorker.register('./sw.js'); } catch { /* nepovinné */ }
+  }
+  initCloud();
+  initPush();
+  applyHashRoute();
+  Household.init();
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden || !Store.state?.onboarded) return;
+    refreshDiscountFeed();
+    Household.pull({ rerender: true });
+  });
 
   // Automatická aktualizace: mimo trénink se přepne sama, v tréninku počká na tebe.
   initUpdater((build, alreadyTried) => {
     // v tréninku a po neúspěšném pokusu nech rozhodnutí na uživateli (karta na Dnes)
-    if (Store.state.activeWorkout || alreadyTried) { render(); return; }
+    if (Store.state?.activeWorkout || alreadyTried) { render(); return; }
     toast('Instaluji novou verzi…');
     setTimeout(() => applyUpdate(build), 900);
   });
 
-  render();
+  if (!initUser()) {
+    // nový telefon bez volby uživatele → obrazovka „Kdo jsi?“
+    Store.init(defaultState());
+    Store.onChange = render;
+    render();
+    return;
+  }
+  startUser();
 }
 
 if (document.readyState === 'loading') {
