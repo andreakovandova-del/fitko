@@ -144,13 +144,23 @@
 
 html { -webkit-text-size-adjust: 100%; }
 
+/* Rozvržení bez position: fixed — obsah roluje uvnitř #app, spodní lišta a časovač
+   sedí v #dock pod ním. iOS s klávesnicí totiž fixní prvky odsune a po zavření
+   klávesnice je u nově vytvořených prvků nevrátí (lišta „lítala“ uprostřed stránky). */
+html, body { height: 100%; }
+
 body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-ui);
   font-size: 16px;
   line-height: 1.55;
-  min-height: 100svh;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  overscroll-behavior: none;
+  display: flex;
+  flex-direction: column;
 }
 
 /* atmosféra: záře + zrno pod obsahem */
@@ -176,12 +186,30 @@ body::after {
 #app {
   position: relative;
   z-index: 1;
-  max-width: 480px;
-  margin: 0 auto;
-  min-height: 100svh;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
   display: flex;
   flex-direction: column;
 }
+
+#dock {
+  position: relative;
+  z-index: 30;
+  flex: none;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 6px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+#dock:empty { display: none; }
 
 button, input, select {
   font: inherit;
@@ -244,7 +272,10 @@ input.num { font-family: var(--font-num); font-variant-numeric: tabular-nums; fo
 
 /* horní odsazení respektuje výřez/hodiny iPhonu (standalone režim) */
 .screen {
-  padding: calc(18px + env(safe-area-inset-top, 0px)) 16px calc(118px + env(safe-area-inset-bottom, 0px));
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: calc(18px + env(safe-area-inset-top, 0px)) 16px 28px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -279,13 +310,9 @@ input.num { font-family: var(--font-num); font-variant-numeric: tabular-nums; fo
 
 hr.rule { border: none; border-top: 1px solid var(--line); margin: 4px 0; }
 
-/* ---------- navigace (plovoucí lišta) ---------- */
+/* ---------- navigace (lišta v docku pod obsahem) ---------- */
 
 .tabbar {
-  position: fixed;
-  left: 12px;
-  right: 12px;
-  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
   display: flex;
   justify-content: center;
   background: var(--surface);
@@ -297,6 +324,7 @@ hr.rule { border: none; border-top: 1px solid var(--line); margin: 4px 0; }
   z-index: 30;
 }
 
+.tabbar[hidden] { display: none; }
 .tabbar-inner { display: flex; width: 100%; max-width: 456px; }
 
 .tab {
@@ -641,12 +669,6 @@ input.set-input {
 /* ---------- rest timer — musí být vidět přes celou tělocvičnu ---------- */
 
 .timerbar {
-  position: fixed;
-  left: 10px; right: 10px;
-  /* Nad spodní lištou Safari: v nainstalované appce stačí safe-area,
-     v prohlížeči je potřeba se vyhnout plovoucí adresní liště. */
-  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-  z-index: 40;
   background: var(--surface);
   border: 1.5px solid var(--accent);
   border-radius: 18px;
@@ -655,8 +677,6 @@ input.set-input {
   padding: 0 0 12px;
   overflow: hidden;
 }
-
-.timerbar.browser-chrome { bottom: calc(74px + env(safe-area-inset-bottom, 0px)); }
 
 /* ubíhající proužek nahoře = kolik pauzy zbývá */
 .timer-progress {
@@ -791,6 +811,9 @@ input.set-input {
 
 .onb {
   flex: 1;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
   display: flex;
   flex-direction: column;
   gap: 18px;
@@ -976,6 +999,27 @@ input.set-input {
 
 .history-row.selected { background: var(--accent-faint); margin: 0 -6px; padding-left: 6px; padding-right: 6px; border-radius: 10px; }
 
+/* barvy kategorií potravin — nákup i recepty se dají přečíst pohledem */
+:root {
+  --cat-maso: #ef6b6b; --cat-mlecne: #5fb0f0; --cat-sacharidy: #f0b23f; --cat-pecivo: #d1955a;
+  --cat-ovoce: #f06fae; --cat-zelenina: #5fcb82; --cat-lusteniny: #a48ef2; --cat-tuky: #d5c14c; --cat-ostatni: #97a1b3;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --cat-maso: #c94444; --cat-mlecne: #2a7fc4; --cat-sacharidy: #b87a12; --cat-pecivo: #9c6430;
+    --cat-ovoce: #c23f82; --cat-zelenina: #2f8f52; --cat-lusteniny: #6f56c9; --cat-tuky: #8f8210; --cat-ostatni: #667081;
+  }
+}
+:root[data-theme="light"] {
+  --cat-maso: #c94444; --cat-mlecne: #2a7fc4; --cat-sacharidy: #b87a12; --cat-pecivo: #9c6430;
+  --cat-ovoce: #c23f82; --cat-zelenina: #2f8f52; --cat-lusteniny: #6f56c9; --cat-tuky: #8f8210; --cat-ostatni: #667081;
+}
+.cat-maso { --cat: var(--cat-maso); } .cat-mlecne { --cat: var(--cat-mlecne); } .cat-sacharidy { --cat: var(--cat-sacharidy); }
+.cat-pecivo { --cat: var(--cat-pecivo); } .cat-ovoce { --cat: var(--cat-ovoce); } .cat-zelenina { --cat: var(--cat-zelenina); }
+.cat-lusteniny { --cat: var(--cat-lusteniny); } .cat-tuky { --cat: var(--cat-tuky); } .cat-ostatni { --cat: var(--cat-ostatni); }
+.cat-label { color: var(--cat, var(--muted)); display: flex; align-items: center; gap: 7px; }
+.cat-label::before { content: ""; width: 9px; height: 9px; border-radius: 3px; background: var(--cat, var(--muted)); }
+
 .shop-row {
   display: flex;
   align-items: center;
@@ -990,7 +1034,16 @@ input.set-input {
 }
 .shop-row:first-of-type { border-top: none; }
 .shop-row.done { opacity: 0.5; }
-.shop-row.done > .grow > div:first-child { text-decoration: line-through; }
+.shop-row.done .shop-name { text-decoration: line-through; }
+.shop-name { font-weight: 600; font-size: 15px; line-height: 1.25; }
+.shop-qty { font-size: 13px; margin-top: 2px; }
+.shop-qty b { color: var(--cat, var(--text)); font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+.shop-deal {
+  display: inline-flex; align-items: center; gap: 5px;
+  margin-top: 4px; padding: 2px 8px; border-radius: 999px;
+  background: var(--accent-soft); color: var(--accent-2);
+  font-size: 11.5px; font-weight: 700; letter-spacing: 0.02em;
+}
 .shop-check {
   flex: none;
   width: 26px; height: 26px;
@@ -1020,6 +1073,7 @@ input.set-input {
 <body>
 <script type="application/json" id="fitko-state">{"__empty":true}</script>
 <div id="app" aria-live="polite"></div>
+<div id="dock"></div>
 <script>
 (() => {
 'use strict';
@@ -4262,6 +4316,61 @@ function completeOnboarding(state, { profile, lifts, waistCm }) {
 // z hodin (JS v pozadí na mobilu stojí). Wake lock jako progressive enhancement.
 
 
+// ---- WAV na míru (bez souborů): tichá smyčka pro sluchátka a záložní pípnutí ----
+
+function wavDataUrl(sampleRate, samples) {
+  const n = samples.length;
+  const buf = new ArrayBuffer(44 + n * 2);
+  const v = new DataView(buf);
+  const str = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  str(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); str(8, 'WAVE'); str(12, 'fmt ');
+  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, sampleRate, true); v.setUint32(28, sampleRate * 2, true);
+  v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+  str(36, 'data'); v.setUint32(40, n * 2, true);
+  for (let i = 0; i < n; i++) v.setInt16(44 + i * 2, Math.max(-32768, Math.min(32767, Math.round(samples[i] * 32767))), true);
+  const bytes = new Uint8Array(buf);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return `data:audio/wav;base64,${btoa(bin)}`;
+}
+
+// Tón do pole vzorků: 20 ms náběh, 60 ms doznění — stejný zvuk jako přes Web Audio.
+function mixTone(samples, sampleRate, at, freq, dur, vol) {
+  const from = Math.round(at * sampleRate);
+  const len = Math.round(dur * sampleRate);
+  for (let i = 0; i < len && from + i < samples.length; i++) {
+    const t = i / sampleRate;
+    const env = Math.min(1, t / 0.02, (dur - t) / 0.06);
+    samples[from + i] += Math.sin(2 * Math.PI * freq * t) * vol * Math.max(0, env);
+  }
+}
+
+let silentWavUrl = null;
+// 1 s „skoro ticha“ (±1 LSB): Bluetooth sluchátka berou stream jako živý a neuspí
+// spojení, přitom to není slyšet.
+function silentWav() {
+  if (!silentWavUrl) {
+    const sr = 8000;
+    const s = new Float32Array(sr);
+    for (let i = 0; i < sr; i++) s[i] = (i % 2 ? 1 : -1) / 32767;
+    silentWavUrl = wavDataUrl(sr, s);
+  }
+  return silentWavUrl;
+}
+
+let beepWavUrl = null;
+function beepWav() {
+  if (!beepWavUrl) {
+    const sr = 22050;
+    const s = new Float32Array(Math.round(sr * 0.7));
+    mixTone(s, sr, 0.02, 1046, 0.18, 0.5);
+    mixTone(s, sr, 0.24, 1318, 0.32, 0.5);
+    beepWavUrl = wavDataUrl(sr, s);
+  }
+  return beepWavUrl;
+}
+
 const RestTimer = {
   endTime: null,
   label: '',
@@ -4275,6 +4384,8 @@ const RestTimer = {
   tonesReady: false,
   resuming: false,
   visibilityBound: false,
+  keepAlive: null,
+  keepAliveTimer: null,
 
   start(seconds, label = '') {
     this.totalSec = seconds;
@@ -4283,7 +4394,8 @@ const RestTimer = {
     this.beeped = false;
     this.ensureUI();
     this.requestWakeLock();
-    this.scheduleTones(); // volá se ze ✓ = z gesta uživatele → audio smí hrát
+    this.startKeepAlive(seconds); // z gesta uživatele (✓) → smí začít hrát
+    this.scheduleTones();
     this.render();
   },
 
@@ -4291,6 +4403,7 @@ const RestTimer = {
     if (!this.endTime) return;
     this.endTime += deltaSeconds * 1000;
     this.totalSec = Math.max(1, (this.totalSec ?? 0) + deltaSeconds);
+    this.startKeepAlive(Math.max(1, (this.endTime - Date.now()) / 1000));
     this.scheduleTones();
     this.render();
   },
@@ -4299,6 +4412,7 @@ const RestTimer = {
     this.endTime = null;
     if (this.interval) { clearInterval(this.interval); this.interval = null; }
     this.clearScheduled();
+    this.stopKeepAlive();
     this.el?.remove();
     this.el = null;
     this.releaseWakeLock();
@@ -4309,24 +4423,10 @@ const RestTimer = {
     return Math.round((this.endTime - Date.now()) / 1000);
   },
 
-  // V prohlížeči (ne v appce z plochy) sedí dole plovoucí lišta Safari —
-  // časovač se musí posadit nad ni, jinak ho uživatel neuvidí.
-  inBrowserChrome() {
-    try {
-      const standalone = window.matchMedia?.('(display-mode: standalone)')?.matches
-        || window.navigator.standalone === true;
-      return !standalone;
-    } catch { return false; }
-  },
-
   ensureUI() {
     if (this.el) return;
-    this.el = h('div', {
-      class: `timerbar${this.inBrowserChrome() ? ' browser-chrome' : ''}`,
-      role: 'timer',
-      'aria-live': 'off',
-    });
-    document.body.append(this.el);
+    this.el = h('div', { class: 'timerbar', role: 'timer', 'aria-live': 'off' });
+    (document.getElementById('dock') ?? document.body).append(this.el);
     if (!this.interval) this.interval = setInterval(() => this.render(), 500);
     // listener jen jednou za život appky a jen když časovač opravdu běží,
     // jinak by se hromadil a držel displej rozsvícený i mimo trénink
@@ -4353,7 +4453,7 @@ const RestTimer = {
     const soon = !overrun && remaining <= 5;
     const pct = this.totalSec ? Math.max(0, Math.min(100, (remaining / this.totalSec) * 100)) : 0;
 
-    this.el.className = `timerbar${this.inBrowserChrome() ? ' browser-chrome' : ''}${overrun ? ' done' : ''}`;
+    this.el.className = `timerbar${overrun ? ' done' : ''}`;
     this.el.replaceChildren(
       h('div', { class: 'timer-progress' }, h('div', { style: `width:${overrun ? 100 : pct}%` })),
       h('div', { class: 'timerbar-inner' },
@@ -4385,20 +4485,88 @@ const RestTimer = {
     this.wakeLock = null;
   },
 
+  // ---- zvuk ----
+  // Proč tolik vrstev: iOS umlčí Web Audio přepínačem tichého režimu, Bluetooth
+  // sluchátka mezi tóny uspí spojení (první tón spolknou) a po přepnutí výstupu
+  // skončí audio kontext ve stavu „interrupted“, ze kterého se sám nevrátí.
+  // Řešení: relace „playback“ (hraje i v tichém režimu), tichá smyčka <audio> po
+  // dobu pauzy (drží spojení se sluchátky otevřené a relaci živou), obnova
+  // kontextu při každé změně stavu a záložní přehrání pípnutí přes <audio>.
   ensureAudio() {
     try {
-      this.audioCtx = this.audioCtx ?? new (window.AudioContext ?? window.webkitAudioContext)();
-      const ctx = this.audioCtx;
-      // iOS startuje kontext uspaný; po probuzení tóny naplánujeme znovu,
-      // aby závěrečný signál nezazněl dvakrát (naplánovaný + záložní).
-      if (ctx.state === 'suspended' && !this.resuming) {
-        this.resuming = true;
-        ctx.resume()
-          .then(() => { this.resuming = false; if (this.endTime) this.scheduleTones(); })
-          .catch(() => { this.resuming = false; });
+      try {
+        if (navigator.audioSession && navigator.audioSession.type !== 'playback') navigator.audioSession.type = 'playback';
+      } catch { /* starší iOS bez Audio Session API */ }
+      if (!this.audioCtx) {
+        this.audioCtx = new (window.AudioContext ?? window.webkitAudioContext)();
+        this.audioCtx.onstatechange = () => {
+          if (this.endTime && this.audioCtx?.state !== 'running') this.resumeAudio();
+        };
       }
+      const ctx = this.audioCtx;
+      if (ctx.state !== 'running') this.resumeAudio();
       return ctx;
     } catch { return null; }
+  },
+
+  // Po probuzení kontextu se tóny naplánují znovu (jinak by závěrečný signál
+  // zazněl dvakrát: naplánovaný + záložní, nebo vůbec).
+  resumeAudio() {
+    const ctx = this.audioCtx;
+    if (!ctx || this.resuming) return;
+    this.resuming = true;
+    ctx.resume()
+      .then(() => { this.resuming = false; if (this.endTime) this.scheduleTones(); })
+      .catch(() => { this.resuming = false; });
+  },
+
+  startKeepAlive(seconds) {
+    try {
+      if (!this.keepAlive) {
+        this.keepAlive = new Audio(silentWav());
+        this.keepAlive.loop = true;
+        this.keepAlive.preload = 'auto';
+        this.keepAlive.setAttribute('playsinline', '');
+      }
+      const p = this.keepAlive.play();
+      if (p?.catch) p.catch(() => { /* bez gesta nejde — tóny přes Web Audio zůstávají */ });
+      try {
+        if ('mediaSession' in navigator) navigator.mediaSession.metadata = new MediaMetadata({ title: 'Pauza mezi sériemi', artist: 'Fitko' });
+      } catch { /* nepodstatné */ }
+      if (this.keepAliveTimer) clearTimeout(this.keepAliveTimer);
+      this.keepAliveTimer = setTimeout(() => this.stopKeepAlive(), (seconds + 4) * 1000);
+    } catch { /* bez keep-alive */ }
+  },
+
+  stopKeepAlive() {
+    if (this.keepAliveTimer) { clearTimeout(this.keepAliveTimer); this.keepAliveTimer = null; }
+    try { this.keepAlive?.pause(); } catch { /* noop */ }
+  },
+
+  // Když Web Audio nehraje (kontext neběží), pípne aspoň přes <audio> — ten jde na
+  // iOS vždy stejnou cestou jako hudba, tedy i do sluchátek a v tichém režimu.
+  fallbackBeep() {
+    try {
+      const a = new Audio(beepWav());
+      a.setAttribute('playsinline', '');
+      const p = a.play();
+      if (p?.catch) p.catch(() => { /* nic víc udělat nejde */ });
+    } catch { /* noop */ }
+  },
+
+  // Zkušební odpočet z Nastavení: 3 · 2 · 1 · píp, stejnou cestou jako v tréninku.
+  testSound() {
+    const ctx = this.ensureAudio();
+    this.startKeepAlive(3);
+    const play = () => {
+      const now = ctx.currentTime + 0.1;
+      const plan = [[0, 720, 0.11, 0.16], [0.5, 720, 0.11, 0.16], [1, 720, 0.11, 0.16], [1.5, 1046, 0.18, 0.32], [1.72, 1318, 0.32, 0.32]];
+      for (const [t, f, d, v] of plan) this.tone(ctx, now + t, f, d, v);
+    };
+    if (ctx && ctx.state === 'running') play();
+    else if (ctx) ctx.resume().then(play).catch(() => this.fallbackBeep());
+    else this.fallbackBeep();
+    try { if (navigator.vibrate) navigator.vibrate([120, 60, 200]); } catch { /* noop */ }
   },
 
   // Jeden tón naplánovaný na přesný čas zvukové karty (nezávislý na tom,
@@ -4427,8 +4595,8 @@ const RestTimer = {
       [left - 3, 720, 0.11, 0.16],
       [left - 2, 720, 0.11, 0.16],
       [left - 1, 720, 0.11, 0.16],
-      [left, 1046, 0.18, 0.26],
-      [left + 0.22, 1318, 0.32, 0.26],
+      [left, 1046, 0.18, 0.32],
+      [left + 0.22, 1318, 0.32, 0.32],
     ];
     for (const [t, freq, dur, vol] of plan) {
       if (t > 0.05) this.tone(ctx, ctx.currentTime + t, freq, dur, vol);
@@ -4446,10 +4614,14 @@ const RestTimer = {
   // Záloha pro případ, že prohlížeč zvuk uspal — zahraje se hned při doběhnutí.
   beep() {
     const ctx = this.ensureAudio();
-    if (ctx && !this.tonesReady) {
-      const now = ctx.currentTime;
-      this.tone(ctx, now, 1046, 0.18, 0.26);
-      this.tone(ctx, now + 0.22, 1318, 0.32, 0.26);
+    if (ctx && ctx.state === 'running') {
+      if (!this.tonesReady) {
+        const now = ctx.currentTime;
+        this.tone(ctx, now, 1046, 0.18, 0.32);
+        this.tone(ctx, now + 0.22, 1318, 0.32, 0.32);
+      }
+    } else {
+      this.fallbackBeep();
     }
     try { if (navigator.vibrate) navigator.vibrate([120, 60, 200]); } catch { /* noop */ }
   },
@@ -6103,7 +6275,7 @@ function renderFood(root) {
     h('div', { class: 'subnav' },
       ...SUBS.map((s) => h('button', {
         class: `chip plain${sub === s.id ? ' active' : ''}`,
-        onClick: () => { sub = s.id; window.scrollTo(0, 0); Store.onChange?.(); },
+        onClick: () => { sub = s.id; scrollTop(0); Store.onChange?.(); },
       }, s.label)),
     ),
     ...views[sub](state, c),
@@ -6442,21 +6614,20 @@ function viewShopping(state, c) {
     ),
   ));
   for (const g of groups) {
-    out.push(h('div', { class: 'card stack', style: 'gap:2px' },
-      h('div', { class: 'label', style: 'margin-bottom:4px' }, g.label),
+    out.push(h('div', { class: `card stack cat-${g.cat}`, style: 'gap:2px' },
+      h('div', { class: 'label cat-label', style: 'margin-bottom:4px' }, g.label),
       ...g.items.map((it) => {
         const on = !!bought[it.foodId];
-        const qty = it.pieces ? `${it.pieces} ks` : `${it.packs}× ${it.packLabel}`;
         return h('button', {
           class: `shop-row${on ? ' done' : ''}`,
           onClick: () => Store.mutate((s) => { const b = (s.food.bought[c.weekStart] ??= {}); b[it.foodId] = !b[it.foodId]; }, { markDirty: false }),
         },
           h('span', { class: `shop-check${on ? ' on' : ''}` }, on ? '✓' : ''),
-          h('span', { class: 'grow', style: 'text-align:left' },
-            h('div', {}, it.name),
-            h('div', { class: 'muted', style: 'font-size:12px' }, `${qty} · ${it.grams} g`),
+          h('span', { class: 'grow', style: 'text-align:left;min-width:0' },
+            h('div', { class: 'shop-name' }, it.name),
+            h('div', { class: 'shop-qty' }, h('b', {}, `Kup ${buyText(it)}`), h('span', { class: 'muted' }, ` · spotřeba ${fmtGrams(it.grams)}`)),
+            it.discount ? h('div', { class: 'shop-deal' }, dealText(it.discount)) : null,
           ),
-          it.discount ? h('span', { class: 'badge accent', style: 'flex:none' }, `${fmtPrice(it.discount.price)}${it.discount.validTo ? ` do ${fmtDate(it.discount.validTo)}` : ''}`) : null,
         );
       }),
     ));
@@ -6464,13 +6635,22 @@ function viewShopping(state, c) {
   return out;
 }
 
-function fmtPrice(p) { return p == null ? 'akce' : `${String(p).replace('.', ',')} Kč`; }
+// „Kup 2× 500 g“ / „Kup 7 ks“ — hlavní údaj nákupu. Spotřeba v gramech je vedlejší.
+function buyText(it) { return it.pieces ? `${it.pieces} ks` : `${it.packs}× ${it.packLabel}`; }
+function fmtGrams(g) { return g >= 1000 ? `${(g / 1000).toFixed(g % 1000 ? 1 : 0).replace('.', ',')} kg` : `${Math.round(g)} g`; }
+function fmtPrice(p) { return p == null ? 'akce' : `${Number(p).toFixed(2).replace('.', ',')} Kč`; }
+
+// Akce vždy s množstvím: „5 kg za 189,90 Kč“ — bez toho vypadala pětikilová rýže jako kilová.
+function dealText(d) {
+  const qty = d.qty ? `${String(d.qty).replace('.', ',')} za ${fmtPrice(d.price)}` : fmtPrice(d.price);
+  return `Akce: ${qty}${d.validTo ? ` · do ${fmtDate(d.validTo)}` : ''}`;
+}
 
 async function copyList(groups, c) {
   const lines = [`Nákup Fitko — týden od ${fmtDate(c.weekStart)}`];
   for (const g of groups) {
     lines.push('', g.label.toUpperCase());
-    for (const it of g.items) lines.push(`- ${it.name}: ${it.pieces ? `${it.pieces} ks` : `${it.packs}× ${it.packLabel}`}${it.discount ? ` (akce ${fmtPrice(it.discount.price)})` : ''}`);
+    for (const it of g.items) lines.push(`- ${it.name}: ${buyText(it)} (spotřeba ${fmtGrams(it.grams)})${it.discount ? ` — ${dealText(it.discount)}` : ''}`);
   }
   try { await navigator.clipboard.writeText(lines.join('\n')); toast('Seznam zkopírován.'); } catch { toast('Kopírování nejde — otevři seznam v appce.'); }
 }
@@ -6942,6 +7122,14 @@ function restCard(state) {
         onClick: () => Store.mutate((s) => { s.restScale = opt.value; }, { publish: true }),
       }, opt.label)),
     ),
+    h('hr', { class: 'rule' }),
+    h('div', { class: 'row between', style: 'gap:10px' },
+      h('div', { class: 'grow' },
+        h('div', { class: 'small', style: 'font-weight:600' }, 'Zvuk odpočtu'),
+        h('div', { class: 'muted', style: 'font-size:12px' }, '3 · 2 · 1 · píp. Vyzkoušej se sluchátky i v tichém režimu — hraje stejnou cestou jako v tréninku.'),
+      ),
+      h('button', { class: 'btn small', onClick: () => { RestTimer.testSound(); toast('Odpočet 3 · 2 · 1 · píp…'); } }, 'Vyzkoušet'),
+    ),
   );
 }
 
@@ -7317,21 +7505,60 @@ const TABS = [
   { id: 'settings', label: 'Nastavení', icon: 'settings', render: renderSettings },
 ];
 
+// Obsah roluje uvnitř #app (ne celé okno) — viz komentář u rozvržení v CSS.
+function scrollTop(y = 0) {
+  const root = document.getElementById('app');
+  if (root) root.scrollTop = y;
+}
+
+// Lišta vzniká jen jednou a žije v #dock; překreslení jen přepne aktivní záložku.
+// (Mazat a znovu vytvářet ji při každé změně stavu bylo přesně to, co ji na iOS
+// nechávalo viset uprostřed obrazovky po zavření klávesnice.)
+function ensureTabbar(visible) {
+  const dock = document.getElementById('dock');
+  let bar = dock.querySelector('.tabbar');
+  if (!bar) {
+    bar = h('nav', { class: 'tabbar' },
+      h('div', { class: 'tabbar-inner' },
+        ...TABS.map((t) => h('button', {
+          class: 'tab', dataset: { tab: t.id }, 'aria-label': t.label,
+          onClick: () => goTab(t.id),
+        }, icon(t.icon), t.label)),
+      ),
+    );
+    dock.append(bar);
+  }
+  bar.hidden = !visible;
+  for (const btn of bar.querySelectorAll('.tab')) btn.classList.toggle('active', btn.dataset.tab === currentTab);
+}
+
+function goTab(id) {
+  if (!TABS.some((t) => t.id === id)) return;
+  try { document.activeElement?.blur?.(); } catch { /* noop */ }
+  currentTab = id;
+  scrollTop(0);
+  render();
+}
+
+let lastMode = null; // onboarding | workout | tabs — při změně režimu se roluje nahoru
+
 function render() {
   const root = document.getElementById('app');
-  const scrollY = window.scrollY;
   const state = Store.state;
+  const mode = !state.onboarded ? 'onboarding' : state.activeWorkout ? 'workout' : 'tabs';
+  const scrollY = mode === lastMode ? root.scrollTop : 0;
+  lastMode = mode;
 
-  document.querySelector('.tabbar')?.remove();
-
-  if (!state.onboarded) {
+  if (mode === 'onboarding') {
+    ensureTabbar(false);
     renderOnboarding(root);
     return;
   }
 
-  if (state.activeWorkout) {
+  if (mode === 'workout') {
+    ensureTabbar(false);
     renderWorkout(root);
-    requestAnimationFrame(() => window.scrollTo(0, scrollY));
+    requestAnimationFrame(() => scrollTop(scrollY));
     return;
   }
 
@@ -7339,21 +7566,12 @@ function render() {
   if (currentTab === 'food') refreshDiscountFeed(); // hned po onboardingu i po dlouhé době v pozadí
   const tab = TABS.find((t) => t.id === currentTab) ?? TABS[0];
   tab.render(root);
-
-  document.body.append(h('nav', { class: 'tabbar' },
-    h('div', { class: 'tabbar-inner' },
-      ...TABS.map((t) => h('button', {
-        class: `tab${t.id === currentTab ? ' active' : ''}`,
-        'aria-label': t.label,
-        onClick: () => { if (currentTab !== t.id) { currentTab = t.id; window.scrollTo(0, 0); render(); } },
-      }, icon(t.icon), t.label)),
-    ),
-  ));
-  requestAnimationFrame(() => window.scrollTo(0, scrollY));
+  ensureTabbar(true);
+  requestAnimationFrame(() => scrollTop(scrollY));
 }
 
 // umožní kartám poslat uživatele na jinou záložku (Dnes → Nastavení, Dnes → Jídlo, notifikace → cíl)
-window.__fitkoGoTab = (id) => { if (TABS.some((t) => t.id === id)) { currentTab = id; window.scrollTo(0, 0); render(); } };
+window.__fitkoGoTab = goTab;
 window.__fitkoGoSettings = () => window.__fitkoGoTab('settings');
 
 // Notifikace otevírá appku s #food / #today / #settings — respektujeme to při startu i za běhu.
@@ -7362,7 +7580,7 @@ function applyHashRoute() {
   if (id && TABS.some((t) => t.id === id)) { currentTab = id; history.replaceState(null, '', location.pathname + location.search); return true; }
   return false;
 }
-window.addEventListener('hashchange', () => { if (applyHashRoute()) { window.scrollTo(0, 0); render(); } });
+window.addEventListener('hashchange', () => { if (applyHashRoute()) { scrollTop(0); render(); } });
 
 // Akce z Lidlu: stáhnout, když jsou uložené starší než pár hodin (bez rerenderu, jen uložit).
 function refreshDiscountFeed() {

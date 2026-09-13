@@ -165,10 +165,10 @@ celku, žádné nové frameworky.
 
 Aktualizuje se po každém commitu.
 
-- [ ] R1 lišta
-- [ ] R2 zvuk pauzy
-- [ ] R3 nákupní seznam
-- [ ] R12 build skript
+- [x] R1 lišta
+- [x] R2 zvuk pauzy
+- [x] R3 nákupní seznam
+- [x] R12 build skript
 - [ ] R4 výživa
 - [ ] R5 projekce a texty
 - [ ] R6 program z profilu + nové cviky
