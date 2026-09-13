@@ -176,7 +176,7 @@ Aktualizuje se po každém commitu.
 - [x] R7 dva uživatelé
 - [x] R8 recepty a krabičky
 - [x] R10 AI návrh týdne
-- [ ] R11 fotky
+- [~] R11 fotky — 5 ze 42 vygenerováno (Highsfield, model nano_banana, 1 kredit/obrázek); zbytek zastavil denní limit účtu. Vývojové prostředí nesmí na CDN, proto obrázky do repa stáhne workflow `obrazky-receptu` (Actions → Run workflow) podle `img/recepty/zdroje.json`. Zadání pro zbylých 37 je v témže souboru; po vygenerování stačí doplnit url a spustit workflow. Appka fotky použije sama, do té doby ukazuje emoji.
 
 ---
 

@@ -1105,6 +1105,12 @@ input.set-input {
 }
 .dish-emoji.small { width: 36px; height: 36px; font-size: 20px; border-radius: 10px; }
 .dish-emoji.big { width: 56px; height: 56px; font-size: 32px; border-radius: 16px; }
+/* fotka receptu (když je v img/recepty/<id>.jpg) — jinak zůstane emoji */
+.dish-emoji { position: relative; overflow: hidden; }
+.dish-emoji img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.dish-emoji img[hidden] { display: none; }
+.recipe-photo { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 14px; border: 1px solid var(--line); display: block; }
+.recipe-photo[hidden] { display: none; }
 .dish-name { font-weight: 700; font-size: 15.5px; line-height: 1.25; }
 .dish-boxes { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin-top: 4px; font-size: 13px; }
 .dish-boxes b { color: var(--cat, var(--text)); }
@@ -1134,7 +1140,7 @@ input.set-input {
 <script>
 (() => {
 'use strict';
-const BUILD_ID = "2026-09-13 19:57";
+const BUILD_ID = "2026-09-13 20:01";
 const VAPID_PUBLIC_KEY = "BD_ok8gw7j2oTGo4onj5L0RKeoBb8CwcRXI6kBmWMQGHidqYlHqA-Mcl8tffN3j8ZxnzX7Fzq_RmG80iWyI6X0M";
 // ===== src/engine/util.js =====
 // Sdílené utility enginu — čisté funkce, žádné závislosti.
@@ -8196,6 +8202,20 @@ const RECIPE_COLOR = { maso: 'cat-maso', ryba: 'cat-mlecne', vege: 'cat-zelenina
 const recipeColorClass = (r) => RECIPE_COLOR[r.color] ?? 'cat-ostatni';
 const PROTEIN_LABEL = { kure: 'kuřecí', kruti: 'krůtí', hovezi: 'hovězí', veprove: 'vepřové', ryba: 'ryba', vejce: 'vejce', mlecne: 'mléčné', lusteniny: 'luštěniny' };
 
+// Fotky receptů žijí v img/recepty/<id>.jpg (přidává je GitHub Action obrazky.yml).
+// Když fotka není, zůstane emoji — obrázek se schová při chybě načtení.
+const recipeImageUrl = (r) => (r.image ?? `./img/recepty/${r.id}.jpg`);
+function recipeThumb(r, size = '') {
+  const img = h('img', { src: recipeImageUrl(r), alt: '', loading: 'lazy', decoding: 'async' });
+  img.addEventListener('error', () => { img.hidden = true; });
+  return h('span', { class: `dish-emoji${size ? ` ${size}` : ''}` }, r.emoji, img);
+}
+function recipePhoto(r) {
+  const img = h('img', { class: 'recipe-photo', src: recipeImageUrl(r), alt: r.name, loading: 'lazy', decoding: 'async' });
+  img.addEventListener('error', () => { img.hidden = true; });
+  return img;
+}
+
 function viewCooking(state, c) {
   const out = [];
   const memberIds = Object.keys(c.members);
@@ -8313,7 +8333,7 @@ function dishRow(c, plan, s, d) {
   const needsFreezer = s.coversDays.length > r.fridgeDays;
   const freezeFrom = needsFreezer ? s.coversDays[r.fridgeDays] : null;
   return h('div', { class: `dish-row ${recipeColorClass(r)}` },
-    h('div', { class: 'dish-emoji' }, r.emoji),
+    recipeThumb(r),
     h('div', { class: 'grow', style: 'min-width:0' },
       h('div', { class: 'dish-name' }, r.name),
       h('div', { class: 'dish-boxes' },
@@ -8376,7 +8396,7 @@ function breakfastCard(c, plan) {
 function smallRecipeRow(r, when, factor, c) {
   const m = recipeMacros(r, c.customFoods);
   return h('button', { class: `history-row ${recipeColorClass(r)}`, onClick: () => openRecipeModal(r, { portions: factor }) },
-    h('span', { class: 'dish-emoji small' }, r.emoji),
+    recipeThumb(r, 'small'),
     h('span', { class: 'grow', style: 'text-align:left' },
       h('div', { style: 'font-size:14.5px' }, r.name),
       h('div', { class: 'muted', style: 'font-size:12px' }, `${when} · ${fmtPortion(factor)} porce · ${fmtKcal(m.kcal * factor)} kcal · ${Math.round(m.p * factor)} g B`),
@@ -8403,13 +8423,14 @@ function openRecipeModal(r, { dish = null, members = {}, portions = null } = {})
   };
   openModal(
     h('div', { class: `recipe-head ${recipeColorClass(r)}` },
-      h('div', { class: 'dish-emoji big' }, r.emoji),
+      recipeThumb(r, 'big'),
       h('div', { class: 'grow' },
         h('h3', {}, r.name),
         h('div', { class: 'muted', style: 'font-size:12.5px' }, `${r.prepMin} min příprava · ${r.cookMin} min vaření · ${(r.equipment ?? []).join(', ') || 'bez nádobí'}`),
         h('div', { class: 'row', style: 'flex-wrap:wrap;gap:4px;margin-top:4px' }, ...(r.tags ?? []).map((t) => h('span', { class: 'badge plain' }, t))),
       ),
     ),
+    recipePhoto(r),
     h('div', { class: 'row between' },
       h('span', { class: 'label' }, `Suroviny na ${String(Math.round(total * 100) / 100).replace('.', ',')} porce${dish ? ` (${Object.values(dish.boxes).reduce((a, n) => a + n, 0)} krabiček)` : ''}`),
       h('span', { class: 'num muted', style: 'font-size:12px' }, `1 porce = ${fmtKcal(m.kcal)} kcal · ${m.p} g B`),
@@ -8450,7 +8471,7 @@ function openSwapDishModal(c, plan, s, d) {
           toast(`Vyměněno za ${r.name}.`);
         },
       },
-        h('span', { class: 'dish-emoji small' }, r.emoji),
+        recipeThumb(r, 'small'),
         h('span', { class: 'grow', style: 'text-align:left' },
           h('div', { style: 'font-size:14.5px' }, r.name),
           h('div', { class: 'muted', style: 'font-size:12px' }, `${PROTEIN_LABEL[r.protein] ?? r.protein} · ${r.prepMin + r.cookMin} min · lednice ${r.fridgeDays} d${r.freezer ? ' · mrazák' : ''}${ok ? '' : ' · nevydrží celé období'}`),
@@ -8560,7 +8581,7 @@ function viewRecipes(state, c) {
         const m = recipeMacros(r, c.customFoods);
         const disc = mealDiscountShare({ items: r.items }, c.discounted);
         return h('button', { class: `history-row ${recipeColorClass(r)}${excluded.has(r.id) ? ' excluded' : ''}`, onClick: () => openRecipeLibraryModal(r, c) },
-          h('span', { class: 'dish-emoji small' }, r.emoji),
+          recipeThumb(r, 'small'),
           h('span', { class: 'grow', style: 'text-align:left' },
             h('div', { style: 'font-size:14.5px' }, r.name),
             h('div', { class: 'muted', style: 'font-size:12px' }, `${fmtKcal(m.kcal)} kcal · ${m.p} g B · ${r.prepMin + r.cookMin} min · lednice ${r.fridgeDays} d${r.freezer ? ' · mrazák' : ''}${r.custom ? ' · vlastní' : ''}`),

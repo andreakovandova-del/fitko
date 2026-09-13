@@ -1,0 +1,66 @@
+{
+ "_poznamka": "Fotky receptů z Highsfield (model nano_banana, 1 kredit/obrázek). images = hotové (url → stáhne workflow obrazky-receptu do img/recepty/<id>.jpg). prompts = zadání pro zbývající recepty; po vygenerování doplň url do images a spusť workflow.",
+ "model": "nano_banana",
+ "aspect_ratio": "4:3",
+ "images": {
+  "kure_ryze_brokolice": {
+   "url": "https://d8j0ntlcm91z4.cloudfront.net/user_39cPAI9MWXLvQuIZNMpdQ4DROOa/hf_20260913_175917_b3c4f9b2-607f-449e-9598-ca8e75359494.png",
+   "job": "b3c4f9b2-607f-449e-9598-ca8e75359494"
+  },
+  "kure_tikka": {
+   "url": "https://d8j0ntlcm91z4.cloudfront.net/user_39cPAI9MWXLvQuIZNMpdQ4DROOa/hf_20260913_180038_6d9ee9c5-89af-4962-b3f2-f61cbef8862a.png",
+   "job": "6d9ee9c5-89af-4962-b3f2-f61cbef8862a"
+  },
+  "kure_fajitas": {
+   "url": "https://d8j0ntlcm91z4.cloudfront.net/user_39cPAI9MWXLvQuIZNMpdQ4DROOa/hf_20260913_180038_6116f83d-d5c4-4344-887f-73c468d9e62c.png",
+   "job": "6116f83d-d5c4-4344-887f-73c468d9e62c"
+  },
+  "kruti_sekana_bataty": {
+   "url": "https://d8j0ntlcm91z4.cloudfront.net/user_39cPAI9MWXLvQuIZNMpdQ4DROOa/hf_20260913_180038_ba5814d6-0684-4749-adef-62ff124b169d.png",
+   "job": "ba5814d6-0684-4749-adef-62ff124b169d"
+  },
+  "panenka_bulgur": {
+   "url": "https://d8j0ntlcm91z4.cloudfront.net/user_39cPAI9MWXLvQuIZNMpdQ4DROOa/hf_20260913_180038_991e1bca-8309-41f0-8281-e5b99679ba2a.png",
+   "job": "991e1bca-8309-41f0-8281-e5b99679ba2a"
+  }
+ },
+ "prompts": {
+  "kure_curry": "Golden chicken curry in coconut sauce with bell pepper next to white rice, in an open glass meal-prep container, overhead view, natural window light, light wooden table, fresh and appetizing, realistic food photography, no text, no people",
+  "kure_kuskus_zelenina": "Sliced grilled chicken breast with couscous, roasted bell pepper, zucchini and red onion and a lemon wedge, in an open glass meal-prep container, overhead view, natural window light, light wooden table, fresh and appetizing, realistic food photography, no text, no people",
+  "kure_stehna_brambory": "Roasted chicken thigh with crispy skin, roasted potato wedges, carrots and onion, in an open glass meal-prep container, overhead view, natural window light, light wooden table, fresh and appetizing, realistic food photography, no text, no people",
+  "kure_teriyaki": "Glossy teriyaki chicken pieces with sesame seeds, white rice, green peas and carrot, in an open glass meal-prep container, overhead view, natural window light, light wooden table, fresh and appetizing, realistic food photography, no text, no people",
+  "hovezi_bolognese": "Penne pasta with rich beef bolognese sauce and grated parmesan, in an open glass meal-prep container, overhead view, natural window light, light wooden table, fresh and appetizing, realistic food photography, no text, no people",
+  "chilli_con_carne": "Chili con carne with kidney beans and corn next to white rice, in an open glass meal-prep container, overhead view, natural window light, light wooden table, fresh and appetizing, realistic food photography, no text, no people",
+  "hovezi_kase_zelenina": "Seasoned ground beef with creamy mashed potatoes and green peas, in an open glass meal-prep container, overhead view, natural window light, light wooden table, fresh and appetizing, realistic food photography, no text, no people",
+  "hovezi_gulas": "Czech beef goulash with dark paprika sauce and boiled potatoes, in an open glass meal-prep container, overhead view, natural window light, light wooden table, fresh and appetizing, realistic food photography, no text, no people",
+  "veprova_kyta_zeli": "Czech roast pork slices with garlic, boiled potatoes and sauerkraut, in an open glass meal-prep container, overhead view, natural window light, light wooden table, fresh and appetizing, realistic food photography, no text, no people",
+  "losos_bataty_spenat": "Baked salmon fillet with roasted sweet potato cubes, sauteed spinach and a lemon wedge, in an open glass meal-prep container, overhead view, natural window light, light wooden table, fresh and appetizing, realistic food photography, no text, no people",
+  "treska_brambory_hrasek": "Baked cod fillet on sliced potatoes with green peas and lemon, in an open glass meal-prep container, overhead view, natural window light, light wooden table, fresh and appetizing, realistic food photography, no text, no people",
+  "tunak_testoviny": "Penne pasta with tuna and tomato sauce and grated parmesan, in an open glass meal-prep container, overhead view, natural window light, light wooden table, fresh and appetizing, realistic food photography, no text, no people",
+  "smazena_ryze_vejce": "Fried rice with chicken, scrambled egg, mixed vegetables and spring onion, in an open glass meal-prep container, overhead view, natural window light, light wooden table, fresh and appetizing, realistic food photography, no text, no people",
+  "cockove_dahl": "Red lentil dahl with spinach and a spoon of yogurt next to white rice, in an open glass meal-prep container, overhead view, natural window light, light wooden table, fresh and appetizing, realistic food photography, no text, no people",
+  "cizrnove_curry": "Chickpea and tofu curry in coconut tomato sauce with bell pepper next to white rice, in an open glass meal-prep container, overhead view, natural window light, light wooden table, fresh and appetizing, realistic food photography, no text, no people",
+  "kure_pohanka_mrkev": "Grilled chicken breast slices with buckwheat and honey roasted carrots, in an open glass meal-prep container, overhead view, natural window light, light wooden table, fresh and appetizing, realistic food photography, no text, no people",
+  "kruti_paprikas_testoviny": "Turkey strips in creamy paprika sauce with pasta, in an open glass meal-prep container, overhead view, natural window light, light wooden table, fresh and appetizing, realistic food photography, no text, no people",
+  "masove_kulicky_rajcata": "Beef meatballs in tomato sauce with pasta and melted mozzarella, in an open glass meal-prep container, overhead view, natural window light, light wooden table, fresh and appetizing, realistic food photography, no text, no people",
+  "kure_gyros_bulgur": "Chicken gyros strips with bulgur, diced tomato and cucumber, tzatziki in a small cup, in an open glass meal-prep container, overhead view, natural window light, light wooden table, fresh and appetizing, realistic food photography, no text, no people",
+  "kure_quinoa_feta": "Cold quinoa salad with roasted chicken, cherry tomatoes, cucumber and feta cheese, in an open glass meal-prep container, overhead view, natural window light, light wooden table, fresh and appetizing, realistic food photography, no text, no people",
+  "zapecene_testoviny_kure": "Baked pasta with chicken, spinach and golden melted mozzarella, in an open glass meal-prep container, overhead view, natural window light, light wooden table, fresh and appetizing, realistic food photography, no text, no people",
+  "batatova_panev_fazole": "Sweet potato hash with black beans, bell pepper, baked eggs and grated cheese, in an open glass meal-prep container, overhead view, natural window light, light wooden table, fresh and appetizing, realistic food photography, no text, no people",
+  "veprova_sweet_chilli": "Sweet chilli pork strips with stir-fried vegetables and sesame next to white rice, in an open glass meal-prep container, overhead view, natural window light, light wooden table, fresh and appetizing, realistic food photography, no text, no people",
+  "losos_teriyaki": "Teriyaki glazed salmon fillet with sesame, white rice and broccoli, in an open glass meal-prep container, overhead view, natural window light, light wooden table, fresh and appetizing, realistic food photography, no text, no people",
+  "kure_paprikas_kuskus": "Chicken paprikash with bell peppers in creamy paprika sauce next to couscous, in an open glass meal-prep container, overhead view, natural window light, light wooden table, fresh and appetizing, realistic food photography, no text, no people",
+  "ovesna_kase_tvaroh": "Bowl of warm oatmeal with quark, sliced banana, honey drizzle and cinnamon, overhead view, natural window light, light wooden table, fresh and appetizing, realistic food photography, no text, no people",
+  "overnight_oats_skyr": "Glass jar of overnight oats with skyr yogurt, chia seeds and fresh blueberries, overhead view, natural window light, light wooden table, fresh and appetizing, realistic food photography, no text, no people",
+  "michana_vejce_chleb": "Plate with creamy scrambled eggs, slices of rye bread, ham and tomato wedges, overhead view, natural window light, light wooden table, fresh and appetizing, realistic food photography, no text, no people",
+  "skyr_musli_ovoce": "Bowl of skyr yogurt topped with muesli, diced apple and almonds, overhead view, natural window light, light wooden table, fresh and appetizing, realistic food photography, no text, no people",
+  "tvarohove_pankejky": "Stack of small quark pancakes with greek yogurt and fresh strawberries on a plate, overhead view, natural window light, light wooden table, fresh and appetizing, realistic food photography, no text, no people",
+  "toast_cottage_vejce": "Whole grain toast topped with cottage cheese, sliced boiled egg and tomato on a plate, overhead view, natural window light, light wooden table, fresh and appetizing, realistic food photography, no text, no people",
+  "tvaroh_med_orechy": "Small bowl of quark with honey drizzle and walnuts, overhead view, natural window light, light wooden table, fresh and appetizing, realistic food photography, no text, no people",
+  "protein_banan": "Tall glass of banana protein shake next to a banana, overhead view, natural window light, light wooden table, fresh and appetizing, realistic food photography, no text, no people",
+  "jogurt_jablko_arasidy": "Bowl of greek yogurt with apple slices, a swirl of peanut butter and cinnamon, overhead view, natural window light, light wooden table, fresh and appetizing, realistic food photography, no text, no people",
+  "chleb_sunka_syr": "Rye bread sandwich with ham, cheese and cucumber slices on a small board, overhead view, natural window light, light wooden table, fresh and appetizing, realistic food photography, no text, no people",
+  "ryzove_chlebicky_cottage": "Rice cakes topped with cottage cheese and red bell pepper strips on a plate, overhead view, natural window light, light wooden table, fresh and appetizing, realistic food photography, no text, no people",
+  "skyr_mandle_mandarinka": "Bowl of skyr yogurt with almonds and mandarin orange segments, overhead view, natural window light, light wooden table, fresh and appetizing, realistic food photography, no text, no people"
+ }
+}

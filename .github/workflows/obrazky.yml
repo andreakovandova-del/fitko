@@ -1,0 +1,21 @@
+name: obrazky-receptu
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-save --no-audit --no-fund sharp
+      - run: node scripts/fetch-images.mjs
+      - name: commit obrázků
+        run: |
+          git config user.name "fitko-bot"
+          git config user.email "fitko-bot@users.noreply.github.com"
+          git add img/recepty/*.jpg
+          if git diff --cached --quiet; then echo "beze změny"; else git commit -m "fotky receptu" && git push; fi
