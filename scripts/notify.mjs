@@ -1,7 +1,8 @@
-// Chytré notifikace bez serveru: GitHub Action každých ~30 min přečte zálohu Fitka
-// (privátní gist), spočítá TÝMŽ enginem co appka, jestli je co říct, a pošle push.
-// Posílá jen relevantní věci, každou nejvýš jednou, s tichem v noci. Paměť odeslaného
-// drží ve vedlejším souboru gistu (fitko-notif.json) — do zálohy samotné nikdy nezapisuje.
+// Chytré notifikace bez serveru: GitHub Action každých ~30 min přečte zálohy Fitka
+// (privátní gist, jeden soubor na člověka), spočítá TÝMŽ enginem co appka, jestli je
+// co říct, a pošle push každému zvlášť. Posílá jen relevantní věci, každou nejvýš
+// jednou, s tichem v noci. Paměť odeslaného drží ve vedlejších souborech gistu
+// (fitko-notif.json, fitko-notif-matilda.json) — do záloh samotných nikdy nezapisuje.
 //
 // Potřebuje secrets: FITKO_GH_TOKEN (gist scope — ten samý, co používá appka),
 // VAPID_PRIVATE_KEY (pár k vapid.public.txt vedle appky).
@@ -15,8 +16,6 @@ const require = createRequire(import.meta.url);
 const TOKEN = process.env.FITKO_GH_TOKEN;
 const VAPID_PRIVATE = process.env.VAPID_PRIVATE_KEY;
 const PAGES_URL = 'https://andreakovandova-del.github.io/fitko/';
-const BACKUP_FILE = 'fitko-zaloha.json';
-const MEMORY_FILE = 'fitko-notif.json';
 const MAX_PER_RUN = 2;
 const TZ = 'Europe/Prague';
 
@@ -53,8 +52,8 @@ const czDays = (n) => (n === 1 ? '1 dnem' : `${n} dny`);
  * Pravidla → kandidáti { key, title, body, url }. Čistá funkce, testovatelná.
  * @param state záloha appky, @param now pragueNow(), @param feed akce-lidl.json (nebo null), @param memory odeslané
  */
-export function dueNotifications(state, now, feed, memory = {}) {
-  const prefs = { workout: true, weigh: true, meals: true, protein: true, shopping: true, quietFrom: 22, quietTo: 7, ...(state.push?.prefs ?? {}) };
+export function dueNotifications(state, now, feed, memory = {}, household = null) {
+  const prefs = { workout: true, weigh: true, meals: true, protein: true, shopping: true, cooking: true, quietFrom: 22, quietTo: 7, ...(state.push?.prefs ?? {}) };
   const out = [];
   const { iso, hour, minute } = now;
   const minutes = hour * 60 + minute;
@@ -82,7 +81,8 @@ export function dueNotifications(state, now, feed, memory = {}) {
     const since = last ? daysBetween(last, iso) : 99;
     const todayDone = sessions.some((s) => s.date === iso);
     if (!todayDone && since >= 2) {
-      const unit = engine.WEEK_TEMPLATE[sessions.length % engine.WEEK_TEMPLATE.length];
+      const days = engine.programDays(state);
+      const unit = days[sessions.length % days.length];
       const sets = unit.exercises.reduce((a, e) => a + e.sets, 0);
       const estMin = Math.round((sets * 2.4 + 8) / 5) * 5;
       out.push({
@@ -159,7 +159,71 @@ export function dueNotifications(state, now, feed, memory = {}) {
     }
   }
 
+  // 7) vaření: v den vaření odpoledne, když ještě není odškrtnuté „uvařeno“
+  if (prefs.cooking && household?.cook && hour >= 14 && hour <= 19) {
+    for (const plan of Object.values(household.cook)) {
+      for (const s of plan.sessions ?? []) {
+        if (s.cookDate !== iso || s.cooked) continue;
+        const names = s.dishes.map((d) => engine.recipeById(d.recipeId, household.customRecipes ?? [])?.name).filter(Boolean);
+        const boxes = s.dishes.reduce((a, d) => a + Object.values(d.boxes ?? {}).reduce((x, y) => x + y, 0), 0);
+        if (!names.length) continue;
+        out.push({ key: `cook:${iso}`, title: `Dnes vařit (${boxes} krabiček)`, body: `${names.join(' + ')}. Recepty a suroviny máš v appce.`, url: '#food' });
+      }
+    }
+  }
+
+  // 8) neděle dopoledne bez plánu na příští týden → naplánovat (s AI návrhem, když je)
+  if (prefs.cooking && now.dow === 7 && hour >= 9 && hour <= 12) {
+    const nextWeek = engine.addDays(engine.weekStartOf(iso), 7);
+    if (!household?.cook?.[nextWeek]) {
+      const hasProposal = !!household?.proposals?.[nextWeek];
+      out.push({ key: `plan:${nextWeek}`, title: 'Naplánuj vaření na příští týden', body: hasProposal ? 'AI už má návrh — v appce ho jen potvrdíš a máš nákup i recepty.' : 'Dvě ťuknutí v záložce Jídlo → Vaření a máš nákup i recepty.', url: '#food' });
+    }
+  }
+
   return out.filter((n) => !memory.sent?.[n.key]);
+}
+
+// Jeden člověk: jeho záloha, jeho paměť odeslaného, jeho subscription.
+async function notifyUser(userId, gist, feed, now, webpushFactory, household) {
+  const backupFile = engine.backupFileFor(userId);
+  const memoryFile = engine.notifFileFor(userId);
+  const state = await gistFile(gist, backupFile);
+  if (!state) { console.log(`[${userId}] záloha ${backupFile} v gistu není.`); return null; }
+  const memory = (await gistFile(gist, memoryFile)) ?? { sent: {} };
+  memory.sent ??= {};
+  memory.checkedAt = new Date().toISOString();
+  const out = { [memoryFile]: memory };
+
+  const sub = state?.push?.subscription;
+  if (!sub?.endpoint) { console.log(`[${userId}] notifikace v appce nejsou zapnuté.`); memory.error = null; return out; }
+  if (memory.deadEndpoint === sub.endpoint) { console.log(`[${userId}] subscription je mrtvá — čeká na nové zapnutí v appce.`); return out; }
+
+  // úklid paměti (14 dní)
+  const cutoff = Date.now() - 14 * 86400e3;
+  for (const [k, at] of Object.entries(memory.sent)) if (new Date(at).getTime() < cutoff) delete memory.sent[k];
+
+  const due = dueNotifications(state, now, feed, memory, household);
+  console.log(`[${userId}] ${now.iso} ${now.hour}:${String(now.minute).padStart(2, '0')} Praha — kandidátů: ${due.length}`);
+  if (!due.length) { memory.error = null; return out; }
+
+  const webpush = webpushFactory();
+  for (const n of due.slice(0, MAX_PER_RUN)) {
+    try {
+      await webpush.sendNotification(sub, JSON.stringify({ title: n.title, body: n.body, tag: n.key, url: `./${n.url ?? ''}` }), { TTL: 3600, urgency: 'normal' });
+      memory.sent[n.key] = new Date().toISOString();
+      memory.last = { title: n.title, at: memory.sent[n.key] };
+      memory.error = null;
+      if (n.feedStamp) memory.lastFeedNotified = n.feedStamp;
+      console.log(`[${userId}] odesláno:`, n.title);
+    } catch (err) {
+      const code = err?.statusCode;
+      memory.error = `push ${code ?? ''} ${err?.body ?? err?.message ?? ''}`.trim();
+      console.error(`[${userId}] chyba odeslání`, memory.error);
+      if (code === 404 || code === 410) { memory.deadEndpoint = sub.endpoint; break; }
+    }
+  }
+  return out;
 }
 
 async function main() {
@@ -168,50 +232,30 @@ async function main() {
   const vapidPublic = (await readFile('vapid.public.txt', 'utf8')).trim();
 
   const gists = await gh('/gists?per_page=100');
-  const meta = gists.find((g) => g.files && g.files[BACKUP_FILE]);
+  const meta = gists.find(engine.isFitkoGist);
   if (!meta) { console.log('Záloha Fitka na účtu není — appka ještě nic nezálohovala.'); return; }
   const gist = await gh(`/gists/${meta.id}`);
-  const state = await gistFile(gist, BACKUP_FILE);
-  const memory = (await gistFile(gist, MEMORY_FILE)) ?? { sent: {} };
-  memory.sent ??= {};
   const now = pragueNow();
-  memory.checkedAt = new Date().toISOString();
-
-  const sub = state?.push?.subscription;
-  const save = () => gh(`/gists/${meta.id}`, { method: 'PATCH', body: JSON.stringify({ files: { [MEMORY_FILE]: { content: JSON.stringify(memory, null, 1) } } }) });
-
-  if (!sub?.endpoint) { console.log('Notifikace v appce nejsou zapnuté.'); memory.error = null; await save(); return; }
-  if (memory.deadEndpoint === sub.endpoint) { console.log('Subscription je mrtvá — čeká na nové zapnutí v appce.'); await save(); return; }
-
-  // úklid paměti (14 dní)
-  const cutoff = Date.now() - 14 * 86400e3;
-  for (const [k, at] of Object.entries(memory.sent)) if (new Date(at).getTime() < cutoff) delete memory.sent[k];
 
   let feed = null;
   try { const r = await fetch(`${PAGES_URL}akce-lidl.json?t=${Date.now()}`); if (r.ok) feed = await r.json(); } catch { /* bez feedu */ }
 
-  const due = dueNotifications(state, now, feed, memory);
-  console.log(`${now.iso} ${now.hour}:${String(now.minute).padStart(2, '0')} Praha — kandidátů: ${due.length}`);
-  if (!due.length) { memory.error = null; await save(); return; }
-
-  const webpush = require('web-push');
-  webpush.setVapidDetails('https://github.com/andreakovandova-del/fitko', vapidPublic, VAPID_PRIVATE);
-  for (const n of due.slice(0, MAX_PER_RUN)) {
-    try {
-      await webpush.sendNotification(sub, JSON.stringify({ title: n.title, body: n.body, tag: n.key, url: `./${n.url ?? ''}` }), { TTL: 3600, urgency: 'normal' });
-      memory.sent[n.key] = new Date().toISOString();
-      memory.last = { title: n.title, at: memory.sent[n.key] };
-      memory.error = null;
-      if (n.feedStamp) memory.lastFeedNotified = n.feedStamp;
-      console.log('odesláno:', n.title);
-    } catch (err) {
-      const code = err?.statusCode;
-      memory.error = `push ${code ?? ''} ${err?.body ?? err?.message ?? ''}`.trim();
-      console.error('chyba odeslání', memory.error);
-      if (code === 404 || code === 410) { memory.deadEndpoint = sub.endpoint; break; }
+  let webpushInstance = null;
+  const webpushFactory = () => {
+    if (!webpushInstance) {
+      webpushInstance = require('web-push');
+      webpushInstance.setVapidDetails('https://github.com/andreakovandova-del/fitko', vapidPublic, VAPID_PRIVATE);
     }
+    return webpushInstance;
+  };
+
+  const household = await gistFile(gist, engine.HOUSEHOLD_FILE);
+  const files = {};
+  for (const userId of engine.USER_ORDER) {
+    const out = await notifyUser(userId, gist, feed, now, webpushFactory, household);
+    for (const [name, data] of Object.entries(out ?? {})) files[name] = { content: JSON.stringify(data, null, 1) };
   }
-  await save();
+  if (Object.keys(files).length) await gh(`/gists/${meta.id}`, { method: 'PATCH', body: JSON.stringify({ files }) });
 }
 
 if (process.argv[1] && /notify\.mjs$/.test(process.argv[1])) {

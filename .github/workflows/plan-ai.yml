@@ -1,0 +1,23 @@
+name: plan-ai
+on:
+  schedule:
+    - cron: '0 14 * * 6'   # sobota 16:00 v Praze (léto) — návrh na příští týden je v neděli ráno v appce
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: plan-ai
+  cancel-in-progress: false
+jobs:
+  propose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-save --no-audit --no-fund @anthropic-ai/sdk zod
+      - run: node scripts/plan-ai.mjs
+        env:
+          FITKO_GH_TOKEN: ${{ secrets.FITKO_GH_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
