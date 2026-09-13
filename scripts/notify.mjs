@@ -52,8 +52,8 @@ const czDays = (n) => (n === 1 ? '1 dnem' : `${n} dny`);
  * Pravidla → kandidáti { key, title, body, url }. Čistá funkce, testovatelná.
  * @param state záloha appky, @param now pragueNow(), @param feed akce-lidl.json (nebo null), @param memory odeslané
  */
-export function dueNotifications(state, now, feed, memory = {}) {
-  const prefs = { workout: true, weigh: true, meals: true, protein: true, shopping: true, quietFrom: 22, quietTo: 7, ...(state.push?.prefs ?? {}) };
+export function dueNotifications(state, now, feed, memory = {}, household = null) {
+  const prefs = { workout: true, weigh: true, meals: true, protein: true, shopping: true, cooking: true, quietFrom: 22, quietTo: 7, ...(state.push?.prefs ?? {}) };
   const out = [];
   const { iso, hour, minute } = now;
   const minutes = hour * 60 + minute;
@@ -159,11 +159,33 @@ export function dueNotifications(state, now, feed, memory = {}) {
     }
   }
 
+  // 7) vaření: v den vaření odpoledne, když ještě není odškrtnuté „uvařeno“
+  if (prefs.cooking && household?.cook && hour >= 14 && hour <= 19) {
+    for (const plan of Object.values(household.cook)) {
+      for (const s of plan.sessions ?? []) {
+        if (s.cookDate !== iso || s.cooked) continue;
+        const names = s.dishes.map((d) => engine.recipeById(d.recipeId, household.customRecipes ?? [])?.name).filter(Boolean);
+        const boxes = s.dishes.reduce((a, d) => a + Object.values(d.boxes ?? {}).reduce((x, y) => x + y, 0), 0);
+        if (!names.length) continue;
+        out.push({ key: `cook:${iso}`, title: `Dnes vařit (${boxes} krabiček)`, body: `${names.join(' + ')}. Recepty a suroviny máš v appce.`, url: '#food' });
+      }
+    }
+  }
+
+  // 8) neděle dopoledne bez plánu na příští týden → naplánovat (s AI návrhem, když je)
+  if (prefs.cooking && now.dow === 7 && hour >= 9 && hour <= 12) {
+    const nextWeek = engine.addDays(engine.weekStartOf(iso), 7);
+    if (!household?.cook?.[nextWeek]) {
+      const hasProposal = !!household?.proposals?.[nextWeek];
+      out.push({ key: `plan:${nextWeek}`, title: 'Naplánuj vaření na příští týden', body: hasProposal ? 'AI už má návrh — v appce ho jen potvrdíš a máš nákup i recepty.' : 'Dvě ťuknutí v záložce Jídlo → Vaření a máš nákup i recepty.', url: '#food' });
+    }
+  }
+
   return out.filter((n) => !memory.sent?.[n.key]);
 }
 
 // Jeden člověk: jeho záloha, jeho paměť odeslaného, jeho subscription.
-async function notifyUser(userId, gist, feed, now, webpushFactory) {
+async function notifyUser(userId, gist, feed, now, webpushFactory, household) {
   const backupFile = engine.backupFileFor(userId);
   const memoryFile = engine.notifFileFor(userId);
   const state = await gistFile(gist, backupFile);
@@ -181,7 +203,7 @@ async function notifyUser(userId, gist, feed, now, webpushFactory) {
   const cutoff = Date.now() - 14 * 86400e3;
   for (const [k, at] of Object.entries(memory.sent)) if (new Date(at).getTime() < cutoff) delete memory.sent[k];
 
-  const due = dueNotifications(state, now, feed, memory);
+  const due = dueNotifications(state, now, feed, memory, household);
   console.log(`[${userId}] ${now.iso} ${now.hour}:${String(now.minute).padStart(2, '0')} Praha — kandidátů: ${due.length}`);
   if (!due.length) { memory.error = null; return out; }
 
@@ -227,9 +249,10 @@ async function main() {
     return webpushInstance;
   };
 
+  const household = await gistFile(gist, engine.HOUSEHOLD_FILE);
   const files = {};
   for (const userId of engine.USER_ORDER) {
-    const out = await notifyUser(userId, gist, feed, now, webpushFactory);
+    const out = await notifyUser(userId, gist, feed, now, webpushFactory, household);
     for (const [name, data] of Object.entries(out ?? {})) files[name] = { content: JSON.stringify(data, null, 1) };
   }
   if (Object.keys(files).length) await gh(`/gists/${meta.id}`, { method: 'PATCH', body: JSON.stringify({ files }) });

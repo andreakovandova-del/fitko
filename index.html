@@ -1134,7 +1134,7 @@ input.set-input {
 <script>
 (() => {
 'use strict';
-const BUILD_ID = "2026-09-13 19:54";
+const BUILD_ID = "2026-09-13 19:57";
 const VAPID_PUBLIC_KEY = "BD_ok8gw7j2oTGo4onj5L0RKeoBb8CwcRXI6kBmWMQGHidqYlHqA-Mcl8tffN3j8ZxnzX7Fzq_RmG80iWyI6X0M";
 // ===== src/engine/util.js =====
 // Sdílené utility enginu — čisté funkce, žádné závislosti.
@@ -4960,7 +4960,7 @@ function defaultPush() {
   return {
     subscription: null,
     enabledAt: null,
-    prefs: { workout: true, weigh: true, meals: true, protein: true, shopping: true, quietFrom: 22, quietTo: 7 },
+    prefs: { workout: true, weigh: true, meals: true, protein: true, shopping: true, cooking: true, quietFrom: 22, quietTo: 7 },
   };
 }
 
@@ -8228,7 +8228,7 @@ function viewCooking(state, c) {
         h('div', { class: 'label accent-text' }, 'Návrh od AI'),
         h('p', { class: 'small', style: 'margin:0' }, proposal.note ?? 'AI navrhla jídla na tenhle týden podle akcí, pestrosti a vašich cílů.'),
         h('div', { class: 'muted', style: 'font-size:12.5px' }, [...(proposal.pick?.A ?? []), ...(proposal.pick?.B ?? [])].map((id) => findRecipe(id)?.name ?? id).join(' · ')),
-        h('button', { class: 'btn primary', onClick: () => makePlan(c, { pick: proposal.pick }) }, 'Použít návrh'),
+        h('button', { class: 'btn primary', onClick: () => makePlan(c, { pick: proposal.pick, fromProposal: true }) }, 'Použít návrh'),
       ) : null,
       h('button', { class: `btn ${proposal ? '' : 'primary'} big`, onClick: () => makePlan(c) }, 'Naplánovat týden'),
     ));
@@ -8236,6 +8236,15 @@ function viewCooking(state, c) {
   }
 
   const plan = c.cookPlan;
+  const proposal = Household.state.proposals?.[c.cookWeek];
+  if (proposal && !plan.fromProposal) {
+    out.push(h('div', { class: 'card stack', style: 'border-color:var(--accent);gap:6px' },
+      h('div', { class: 'label accent-text' }, 'Návrh od AI na tenhle týden'),
+      h('p', { class: 'small', style: 'margin:0' }, proposal.note ?? 'AI navrhla jiný výběr jídel.'),
+      h('div', { class: 'muted', style: 'font-size:12.5px' }, [...(proposal.pick?.A ?? []), ...(proposal.pick?.B ?? [])].map((id) => findRecipe(id)?.name ?? id).join(' · ')),
+      h('button', { class: 'btn small', onClick: () => makePlan(c, { pick: proposal.pick, fromProposal: true }) }, 'Přeplánovat podle návrhu'),
+    ));
+  }
   for (const s of plan.sessions) out.push(sessionCard(c, plan, s));
   out.push(dayStripCard(c, plan));
   out.push(breakfastCard(c, plan));
@@ -8263,7 +8272,7 @@ function previousWeekRecipes(weekStart) {
   return prev ? prev.sessions.flatMap((s) => s.dishes.map((d) => d.recipeId)) : [];
 }
 
-function makePlan(c, { pick = null, seed = null } = {}) {
+function makePlan(c, { pick = null, seed = null, fromProposal = false } = {}) {
   const members = c.members;
   if (!Object.keys(members).length) { toast('Nejdřív dokonči nastavení — bez cílů výživy nejde plánovat.'); return; }
   const plan = planCookWeek({
@@ -8272,6 +8281,7 @@ function makePlan(c, { pick = null, seed = null } = {}) {
     exclude: Household.state.prefs?.excludedRecipes ?? [],
   });
   if (!plan) { toast('Plán nejde sestavit.'); return; }
+  if (pick) plan.fromProposal = fromProposal || !!pick;
   Household.mutate((hh) => { hh.cook[c.cookWeek] = plan; });
   const inAkce = Object.keys(c.discounted).length;
   toast(inAkce ? `Týden naplánován — ${inAkce} potravin z akce.` : 'Týden naplánován.');
@@ -8977,6 +8987,7 @@ const PUSH_PREFS = [
   { id: 'meals', label: 'Jídlo', hint: '45 min po plánovaném jídle, pokud není zapsané' },
   { id: 'protein', label: 'Bílkoviny', hint: 've 20:00, když ti do cíle chybí víc než 30 g' },
   { id: 'shopping', label: 'Leták', hint: 'když přijdou nové akce a máš z nich něco v nákupu' },
+  { id: 'cooking', label: 'Vaření', hint: 'v den vaření odpoledne, dokud není odškrtnuté; v neděli dopoledne, když příští týden nemá plán' },
 ];
 
 let notifStatus = null; // { checkedAt, last, error } z fitko-notif.json (zapisuje Action)

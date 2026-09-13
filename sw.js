@@ -1,5 +1,5 @@
 // Fitko service worker — precache jádra, navigace network-first (updaty), zbytek cache-first.
-const CACHE = 'fitko-mu045o5j';
+const CACHE = 'fitko-mu049sdf';
 const CORE = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 
 self.addEventListener('install', (e) => {

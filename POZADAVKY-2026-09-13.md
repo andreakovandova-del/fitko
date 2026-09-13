@@ -175,5 +175,26 @@ Aktualizuje se po každém commitu.
 - [x] R9 barvy
 - [x] R7 dva uživatelé
 - [x] R8 recepty a krabičky
-- [ ] R10 AI návrh týdne
+- [x] R10 AI návrh týdne
 - [ ] R11 fotky
+
+---
+
+## 6. Co je potřeba nastavit v repozitáři (secrets)
+
+- `FITKO_GH_TOKEN` — už existuje (notifikace). Stejný token, co je v appce na obou telefonech.
+- `VAPID_PRIVATE_KEY` — už existuje (notifikace).
+- `ANTHROPIC_API_KEY` — **nový**, pro AI návrh týdne (`.github/workflows/plan-ai.yml`).
+  Klíč z console.anthropic.com → Settings → Secrets → Actions. Bez něj workflow jen vypíše,
+  že klíč chybí, a appka plánuje sama. Model: `claude-opus-5` (dá se změnit proměnnou
+  `FITKO_AI_MODEL`). Ruční spuštění: Actions → plan-ai → Run workflow.
+
+## 7. Jak to funguje po nasazení (pro oba telefony)
+
+1. Niklasův telefon: nic se neptá, data zůstávají. V Nastavení je vidět „Tenhle telefon používá Niklas“.
+2. Matildin iPhone: otevřít https://andreakovandova-del.github.io/fitko/ v Safari → Sdílet → Přidat na plochu
+   → otevřít z plochy → „Kdo jsi?“ → Matilda → vložit stejný token → projít nastavení (6 kroků).
+   Její záloha vznikne jako `fitko-zaloha-matilda.json` ve stejném gistu.
+3. Jakmile má Matilda cíle, objeví se v Niklasově appce v Jídlo → Vaření jako druhý člen domácnosti
+   (po otevření appky se domácnost stáhne). Od té chvíle se krabičky plánují pro oba.
+4. Neděle: Jídlo → Vaření → Naplánovat týden (nebo Použít návrh AI) → Nákup → Recept.
