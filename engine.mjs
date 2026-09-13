@@ -1906,6 +1906,20 @@ export const FOODS = {
   sojova_omacka: { name: 'Sójová omáčka', cat: 'ostatni', kcal: 60, p: 6, c: 6, f: 0, packG: 150, packLabel: '150 ml', match: ['sojova omacka'] },
   rajcatovy_protlak: { name: 'Rajčatový protlak / passata', cat: 'ostatni', kcal: 30, p: 1.5, c: 5, f: 0.3, packG: 500, match: ['passata', 'protlak', 'rajcata loupan', 'loupana rajcata'] },
   kakao: { name: 'Kakao (holandské)', cat: 'ostatni', kcal: 350, p: 20, c: 12, f: 20, packG: 100, match: ['kakao holand', 'kakaovy prasek'], exclude: ['granko', 'instant'] },
+
+  // ---------- doplněno pro recepty do krabiček ----------
+  kokosove_mleko: { name: 'Kokosové mléko (plechovka)', cat: 'ostatni', kcal: 180, p: 1.5, c: 3, f: 18, packG: 400, packLabel: '1 plechovka', match: ['kokosove mleko', 'kokosovy napoj'], exclude: ['sladk'] },
+  smetana_na_vareni: { name: 'Smetana na vaření 12 %', cat: 'mlecne', kcal: 125, p: 3, c: 4, f: 12, packG: 250, packLabel: '250 ml', match: ['smetana na varen', 'smetana 12'] },
+  kysane_zeli: { name: 'Kysané zelí', cat: 'zelenina', kcal: 20, p: 1, c: 3, f: 0.2, packG: 500, match: ['kysane zeli', 'zeli kysan'] },
+  citron: { name: 'Citron', cat: 'ovoce', kcal: 30, p: 0.9, c: 6, f: 0.3, pieceG: 100, packG: 500, match: ['citron'], exclude: ['stava', 'limon'], loose: true },
+  sladke_chilli: { name: 'Sweet chilli omáčka', cat: 'ostatni', kcal: 200, p: 0.5, c: 48, f: 0.2, packG: 250, packLabel: '250 ml', match: ['sweet chilli', 'sladke chilli'] },
+  pesto: { name: 'Pesto (bazalkové)', cat: 'ostatni', kcal: 450, p: 5, c: 8, f: 44, packG: 190, match: ['pesto'] },
+  mouka_hladka: { name: 'Mouka hladká', cat: 'sacharidy', kcal: 350, p: 10, c: 72, f: 1, packG: 1000, match: ['mouka hladka', 'hladka mouka'] },
+  rajcata_konzerva: { name: 'Rajčata krájená (konzerva)', cat: 'ostatni', kcal: 25, p: 1.2, c: 4, f: 0.2, packG: 400, packLabel: '1 konzerva', match: ['rajcata krajen', 'krajena rajcata', 'rajcata loupana', 'loupana rajcata'] },
+  cocka_cervena: { name: 'Čočka červená (syrová)', cat: 'lusteniny', kcal: 350, p: 25, c: 58, f: 1.5, packG: 500, match: ['cocka cerven', 'cervena cocka'] },
+  zazvor: { name: 'Zázvor', cat: 'zelenina', kcal: 80, p: 1.8, c: 18, f: 0.8, pieceG: 30, packG: 100, match: ['zazvor'], exclude: ['caj', 'sirup', 'kandov'], loose: true },
+  jarni_cibulka: { name: 'Jarní cibulka', cat: 'zelenina', kcal: 32, p: 1.8, c: 7, f: 0.2, pieceG: 15, packG: 100, packLabel: '1 svazek', match: ['jarni cibulk'] },
+  zakysana_smetana: { name: 'Zakysaná smetana', cat: 'mlecne', kcal: 190, p: 3, c: 4, f: 18, packG: 200, match: ['zakysana smetana'] },
 };
 
 export const FOOD_IDS = Object.keys(FOODS);
@@ -2315,4 +2329,548 @@ export function mergeHousehold(local, remote) {
   out.customRecipes = [...recipes.values()];
   out.updatedAt = [a.updatedAt, b.updatedAt].filter(Boolean).sort().at(-1) ?? null;
   return out;
+}
+
+
+// ===== src/engine/recipes.js =====
+// Recepty do krabiček. Každý recept má suroviny v gramech na JEDNU REFERENČNÍ porci
+// (syrové hmotnosti — přesně tak se nakupuje), kroky psané pro celou dávku, dobu
+// přípravy, trvanlivost v lednici a jestli se dá mrazit. Makra se počítají z FOODS,
+// takže sedí s nákupem i s tím, co appka zapisuje jako snědené.
+//   kind: hlavni (oběd i večeře, do krabiček) | snidane | svacina
+//   protein: kure | kruti | hovezi | veprove | ryba | vejce | mlecne | lusteniny — pestrost týdne
+//   pantry: co se nekupuje (sůl, pepř, koření) — jen se ukáže v receptu
+
+const R = (id, name, kind, meta, items, steps) => ({
+  id, name, kind, ...meta,
+  items: items.map(([foodId, grams]) => ({ foodId, grams })),
+  steps,
+});
+
+export const RECIPES = [
+  // ---------- hlavní jídla (referenční porce ~600–750 kcal, ≥ 40 g bílkovin) ----------
+  R('kure_ryze_brokolice', 'Kuřecí prsa s rýží a brokolicí', 'hlavni',
+    { emoji: '🍗', protein: 'kure', color: 'maso', prepMin: 15, cookMin: 30, fridgeDays: 4, freezer: true, equipment: ['rýžovar', 'pánev'], tags: ['klasika', 'rychle'], pantry: ['sůl', 'pepř', 'sladká paprika', 'česnek sušený'] },
+    [['kureci_prsa', 200], ['ryze', 90], ['brokolice', 200], ['olivovy_olej', 8], ['sojova_omacka', 8]],
+    ['Rýži propláchni a dej do rýžovaru (1 díl rýže : 1,5 dílu vody).',
+     'Prsa nakrájej na 2 cm kostky, osol, opepři, posyp paprikou a česnekem.',
+     'Rozpal pánev s olejem, kuře opékej po dávkách 6–8 min dozlatova, na konci zakápni sójovkou.',
+     'Brokolici rozeber na růžičky a 4 min povař v osolené vodě (nebo 6 min v páře), sceď.',
+     'Do krabiček: rýže, kuře, brokolice. Nech vychladnout odkryté, pak zavři a do lednice.']),
+  R('kure_curry', 'Kuřecí curry s rýží', 'hlavni',
+    { emoji: '🍛', protein: 'kure', color: 'maso', prepMin: 15, cookMin: 35, fridgeDays: 4, freezer: true, equipment: ['rýžovar', 'hrnec'], tags: ['omáčka', 'oblíbené'], pantry: ['kari koření (2 lžíce na dávku)', 'sůl', 'kurkuma'] },
+    [['kureci_stehna', 160], ['ryze', 70], ['kokosove_mleko', 60], ['rajcata_konzerva', 100], ['cibule', 60], ['paprika', 80], ['repkovy_olej', 5]],
+    ['Rýži do rýžovaru. Cibuli nakrájej nadrobno, papriku na proužky, stehna na kostky.',
+     'V hrnci rozehřej olej, cibuli 4 min osmahni, přidej kari a kurkumu a 30 s restuj.',
+     'Přidej maso, opeč ze všech stran, přilij rajčata a kokosové mléko.',
+     'Vař odkryté 20 min, posledních 5 min přidej papriku. Dosol.',
+     'Do krabiček rýži a curry vedle sebe (omáčku nalij až na maso, ne na rýži — lépe se ohřívá).']),
+  R('kure_kuskus_zelenina', 'Kuřecí s kuskusem a pečenou zeleninou', 'hlavni',
+    { emoji: '🥗', protein: 'kure', color: 'maso', prepMin: 15, cookMin: 30, fridgeDays: 4, freezer: false, equipment: ['trouba', 'hrnec'], tags: ['trouba', 'lehké'], pantry: ['sůl', 'pepř', 'oregano', 'uzená paprika'] },
+    [['kureci_prsa', 200], ['kuskus', 80], ['paprika', 120], ['cuketa', 120], ['cibule', 50], ['olivovy_olej', 10], ['citron', 20]],
+    ['Troubu na 210 °C. Papriku, cuketu a cibuli nakrájej na kostky, na plech, pokapej olejem, osol, oregano.',
+     'Prsa rozřízni na plátky 1,5 cm, osol, uzená paprika, polož na druhý plech.',
+     'Peč zeleninu 25 min (v půlce promíchej), kuře 18 min.',
+     'Kuskus zalij stejným objemem vroucí osolené vody, přikryj, 5 min nech nabobtnat, načechrej vidličkou, zakápni citronem.',
+     'Do krabiček: kuskus, zelenina, nakrájené kuře.']),
+  R('kure_stehna_brambory', 'Pečená kuřecí stehna s bramborami', 'hlavni',
+    { emoji: '🍠', protein: 'kure', color: 'maso', prepMin: 10, cookMin: 45, fridgeDays: 4, freezer: true, equipment: ['trouba'], tags: ['trouba', 'nedělní'], pantry: ['sůl', 'pepř', 'sladká paprika', 'kmín', 'česnek sušený'] },
+    [['kureci_stehna', 200], ['brambory', 320], ['mrkev', 80], ['cibule', 50], ['repkovy_olej', 8]],
+    ['Troubu na 200 °C. Brambory (se slupkou) nakrájej na klínky, mrkev na kolečka, cibuli na měsíčky.',
+     'Vše na plech, olej, sůl, kmín, promíchej. Stehna osol, opepři, paprika, česnek, polož nahoru kůží nahoru.',
+     'Peč 40–45 min, v půlce promíchej brambory. Kůže má být dozlatova.',
+     'Vychladlé rozděl do krabiček: 1 stehno + brambory + zelenina. Ohřívá se nejlíp ve fritéze 6 min na 180 °C.']),
+  R('kure_tikka', 'Kuřecí tikka v jogurtu s rýží', 'hlavni',
+    { emoji: '🫕', protein: 'kure', color: 'maso', prepMin: 20, cookMin: 30, fridgeDays: 4, freezer: true, equipment: ['rýžovar', 'pánev'], tags: ['omáčka', 'indická'], pantry: ['garam masala', 'kurkuma', 'kmín mletý', 'sůl', 'chilli'] },
+    [['kureci_prsa', 200], ['ryze', 85], ['bily_jogurt', 80], ['rajcata_konzerva', 120], ['cibule', 60], ['cesnek', 6], ['zazvor', 6], ['repkovy_olej', 6]],
+    ['Kuře na kostky, zamíchej s jogurtem, půlkou koření a solí — klidně den předem.',
+     'Rýži do rýžovaru. Cibuli, česnek a zázvor nadrobno.',
+     'Na oleji osmahni cibuli 5 min, přidej česnek, zázvor a zbylé koření, 30 s.',
+     'Přidej rajčata, 5 min vař, pak kuře i s marinádou a 15 min bez pokličky.',
+     'Do krabiček s rýží. Po ohřátí zamíchej — omáčka zhoustne.']),
+  R('kure_fajitas', 'Kuřecí fajitas směs (tortilly zvlášť)', 'hlavni',
+    { emoji: '🌮', protein: 'kure', color: 'maso', prepMin: 15, cookMin: 20, fridgeDays: 4, freezer: false, equipment: ['pánev'], tags: ['rychle', 'mexické'], pantry: ['uzená paprika', 'kmín mletý', 'chilli', 'sůl'] },
+    [['kureci_prsa', 180], ['tortilla', 80], ['paprika', 150], ['cibule', 70], ['kukurice_konzerva', 60], ['eidam', 30], ['zakysana_smetana', 30], ['repkovy_olej', 6]],
+    ['Kuře na proužky, koření, sůl. Papriky a cibuli na proužky.',
+     'Na rozpálené pánvi opékej kuře po dávkách 5 min, dej stranou. Na stejné pánvi zeleninu 6 min do zlatova, vrať kuře, kukuřice.',
+     'Do krabiček jen směs. Tortilly, sýr a zakysanou smetanu skladuj zvlášť — plní se až při jídle (tortilla nezvlhne).']),
+  R('kure_teriyaki', 'Kuřecí teriyaki s rýží a hráškem', 'hlavni',
+    { emoji: '🥢', protein: 'kure', color: 'maso', prepMin: 10, cookMin: 25, fridgeDays: 4, freezer: true, equipment: ['rýžovar', 'pánev'], tags: ['rychle', 'asijské'], pantry: ['sezam', 'pepř'] },
+    [['kureci_stehna', 160], ['ryze', 75], ['hrasek_mrazeny', 100], ['mrkev', 70], ['sojova_omacka', 15], ['med', 10], ['zazvor', 5], ['cesnek', 5], ['repkovy_olej', 6]],
+    ['Rýže do rýžovaru. Omáčka: sójovka, med, nastrouhaný zázvor a česnek, 2 lžíce vody.',
+     'Stehna na kostky, opékej na oleji 8 min. Přidej mrkev na tenká kolečka, 3 min.',
+     'Přilij omáčku, vař 2 min, až zhoustne a obalí maso. Hrášek vhoď na poslední minutu.',
+     'Do krabiček s rýží, posyp sezamem.']),
+  R('hovezi_bolognese', 'Hovězí bolognese s těstovinami', 'hlavni',
+    { emoji: '🍝', protein: 'hovezi', color: 'maso', prepMin: 10, cookMin: 40, fridgeDays: 4, freezer: true, equipment: ['hrnec'], tags: ['klasika', 'mrazák'], pantry: ['oregano', 'bazalka', 'sůl', 'pepř', 'špetka cukru'] },
+    [['hovezi_mlete', 150], ['testoviny', 90], ['rajcatovy_protlak', 200], ['cibule', 60], ['mrkev', 50], ['cesnek', 5], ['olivovy_olej', 8], ['parmezan', 12]],
+    ['Cibuli, mrkev a česnek nadrobno, na oleji 6 min zesklovatět.',
+     'Přidej mleté, rozmělni a opékej, až pustí a zase vsákne šťávu (8 min).',
+     'Passata, bylinky, sůl, špetka cukru. Vař na mírném ohni 25 min, občas zamíchej.',
+     'Těstoviny uvař o minutu kratší než na obalu (v krabičce ještě dojdou), sceď, promíchej s lžící oleje.',
+     'Do krabiček těstoviny a omáčku, parmezán nahoru.']),
+  R('chilli_con_carne', 'Chilli con carne s rýží', 'hlavni',
+    { emoji: '🌶️', protein: 'hovezi', color: 'maso', prepMin: 10, cookMin: 40, fridgeDays: 5, freezer: true, equipment: ['hrnec', 'rýžovar'], tags: ['mrazák', 'vydrží'], pantry: ['kmín mletý', 'uzená paprika', 'chilli', 'kakao (špetka)', 'sůl'] },
+    [['hovezi_mlete', 130], ['fazole_konzerva', 120], ['ryze', 80], ['rajcata_konzerva', 150], ['cibule', 60], ['paprika', 80], ['kukurice_konzerva', 50], ['repkovy_olej', 6]],
+    ['Cibuli a papriku na kostky, na oleji 5 min. Přidej mleté a opékej dozlatova.',
+     'Koření, 30 s restuj, přidej rajčata a 100 ml vody. Vař 25 min.',
+     'Fazole a kukuřici scezené vmíchej na posledních 5 min. Dosol.',
+     'Rýži z rýžovaru do krabiček, chilli navrch. Chuťově je druhý den ještě lepší.']),
+  R('hovezi_kase_zelenina', 'Hovězí mleté s bramborovou kaší a hráškem', 'hlavni',
+    { emoji: '🥔', protein: 'hovezi', color: 'maso', prepMin: 15, cookMin: 30, fridgeDays: 3, freezer: true, equipment: ['hrnec', 'pánev'], tags: ['domácí'], pantry: ['sůl', 'pepř', 'muškátový oříšek', 'majoránka'] },
+    [['hovezi_mlete', 150], ['brambory', 300], ['mleko_polotucne', 50], ['maslo', 8], ['hrasek_mrazeny', 100], ['cibule', 50], ['cesnek', 5]],
+    ['Brambory oloupej, nakrájej, uvař do měkka v osolené vodě (20 min). Sceď, rozmačkej s mlékem a máslem, muškát.',
+     'Cibuli a česnek nadrobno, osmahni, přidej mleté, majoránka, sůl, pepř, opékej 10 min.',
+     'Hrášek povař 3 min. Do krabiček kaše, maso, hrášek.']),
+  R('hovezi_gulas', 'Hovězí guláš z kýty s bramborami', 'hlavni',
+    { emoji: '🥘', protein: 'hovezi', color: 'maso', prepMin: 15, cookMin: 120, fridgeDays: 5, freezer: true, equipment: ['hrnec'], tags: ['nedělní', 'vydrží', 'mrazák'], pantry: ['sladká paprika (hodně)', 'kmín', 'majoránka', 'sůl', 'pepř'] },
+    [['hovezi_zadni', 180], ['brambory', 300], ['cibule', 120], ['rajcatovy_protlak', 40], ['cesnek', 5], ['repkovy_olej', 8]],
+    ['Cibule nadrobno (stejná váha jako polovina masa), na oleji pomalu 12 min dozlatova.',
+     'Maso na 3 cm kostky, přidej, opeč. Odstav, paprika, promíchej (nesmí se spálit), protlak, kmín.',
+     'Zalij vodou tak akorát, přikryj, duš 1,5–2 h do měkka. Na konci česnek, majoránka, dosol.',
+     'Brambory uvař zvlášť ve slupce, oloupej, na kostky. Do krabiček brambory + guláš.']),
+  R('kruti_sekana_bataty', 'Krůtí sekaná s batáty a salátem', 'hlavni',
+    { emoji: '🍖', protein: 'kruti', color: 'maso', prepMin: 20, cookMin: 45, fridgeDays: 4, freezer: true, equipment: ['trouba', 'mixér'], tags: ['trouba'], pantry: ['sůl', 'pepř', 'majoránka', 'hořčice'] },
+    [['kruti_prsa', 180], ['vejce', 30], ['ovesne_vlocky', 20], ['cibule', 50], ['bataty', 250], ['ledovy_salat', 80], ['olivovy_olej', 8]],
+    ['Troubu na 190 °C. Krůtí umel v mixéru (nebo kup mleté), smíchej s vejcem, vločkami, cibulí nadrobno, kořením a lžičkou hořčice.',
+     'Vytvaruj šišku na plech s papírem (nebo do formy), peč 40 min.',
+     'Batáty na hranolky, olej, sůl, na druhý plech, peč 30 min.',
+     'Sekanou nakrájej na plátky. Do krabiček sekaná + batáty; salát přidej až při jídle.']),
+  R('panenka_bulgur', 'Vepřová panenka s bulgurem a zeleninou', 'hlavni',
+    { emoji: '🥩', protein: 'veprove', color: 'maso', prepMin: 15, cookMin: 30, fridgeDays: 4, freezer: true, equipment: ['trouba', 'pánev', 'hrnec'], tags: ['libové'], pantry: ['sůl', 'pepř', 'tymián', 'hořčice'] },
+    [['veprova_panenka', 180], ['bulgur', 80], ['paprika', 100], ['cuketa', 100], ['cibule', 40], ['olivovy_olej', 10]],
+    ['Troubu na 200 °C. Panenku osol, opepři, potři hořčicí, opeč na pánvi 2 min z každé strany, dopeč v troubě 12 min. Nech 5 min odpočinout, nakrájej.',
+     'Zeleninu na kostky, na stejné pánvi 8 min opékej, tymián, sůl.',
+     'Bulgur uvař v dvojnásobku osolené vody 12 min, nech dojít.',
+     'Do krabiček bulgur, zelenina, plátky panenky.']),
+  R('veprova_kyta_zeli', 'Vepřová kýta na česneku s bramborami a zelím', 'hlavni',
+    { emoji: '🍽️', protein: 'veprove', color: 'maso', prepMin: 15, cookMin: 75, fridgeDays: 4, freezer: true, equipment: ['trouba', 'hrnec'], tags: ['česká', 'nedělní'], pantry: ['kmín', 'sůl', 'pepř', 'cukr (špetka)'] },
+    [['veprova_kyta', 180], ['brambory', 300], ['kysane_zeli', 150], ['cibule', 60], ['cesnek', 8], ['repkovy_olej', 8]],
+    ['Kýtu prošpikuj česnekem, osol, kmín, opepři. Do pekáče s cibulí a 150 ml vody, přikryj, peč 60 min na 180 °C, pak 15 min odkryté.',
+     'Zelí sceď, s cibulí krátce podus 15 min, špetka cukru.',
+     'Brambory uvař ve slupce, oloupej.',
+     'Maso nakrájej na plátky, do krabiček s bramborami a zelím, přelij šťávou z pekáče.']),
+  R('losos_bataty_spenat', 'Losos pečený s batáty a špenátem', 'hlavni',
+    { emoji: '🐟', protein: 'ryba', color: 'ryba', prepMin: 10, cookMin: 30, fridgeDays: 3, freezer: false, equipment: ['trouba', 'pánev'], tags: ['omega-3', 'rychle'], pantry: ['sůl', 'pepř', 'citronová šťáva', 'kopr'] },
+    [['losos', 150], ['bataty', 280], ['spenat_mrazeny', 150], ['cesnek', 5], ['olivovy_olej', 8], ['citron', 20]],
+    ['Troubu na 200 °C. Batáty na kostky, olej, sůl, peč 25 min.',
+     'Lososa osol, opepři, citron, na plech s papírem; posledních 12 min pečení přidej k batátům.',
+     'Špenát rozpusť na pánvi s česnekem, osol, odpař vodu.',
+     'Do krabiček batáty, špenát, losos. Ryba v lednici 3 dny — nauvařené na sobotu dej nejdřív.']),
+  R('treska_brambory_hrasek', 'Treska v troubě s bramborami a hráškem', 'hlavni',
+    { emoji: '🐠', protein: 'ryba', color: 'ryba', prepMin: 10, cookMin: 30, fridgeDays: 3, freezer: false, equipment: ['trouba'], tags: ['lehké', 'libové'], pantry: ['sůl', 'pepř', 'sladká paprika', 'citron'] },
+    [['treska', 200], ['brambory', 300], ['hrasek_mrazeny', 120], ['maslo', 10], ['citron', 20], ['cesnek', 5]],
+    ['Troubu na 200 °C. Brambory na plátky 1 cm, uvař 8 min, sceď, na plech, sůl, paprika, kousky másla.',
+     'Tresku osol, opepři, česnek, citron; polož na brambory a peč 15 min.',
+     'Hrášek povař 3 min. Do krabiček vše dohromady, zakápni citronem.']),
+  R('tunak_testoviny', 'Těstoviny s tuňákem a rajčaty', 'hlavni',
+    { emoji: '🍅', protein: 'ryba', color: 'ryba', prepMin: 5, cookMin: 20, fridgeDays: 4, freezer: false, equipment: ['hrnec', 'pánev'], tags: ['rychle', 'levné'], pantry: ['oregano', 'chilli', 'sůl', 'pepř'] },
+    [['testoviny', 100], ['tunak_konzerva', 110], ['rajcatovy_protlak', 150], ['cibule', 50], ['cesnek', 5], ['olivovy_olej', 10], ['parmezan', 12]],
+    ['Těstoviny uvař o minutu kratší, sceď.',
+     'Cibuli a česnek na oleji 4 min, passata, oregano, chilli, 10 min vař.',
+     'Tuňáka okapaného vmíchej do omáčky, jen prohřej.',
+     'Smíchej s těstovinami, do krabiček, parmezán navrch.']),
+  R('smazena_ryze_vejce', 'Smažená rýže s kuřecím, vejci a zeleninou', 'hlavni',
+    { emoji: '🍳', protein: 'kure', color: 'maso', prepMin: 10, cookMin: 25, fridgeDays: 3, freezer: false, equipment: ['rýžovar', 'pánev'], tags: ['rychle', 'zbytky'], pantry: ['pepř', 'sezamový olej (kapka)'] },
+    [['ryze', 90], ['kureci_prsa', 130], ['vejce', 60], ['zeleninova_smes', 180], ['sojova_omacka', 15], ['jarni_cibulka', 15], ['repkovy_olej', 10]],
+    ['Rýži uvař a nech vychladnout (ideálně z předchozího dne — nelepí se).',
+     'Kuře na kostky, opékej na oleji 6 min, dej stranou. Vejce rozmíchej a na pánvi udělej míchaná, stranou.',
+     'Zeleninu z mrazáku na pánev 5 min, přidej rýži, opékej 4 min, sójovka, vrať kuře a vejce.',
+     'Jarní cibulka navrch. Do krabiček.']),
+  R('cockove_dahl', 'Čočkové dahl s rýží', 'hlavni',
+    { emoji: '🥣', protein: 'lusteniny', color: 'vege', prepMin: 10, cookMin: 30, fridgeDays: 5, freezer: true, equipment: ['hrnec', 'rýžovar'], tags: ['vege', 'levné', 'vydrží'], pantry: ['kurkuma', 'kmín', 'garam masala', 'sůl', 'chilli'] },
+    [['cocka_cervena', 75], ['ryze', 60], ['kokosove_mleko', 50], ['rajcata_konzerva', 120], ['cibule', 60], ['cesnek', 6], ['zazvor', 6], ['spenat_mrazeny', 80], ['repkovy_olej', 5], ['recky_jogurt', 100]],
+    ['Cibuli, česnek a zázvor osmahni na oleji, koření 30 s.',
+     'Čočku propláchni, přidej s rajčaty a 2,5 násobkem vody, vař 20 min do rozvaření.',
+     'Kokosové mléko a špenát, 5 min. Osol.',
+     'Do krabiček s rýží; lžíce jogurtu při jídle dodá bílkoviny.']),
+  R('cizrnove_curry', 'Cizrnové curry s rýží a tofu', 'hlavni',
+    { emoji: '🌱', protein: 'lusteniny', color: 'vege', prepMin: 10, cookMin: 30, fridgeDays: 5, freezer: true, equipment: ['hrnec', 'rýžovar', 'pánev'], tags: ['vege', 'vydrží'], pantry: ['kari', 'kurkuma', 'sůl'] },
+    [['cizrna_konzerva', 140], ['tofu', 150], ['ryze', 60], ['kokosove_mleko', 50], ['rajcata_konzerva', 120], ['cibule', 60], ['paprika', 80], ['repkovy_olej', 5]],
+    ['Tofu na kostky, osuš, opeč na pánvi dozlatova, osol.',
+     'Cibuli osmahni, kari a kurkuma, rajčata, kokosové mléko, 10 min.',
+     'Cizrnu a papriku vař 8 min, vmíchej tofu.',
+     'Do krabiček s rýží.']),
+  R('kure_pohanka_mrkev', 'Kuřecí s pohankou a pečenou mrkví', 'hlavni',
+    { emoji: '🥕', protein: 'kure', color: 'maso', prepMin: 10, cookMin: 30, fridgeDays: 4, freezer: true, equipment: ['trouba', 'hrnec'], tags: ['lehké', 'bez lepku'], pantry: ['sůl', 'pepř', 'tymián', 'med (lžička)'] },
+    [['kureci_prsa', 200], ['pohanka', 80], ['mrkev', 200], ['cibule', 40], ['olivovy_olej', 10], ['recky_jogurt', 50]],
+    ['Troubu na 200 °C. Mrkev na klínky, olej, sůl, tymián, lžička medu, peč 25 min.',
+     'Pohanku propláchni, vař v 1,5násobku osolené vody 12 min, nech dojít.',
+     'Prsa na plátky, osol, opepři, opeč na pánvi 4 min z každé strany.',
+     'Do krabiček pohanka, mrkev, kuře. Jogurt jako omáčka při jídle.']),
+  R('kruti_paprikas_testoviny', 'Krůtí na paprice s těstovinami', 'hlavni',
+    { emoji: '🧡', protein: 'kruti', color: 'maso', prepMin: 10, cookMin: 30, fridgeDays: 4, freezer: true, equipment: ['hrnec'], tags: ['česká', 'omáčka'], pantry: ['sladká paprika', 'sůl', 'pepř'] },
+    [['kruti_prsa', 180], ['testoviny', 90], ['cibule', 70], ['smetana_na_vareni', 60], ['rajcatovy_protlak', 40], ['mouka_hladka', 8], ['repkovy_olej', 8]],
+    ['Cibuli nadrobno osmahni na oleji dozlatova, odstav, paprika, protlak.',
+     'Krůtí na nudličky, přidej, opeč, zalij 200 ml vody, vař 15 min.',
+     'Smetanu rozmíchej s moukou, vmíchej, 5 min provař, dosol.',
+     'Těstoviny uvař, do krabiček, omáčka navrch.']),
+  R('masove_kulicky_rajcata', 'Hovězí kuličky v rajčatové omáčce s těstovinami', 'hlavni',
+    { emoji: '🍡', protein: 'hovezi', color: 'maso', prepMin: 20, cookMin: 35, fridgeDays: 4, freezer: true, equipment: ['trouba', 'hrnec'], tags: ['mrazák', 'děti'], pantry: ['oregano', 'sůl', 'pepř', 'česnek sušený'] },
+    [['hovezi_mlete', 150], ['vejce', 25], ['ovesne_vlocky', 15], ['testoviny', 70], ['rajcatovy_protlak', 200], ['cibule', 50], ['mozzarella', 30], ['olivovy_olej', 5]],
+    ['Mleté, vejce, vločky, sůl, pepř, česnek, promíchej, tvaruj kuličky (5 cm), na plech, peč 15 min na 200 °C.',
+     'Cibuli na oleji, passata, oregano, 15 min vař, přidej kuličky, 5 min.',
+     'Těstoviny uvař o minutu kratší. Do krabiček těstoviny, kuličky s omáčkou, kousky mozzarelly navrch.']),
+  R('kure_gyros_bulgur', 'Kuřecí gyros mísa s bulgurem a tzatziki', 'hlavni',
+    { emoji: '🥙', protein: 'kure', color: 'maso', prepMin: 15, cookMin: 25, fridgeDays: 4, freezer: false, equipment: ['pánev', 'hrnec'], tags: ['řecké', 'oblíbené'], pantry: ['gyros koření', 'sůl', 'oregano', 'česnek'] },
+    [['kureci_stehna', 190], ['bulgur', 80], ['recky_jogurt', 80], ['okurka', 100], ['rajcata', 100], ['cibule', 40], ['olivovy_olej', 10], ['citron', 15]],
+    ['Stehna na proužky, gyros koření, sůl, lžíce oleje, nech 20 min.',
+     'Bulgur uvař (12 min), zakápni citronem. Tzatziki: jogurt, polovina okurky nastrouhaná a vymačkaná, česnek, sůl.',
+     'Kuře opékej na prudké pánvi po dávkách do křupava.',
+     'Do krabiček bulgur, kuře, rajčata a okurka na kostky; tzatziki v malé krabičce zvlášť.']),
+  R('kure_quinoa_feta', 'Pečené kuřecí s quinoou, fetou a zeleninou (studená krabička)', 'hlavni',
+    { emoji: '🧀', protein: 'kure', color: 'maso', prepMin: 15, cookMin: 25, fridgeDays: 4, freezer: false, equipment: ['trouba', 'hrnec'], tags: ['studené', 'léto', 'lehké'], pantry: ['sůl', 'pepř', 'oregano'] },
+    [['kureci_prsa', 180], ['quinoa', 75], ['balkansky_syr', 40], ['cherry_rajcata', 120], ['okurka', 100], ['olivovy_olej', 10], ['citron', 15]],
+    ['Quinou propláchni, vař v dvojnásobku vody 15 min, nech vychladnout.',
+     'Prsa osol, oregano, peč 18 min na 200 °C, nakrájej.',
+     'Smíchej quinou, rajčata na půlky, okurku na kostky, olej, citron, sůl. Feta navrch.',
+     'Do krabiček; jí se studené, nic se neohřívá.']),
+  R('zapecene_testoviny_kure', 'Zapečené těstoviny s kuřecím, špenátem a mozzarellou', 'hlavni',
+    { emoji: '🧆', protein: 'kure', color: 'maso', prepMin: 15, cookMin: 35, fridgeDays: 4, freezer: true, equipment: ['trouba', 'hrnec'], tags: ['trouba', 'mrazák'], pantry: ['sůl', 'pepř', 'muškát', 'česnek'] },
+    [['testoviny', 80], ['kureci_prsa', 170], ['spenat_mrazeny', 120], ['smetana_na_vareni', 60], ['mozzarella', 50], ['cibule', 40], ['olivovy_olej', 5]],
+    ['Těstoviny uvař o 2 minuty kratší. Kuře na kostky opeč s cibulí, přidej špenát a smetanu, muškát, sůl, 5 min.',
+     'Smíchej s těstovinami, do pekáče, mozzarella navrch, peč 20 min na 200 °C.',
+     'Nakrájej na porce do krabiček. Ohřev ve fritéze nebo troubě — zůstane křupavá.']),
+  R('batatova_panev_fazole', 'Batátová pánev s fazolemi a vejci', 'hlavni',
+    { emoji: '🍳', protein: 'vejce', color: 'vege', prepMin: 10, cookMin: 25, fridgeDays: 3, freezer: false, equipment: ['pánev'], tags: ['vege', 'rychle'], pantry: ['uzená paprika', 'kmín', 'sůl', 'chilli'] },
+    [['bataty', 250], ['fazole_konzerva', 120], ['vejce', 110], ['paprika', 80], ['cibule', 50], ['eidam', 30], ['repkovy_olej', 10]],
+    ['Batáty na kostky 1,5 cm, na oleji pod pokličkou 12 min do měkka, promíchávej.',
+     'Cibuli a papriku přidej, 5 min, koření, fazole, prohřej.',
+     'Vejce rozklepni do důlků ve směsi, přikryj, 4 min. Sýr navrch.',
+     'Do krabiček. Vejce při ohřevu ztuhnou víc — ohřívej krátce.']),
+  R('veprova_sweet_chilli', 'Vepřová kýta sweet chilli s rýží a zeleninou', 'hlavni',
+    { emoji: '🍜', protein: 'veprove', color: 'maso', prepMin: 10, cookMin: 25, fridgeDays: 4, freezer: true, equipment: ['pánev', 'rýžovar'], tags: ['rychle', 'asijské'], pantry: ['pepř', 'sezam'] },
+    [['veprova_kyta', 180], ['ryze', 90], ['zeleninova_smes', 180], ['sladke_chilli', 25], ['sojova_omacka', 10], ['cesnek', 5], ['repkovy_olej', 8]],
+    ['Kýtu na tenké nudličky, opékej na prudké pánvi po dávkách 4 min.',
+     'Zeleninu z mrazáku 5 min, česnek, vrať maso, sweet chilli a sójovka, 2 min.',
+     'Do krabiček s rýží, sezam navrch.']),
+  R('losos_teriyaki', 'Losos teriyaki z fritézy s rýží', 'hlavni',
+    { emoji: '🍣', protein: 'ryba', color: 'ryba', prepMin: 5, cookMin: 20, fridgeDays: 3, freezer: false, equipment: ['horkovzdušná fritéza', 'rýžovar'], tags: ['fritéza', 'rychle'], pantry: ['sezam', 'jarní cibulka'] },
+    [['losos', 150], ['ryze', 90], ['brokolice', 180], ['sojova_omacka', 15], ['med', 8], ['zazvor', 5]],
+    ['Lososa potři směsí sójovky, medu a zázvoru, nech 10 min.',
+     'Fritéza 190 °C, 9 min. Brokolici v páře 5 min.',
+     'Do krabiček rýže, brokolice, losos, sezam.']),
+  R('kure_paprikas_kuskus', 'Kuřecí paprikáš s kuskusem', 'hlavni',
+    { emoji: '🫑', protein: 'kure', color: 'maso', prepMin: 10, cookMin: 30, fridgeDays: 4, freezer: true, equipment: ['hrnec'], tags: ['omáčka', 'rychle'], pantry: ['sladká paprika', 'uzená paprika', 'sůl'] },
+    [['kureci_stehna', 160], ['kuskus', 70], ['paprika', 120], ['cibule', 60], ['rajcata_konzerva', 120], ['zakysana_smetana', 30], ['repkovy_olej', 5]],
+    ['Cibuli osmahni, papriky na proužky přidej na 5 min, obojí koření.',
+     'Stehna na kostky, opeč, rajčata, 15 min vař. Na konci zakysaná smetana, dosol.',
+     'Kuskus zalij vroucí vodou 1:1, 5 min, načechrej. Do krabiček.']),
+
+  // ---------- snídaně (referenční porce ~450–550 kcal) ----------
+  R('ovesna_kase_tvaroh', 'Ovesná kaše s tvarohem a banánem', 'snidane',
+    { emoji: '🥣', protein: 'mlecne', color: 'snidane', prepMin: 5, cookMin: 5, fridgeDays: 2, freezer: false, equipment: ['mikrovlnka'], tags: ['rychle', 'teplé'], pantry: ['skořice', 'špetka soli'] },
+    [['ovesne_vlocky', 70], ['mleko_polotucne', 200], ['tvaroh_polotucny', 120], ['banan', 100], ['med', 10]],
+    ['Vločky s mlékem 3 min v mikrovlnce (nebo 4 min v hrnci), zamíchej.',
+     'Vmíchej tvaroh, med, skořici. Banán nakrájej navrch.']),
+  R('overnight_oats_skyr', 'Overnight oats se skyrem a borůvkami', 'snidane',
+    { emoji: '🫐', protein: 'mlecne', color: 'snidane', prepMin: 5, cookMin: 0, fridgeDays: 3, freezer: false, equipment: [], tags: ['bez vaření', 'připrav večer'], pantry: ['vanilka', 'skořice'] },
+    [['ovesne_vlocky', 60], ['skyr', 200], ['mleko_polotucne', 120], ['boruvky', 80], ['chia', 10], ['med', 8]],
+    ['Vločky, chia, mléko a polovinu skyru zamíchej ve sklenici, přes noc do lednice.',
+     'Ráno zbytek skyru, med, borůvky navrch. Připrav rovnou na 3 dny.']),
+  R('michana_vejce_chleb', 'Míchaná vejce s chlebem a rajčaty', 'snidane',
+    { emoji: '🍳', protein: 'vejce', color: 'snidane', prepMin: 5, cookMin: 8, fridgeDays: 0, freezer: false, equipment: ['pánev'], tags: ['teplé', 'čerstvě'], pantry: ['sůl', 'pepř', 'pažitka'] },
+    [['vejce', 150], ['chleb', 80], ['maslo', 8], ['rajcata', 120], ['sunka', 40]],
+    ['Vejce rozšlehej se solí, na másle míchej na mírném ohni do krémova.',
+     'Chleb, šunka, rajčata vedle. Jí se hned — nedělá se do zásoby.']),
+  R('skyr_musli_ovoce', 'Skyr s müsli a ovocem', 'snidane',
+    { emoji: '🥛', protein: 'mlecne', color: 'snidane', prepMin: 3, cookMin: 0, fridgeDays: 0, freezer: false, equipment: [], tags: ['bez vaření', 'rychle'], pantry: [] },
+    [['skyr', 250], ['musli', 60], ['jablko', 150], ['mandle', 15]],
+    ['Skyr do misky, müsli, jablko na kostky, mandle. Hotovo za 3 minuty.']),
+  R('tvarohove_pankejky', 'Tvarohové pankejky s ovocem', 'snidane',
+    { emoji: '🥞', protein: 'mlecne', color: 'snidane', prepMin: 10, cookMin: 20, fridgeDays: 3, freezer: true, equipment: ['pánev', 'mixér'], tags: ['do zásoby', 'víkend'], pantry: ['kypřicí prášek (lžička)', 'vanilka', 'špetka soli'] },
+    [['tvaroh_polotucny', 150], ['vejce', 80], ['ovesne_vlocky', 45], ['banan', 60], ['recky_jogurt', 80], ['jahody', 100], ['repkovy_olej', 5]],
+    ['Tvaroh, vejce, vločky, banán a kypřicí prášek rozmixuj na těsto.',
+     'Na lehce vymazané pánvi peč malé lívance 2 min z každé strany.',
+     'Skládej do krabičky s papírem; jogurt a ovoce přidej při jídle. Vydrží 3 dny, dají se zamrazit.']),
+  R('toast_cottage_vejce', 'Toast s cottage, vejcem a rajčaty', 'snidane',
+    { emoji: '🍞', protein: 'mlecne', color: 'snidane', prepMin: 5, cookMin: 8, fridgeDays: 0, freezer: false, equipment: ['toustovač', 'hrnec'], tags: ['rychle'], pantry: ['sůl', 'pepř'] },
+    [['celozrnny_toust', 90], ['cottage', 150], ['vejce', 110], ['rajcata', 100]],
+    ['Vejce uvař natvrdo (9 min) — klidně na celý týden dopředu.',
+     'Toust opeč, cottage, plátky vejce, rajčata, sůl, pepř.']),
+
+  // ---------- svačiny (referenční porce ~250–350 kcal) ----------
+  R('tvaroh_med_orechy', 'Tvaroh s medem a ořechy', 'svacina',
+    { emoji: '🍯', protein: 'mlecne', color: 'svacina', prepMin: 2, cookMin: 0, fridgeDays: 0, freezer: false, equipment: [], tags: ['bez vaření'], pantry: [] },
+    [['tvaroh_polotucny', 200], ['med', 15], ['vlasske_orechy', 15]],
+    ['Zamíchej. Do práce v malé krabičce.']),
+  R('protein_banan', 'Proteinový shake s banánem', 'svacina',
+    { emoji: '🥤', protein: 'mlecne', color: 'svacina', prepMin: 2, cookMin: 0, fridgeDays: 0, freezer: false, equipment: ['mixér'], tags: ['po tréninku'], pantry: [] },
+    [['protein_syrovatkovy', 30], ['mleko_polotucne', 250], ['banan', 100]],
+    ['Rozmixuj. Po tréninku nejdřív.']),
+  R('jogurt_jablko_arasidy', 'Řecký jogurt s jablkem a arašídovým máslem', 'svacina',
+    { emoji: '🍎', protein: 'mlecne', color: 'svacina', prepMin: 3, cookMin: 0, fridgeDays: 0, freezer: false, equipment: [], tags: ['bez vaření'], pantry: ['skořice'] },
+    [['recky_jogurt', 180], ['jablko', 150], ['arasidove_maslo', 15]],
+    ['Jablko na plátky, jogurt, arašídové máslo, skořice.']),
+  R('chleb_sunka_syr', 'Chléb se šunkou, sýrem a okurkou', 'svacina',
+    { emoji: '🥪', protein: 'mlecne', color: 'svacina', prepMin: 3, cookMin: 0, fridgeDays: 1, freezer: false, equipment: [], tags: ['do kabelky'], pantry: ['hořčice'] },
+    [['chleb', 80], ['sunka', 50], ['eidam', 25], ['okurka', 80]],
+    ['Klasika. Okurku zvlášť, ať chleba nezvlhne.']),
+  R('ryzove_chlebicky_cottage', 'Rýžové chlebíčky s cottage a paprikou', 'svacina',
+    { emoji: '🍘', protein: 'mlecne', color: 'svacina', prepMin: 3, cookMin: 0, fridgeDays: 0, freezer: false, equipment: [], tags: ['lehké'], pantry: ['pepř'] },
+    [['ryzove_chlebicky', 24], ['cottage', 150], ['paprika', 80]],
+    ['Cottage na chlebíčky až při jídle, paprika na proužky.']),
+  R('skyr_mandle_mandarinka', 'Skyr s mandlemi a mandarinkou', 'svacina',
+    { emoji: '🍊', protein: 'mlecne', color: 'svacina', prepMin: 2, cookMin: 0, fridgeDays: 0, freezer: false, equipment: [], tags: ['bez vaření'], pantry: [] },
+    [['skyr', 200], ['mandle', 15], ['mandarinka', 140]],
+    ['Skyr, mandle, mandarinka. Hotovo.']),
+];
+
+export const RECIPE_IDS = RECIPES.map((r) => r.id);
+
+export function recipeById(id, customRecipes = []) {
+  return RECIPES.find((r) => r.id === id) ?? customRecipes.find((r) => r.id === id) ?? null;
+}
+
+/** Recept jako jídlo appky (id r_<recept>) — makra a snědeno fungují beze změny. */
+export function recipeToMeal(recipe) {
+  const slot = recipe.kind === 'hlavni' ? null : recipe.kind;
+  return { id: `r_${recipe.id}`, name: recipe.name, slot, items: recipe.items.map((it) => ({ ...it })), recipeId: recipe.id, starter: true };
+}
+
+/** Makra referenční porce receptu. */
+export function recipeMacros(recipe, customFoods = []) {
+  return roundMacros(mealMacros({ items: recipe.items }, customFoods));
+}
+
+
+// ===== src/engine/cooking.js =====
+// Plán vaření do krabiček: dvě vaření týdně (neděle → Po–St, středa → Čt–Ne),
+// každé vaření 2 jídla, krabičky pro oba podle jejich kalorií, snídaně a svačiny
+// na každého zvlášť. Deterministické podle seedu (stejný vstup = stejný plán),
+// s pestrostí (jiná bílkovina v každém jídle, nic z minulého týdne).
+
+export const BOX_SLOTS = ['obed', 'vecere'];
+const BOX_SHARE = (FOOD_SLOTS.find((s) => s.id === 'obed').share + FOOD_SLOTS.find((s) => s.id === 'vecere').share) / 2; // 0,275
+const BREAKFAST_SHARE = FOOD_SLOTS.find((s) => s.id === 'snidane').share; // 0,25
+const SNACK_SHARE = FOOD_SLOTS.find((s) => s.id === 'svacina1').share;    // 0,10
+export const PORTION_STEP_BOX = 0.05;
+
+// Neděle a středa: vaření pokrývá Po–St (3 dny) a Čt–Ne (4 dny).
+export function cookSessionsFor(weekStart, cookDays = [0, 3]) {
+  const days = weekDays(weekStart);
+  const [a, b] = cookDays.length === 2 ? cookDays : [0, 3];
+  // cookDays: den v týdnu (0 = Ne). Neděle před týdnem = weekStart − 1.
+  const cookDate = (dow) => (dow === 0 ? addDays(weekStart, -1) : addDays(weekStart, dow - 1));
+  const splitAt = b === 0 ? 7 : b - 1; // index prvního dne druhého vaření (St = 2 → Čt = 3)
+  return [
+    { id: 'A', cookDate: cookDate(a), coversDays: days.slice(0, Math.max(1, Math.min(7, splitAt + 1))) },
+    { id: 'B', cookDate: cookDate(b), coversDays: days.slice(Math.max(1, Math.min(7, splitAt + 1))) },
+  ].filter((s) => s.coversDays.length);
+}
+
+// Násobek referenční porce pro člověka a jídlo (kolikrát víc než referenční porce).
+export function portionFactor(memberKcal, share, recipeKcal) {
+  if (!(recipeKcal > 0) || !(memberKcal > 0)) return 1;
+  const raw = (memberKcal * share) / recipeKcal;
+  return Math.round(Math.round(clamp(raw, 0.5, 2.2) / PORTION_STEP_BOX) * PORTION_STEP_BOX * 100) / 100;
+}
+
+function seededRandom(seed) {
+  let s = 0;
+  for (const ch of String(seed)) s = (s * 31 + ch.charCodeAt(0)) >>> 0;
+  return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+}
+
+/**
+ * Výběr jídel do vaření: pestrá bílkovina, vydrží do posledního dne (nebo mrazák),
+ * přednost tomu, co je v akci, nic z minulého týdne, nic vyloučeného.
+ */
+function pickDishes(candidates, count, { minFridgeDays, used, proteins, rnd, discounted, customFoods }) {
+  const scored = candidates
+    .filter((r) => !used.has(r.id))
+    .filter((r) => r.fridgeDays >= minFridgeDays || r.freezer)
+    .map((r) => {
+      const disc = mealDiscountShare({ items: r.items }, discounted);
+      const m = recipeMacros(r, customFoods);
+      const density = m.p / Math.max(m.kcal, 1);
+      const sameProtein = proteins.has(r.protein) ? -2 : 0;
+      const fits = r.fridgeDays >= minFridgeDays ? 0.4 : 0; // bez mrazení je jednodušší
+      return { r, score: disc * 2 + density * 6 + sameProtein + fits + rnd() * 0.8 };
+    })
+    .sort((a, b) => b.score - a.score);
+  const out = [];
+  for (const { r } of scored) {
+    if (out.length >= count) break;
+    if (out.some((x) => x.protein === r.protein)) continue;
+    out.push(r);
+    used.add(r.id);
+    proteins.add(r.protein);
+  }
+  // kdyby pestrost nešla dodržet, doplň bez ohledu na bílkovinu
+  for (const { r } of scored) {
+    if (out.length >= count) break;
+    if (out.includes(r) || used.has(r.id)) continue;
+    out.push(r); used.add(r.id);
+  }
+  return out;
+}
+
+/**
+ * Naplánuje týden vaření.
+ * @param members { [userId]: { name, kcal, proteinG } } — oba lidé (kdo chybí, ten se neplánuje)
+ * @param previous pole receptů z minulého týdne (pestrost mezi týdny)
+ * @param pick volitelný výběr (z AI návrhu): { A: [ids], B: [ids], breakfasts: {userId: [ids]}, snacks: {userId: [ids]} }
+ * @returns plán { weekStart, updatedAt, sessions: [{ id, cookDate, coversDays, dishes: [{ recipeId, boxes: {uid: n}, factor: {uid: f} }], cooked }], breakfasts, snacks, assignments: { iso: { obed: recipeId, vecere: recipeId } } }
+ */
+export function planCookWeek({ weekStart, members, customRecipes = [], customFoods = [], discounted = {}, cookDays = [0, 3], previous = [], seed = weekStart, pick = null, exclude = [] }) {
+  const memberIds = Object.keys(members).filter((id) => members[id]?.kcal > 0);
+  if (!memberIds.length) return null;
+  const all = [...RECIPES, ...customRecipes].filter((r) => !exclude.includes(r.id));
+  const mains = all.filter((r) => r.kind === 'hlavni');
+  const rnd = seededRandom(seed);
+  const used = new Set(previous);
+  const proteins = new Set();
+  const sessions = cookSessionsFor(weekStart, cookDays).map((s) => {
+    const wanted = pick?.[s.id]?.map((id) => recipeById(id, customRecipes)).filter(Boolean) ?? [];
+    for (const r of wanted) { used.add(r.id); proteins.add(r.protein); }
+    const dishes = wanted.length >= 2 ? wanted.slice(0, 2)
+      : [...wanted, ...pickDishes(mains, 2 - wanted.length, { minFridgeDays: s.coversDays.length, used, proteins, rnd, discounted, customFoods })];
+    return { ...s, dishes, cooked: false };
+  });
+
+  // Přiřazení: den 1 oběd = jídlo 1, večeře = jídlo 2; další den prohodit — nikdy totéž dvakrát za den.
+  const assignments = {};
+  for (const s of sessions) {
+    s.coversDays.forEach((iso, i) => {
+      const [d1, d2] = s.dishes.length >= 2 ? s.dishes : [s.dishes[0], s.dishes[0]];
+      assignments[iso] = i % 2 === 0 ? { obed: d1?.id ?? null, vecere: d2?.id ?? null } : { obed: d2?.id ?? null, vecere: d1?.id ?? null };
+    });
+  }
+
+  // Krabičky a násobky porcí na člověka a jídlo.
+  const outSessions = sessions.map((s) => ({
+    id: s.id, cookDate: s.cookDate, coversDays: s.coversDays, cooked: false,
+    dishes: s.dishes.map((r) => {
+      const m = recipeMacros(r, customFoods);
+      const boxes = {}; const factor = {};
+      for (const uid of memberIds) {
+        boxes[uid] = s.coversDays.reduce((n, iso) => n + BOX_SLOTS.filter((slot) => assignments[iso][slot] === r.id).length, 0);
+        factor[uid] = portionFactor(members[uid].kcal, BOX_SHARE, m.kcal);
+      }
+      return { recipeId: r.id, boxes, factor };
+    }),
+  }));
+
+  // Snídaně a svačiny: 2 + 2 na člověka, střídají se po dnech (Po–Čt / Pá–Ne).
+  const breakfasts = {}; const snacks = {};
+  const bfAll = all.filter((r) => r.kind === 'snidane');
+  const snAll = all.filter((r) => r.kind === 'svacina');
+  const rotate = (arr, n, offset) => arr.length ? Array.from({ length: n }, (_, i) => arr[(i + offset) % arr.length]) : [];
+  memberIds.forEach((uid, idx) => {
+    const wantedB = pick?.breakfasts?.[uid]?.map((id) => recipeById(id, customRecipes)).filter(Boolean);
+    const wantedS = pick?.snacks?.[uid]?.map((id) => recipeById(id, customRecipes)).filter(Boolean);
+    const bf = wantedB?.length ? wantedB.slice(0, 2) : rotate([...bfAll].sort(() => rnd() - 0.5), 2, idx);
+    const sn = wantedS?.length ? wantedS.slice(0, 2) : rotate([...snAll].sort(() => rnd() - 0.5), 2, idx);
+    breakfasts[uid] = bf.map((r) => ({ recipeId: r.id, factor: portionFactor(members[uid].kcal, BREAKFAST_SHARE, recipeMacros(r, customFoods).kcal) }));
+    snacks[uid] = sn.map((r) => ({ recipeId: r.id, factor: portionFactor(members[uid].kcal, SNACK_SHARE, recipeMacros(r, customFoods).kcal) }));
+  });
+
+  return { weekStart, updatedAt: new Date().toISOString(), cookDays, members: memberIds, sessions: outSessions, breakfasts, snacks, assignments };
+}
+
+/** Vymění jídlo ve vaření (zachová krabičky, přepočítá násobky). */
+export function swapDish(plan, sessionId, oldRecipeId, newRecipeId, members, customRecipes = [], customFoods = []) {
+  const s = plan.sessions.find((x) => x.id === sessionId);
+  const dish = s?.dishes.find((d) => d.recipeId === oldRecipeId);
+  const r = recipeById(newRecipeId, customRecipes);
+  if (!s || !dish || !r) return plan;
+  const m = recipeMacros(r, customFoods);
+  dish.recipeId = newRecipeId;
+  for (const uid of Object.keys(dish.factor)) dish.factor[uid] = portionFactor(members[uid]?.kcal, BOX_SHARE, m.kcal);
+  for (const iso of s.coversDays) for (const slot of BOX_SLOTS) if (plan.assignments[iso]?.[slot] === oldRecipeId) plan.assignments[iso][slot] = newRecipeId;
+  plan.updatedAt = new Date().toISOString();
+  return plan;
+}
+
+/** Denní rozpis jednoho člověka z plánu vaření — přesně ve tvaru, který appka používá pro „Dnes“. */
+export function userDayPlans(plan, userId, customRecipes = []) {
+  if (!plan?.assignments || !plan.members?.includes(userId)) return null;
+  const days = {};
+  const dayList = weekDays(plan.weekStart);
+  const bf = plan.breakfasts?.[userId] ?? [];
+  const sn = plan.snacks?.[userId] ?? [];
+  dayList.forEach((iso, i) => {
+    const day = {};
+    const b = bf.length ? bf[i < 4 ? 0 : 1 % bf.length] : null;
+    if (b) day.snidane = { mealId: `r_${b.recipeId}`, portion: b.factor };
+    if (sn[0]) day.svacina1 = { mealId: `r_${sn[0].recipeId}`, portion: sn[0].factor };
+    if (sn[1] ?? sn[0]) day.svacina2 = { mealId: `r_${(sn[1] ?? sn[0]).recipeId}`, portion: (sn[1] ?? sn[0]).factor };
+    for (const slot of BOX_SLOTS) {
+      const rid = plan.assignments[iso]?.[slot];
+      if (!rid) continue;
+      const dish = plan.sessions.flatMap((s) => s.dishes).find((d) => d.recipeId === rid);
+      day[slot] = { mealId: `r_${rid}`, portion: dish?.factor?.[userId] ?? 1 };
+    }
+    days[iso] = day;
+  });
+  return days;
+}
+
+/** Suroviny jednoho jídla ve vaření: celkem gramů podle krabiček obou. */
+export function dishIngredients(dish, recipe) {
+  const portions = Object.keys(dish.boxes).reduce((a, uid) => a + (dish.boxes[uid] ?? 0) * (dish.factor[uid] ?? 1), 0);
+  return { portions: Math.round(portions * 100) / 100, items: recipe.items.map((it) => ({ foodId: it.foodId, grams: Math.round(it.grams * portions), perPortion: it.grams })) };
+}
+
+/**
+ * Nákupní seznam domácnosti z plánu vaření: všechna vaření + snídaně a svačiny obou
+ * × dny, sečteno a zaokrouhleno na balení. Stejný tvar jako shoppingList, navíc
+ * „uses“ = ve kterých jídlech se surovina používá.
+ */
+export function householdShoppingList(plan, customRecipes = [], customFoods = [], discounted = {}) {
+  const grams = {}; const uses = {};
+  const add = (foodId, g, name) => { grams[foodId] = (grams[foodId] ?? 0) + g; (uses[foodId] ??= new Set()).add(name); };
+  for (const s of plan?.sessions ?? []) {
+    for (const d of s.dishes) {
+      const r = recipeById(d.recipeId, customRecipes);
+      if (!r) continue;
+      const { items } = dishIngredients(d, r);
+      for (const it of items) add(it.foodId, it.grams, r.name);
+    }
+  }
+  const dayList = weekDays(plan.weekStart);
+  for (const uid of plan.members ?? []) {
+    const bf = plan.breakfasts?.[uid] ?? [];
+    const sn = plan.snacks?.[uid] ?? [];
+    dayList.forEach((iso, i) => {
+      const b = bf.length ? bf[i < 4 ? 0 : 1 % bf.length] : null;
+      const entries = [b, sn[0], sn[1] ?? sn[0]].filter(Boolean);
+      for (const e of entries) {
+        const r = recipeById(e.recipeId, customRecipes);
+        if (!r) continue;
+        for (const it of r.items) add(it.foodId, it.grams * e.factor, r.name);
+      }
+    });
+  }
+  const byCat = {};
+  for (const [foodId, g] of Object.entries(grams)) {
+    const food = foodById(foodId, customFoods);
+    if (!food) continue;
+    const packG = food.packG ?? 500;
+    const packs = Math.max(1, Math.ceil(g / packG - 0.05));
+    const countable = !!food.pieceG && (food.loose || /\bks\b/.test(food.packLabel ?? ''));
+    const pieces = countable ? Math.ceil(g / food.pieceG) : null;
+    const cat = food.cat ?? 'ostatni';
+    (byCat[cat] ??= []).push({
+      foodId, name: food.name, grams: Math.round(g), packs, pieces,
+      packLabel: food.packLabel ?? (packG >= 1000 ? `${packG / 1000} kg` : `${packG} g`),
+      discount: discounted[foodId] ?? null,
+      uses: [...(uses[foodId] ?? [])],
+    });
+  }
+  return Object.keys(FOOD_CATEGORIES)
+    .filter((cat) => byCat[cat])
+    .map((cat) => ({ cat, label: FOOD_CATEGORIES[cat], items: byCat[cat].sort((a, b) => b.grams - a.grams) }));
+}
+
+/** Kolik krabiček pro koho a jak velké (na kartu vaření). */
+export function dishSummary(dish, recipe, members, customFoods = []) {
+  const m = recipeMacros(recipe, customFoods);
+  const total = Object.values(dish.boxes).reduce((a, n) => a + n, 0);
+  const per = Object.keys(dish.boxes).map((uid) => ({
+    userId: uid, name: members[uid]?.name ?? uid, boxes: dish.boxes[uid], factor: dish.factor[uid],
+    kcal: Math.round(m.kcal * dish.factor[uid]), p: Math.round(m.p * dish.factor[uid]),
+  }));
+  return { total, per, ref: m };
 }

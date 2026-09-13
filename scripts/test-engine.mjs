@@ -141,4 +141,67 @@ t('domácnost: slučování po částech, novější vyhrává', () => {
   assert.ok(e.isFitkoGist({ files: { 'fitko-zaloha-matilda.json': {} } }));
 });
 
+
+t('recepty: makra hlavních jídel v rozumném pásmu', () => {
+  const bad = [];
+  for (const r of e.RECIPES) {
+    const m = e.recipeMacros(r);
+    for (const it of r.items) assert.ok(e.FOODS[it.foodId], `${r.id}: neznámá potravina ${it.foodId}`);
+    if (r.kind === 'hlavni' && (m.kcal < 520 || m.kcal > 820 || m.p < 35)) bad.push(`${r.id} ${m.kcal} kcal ${m.p} g`);
+    if (r.kind === 'snidane' && (m.kcal < 380 || m.kcal > 650)) bad.push(`${r.id} ${m.kcal} kcal`);
+    if (r.kind === 'svacina' && (m.kcal < 180 || m.kcal > 420)) bad.push(`${r.id} ${m.kcal} kcal`);
+    assert.ok(r.steps.length >= 1 && r.fridgeDays != null && r.emoji);
+  }
+  assert.deepEqual(bad, []);
+  assert.ok(e.RECIPES.filter((r) => r.kind === 'hlavni').length >= 25);
+});
+
+t('plán vaření: dvě vaření, pestré bílkoviny, krabičky pro oba, násobky podle kalorií', () => {
+  const members = { niklas: { name: 'Niklas', kcal: 3600, proteinG: 153 }, matilda: { name: 'Matilda', kcal: 1700, proteinG: 106 } };
+  const plan = e.planCookWeek({ weekStart: '2026-09-14', members });
+  assert.equal(plan.sessions.length, 2);
+  assert.equal(plan.sessions[0].cookDate, '2026-09-13');
+  assert.deepEqual(plan.sessions[0].coversDays, ['2026-09-14', '2026-09-15', '2026-09-16']);
+  assert.equal(plan.sessions[1].cookDate, '2026-09-16');
+  assert.equal(plan.sessions[1].coversDays.length, 4);
+  const dishes = plan.sessions.flatMap((s) => s.dishes);
+  assert.equal(dishes.length, 4);
+  const prots = dishes.map((d) => e.recipeById(d.recipeId).protein);
+  assert.equal(new Set(prots).size, 4, `bílkoviny se opakují: ${prots}`);
+  for (const s of plan.sessions) {
+    for (const d of s.dishes) {
+      assert.equal(d.boxes.niklas, s.coversDays.length, 'každé jídlo = jeden oběd nebo večeře denně');
+      assert.ok(d.factor.niklas > d.factor.matilda);
+      const r = e.recipeById(d.recipeId);
+      assert.ok(r.fridgeDays >= s.coversDays.length || r.freezer, `${r.id} nevydrží ${s.coversDays.length} dny`);
+    }
+  }
+  const days = e.userDayPlans(plan, 'matilda');
+  assert.equal(Object.keys(days).length, 7);
+  const mon = days['2026-09-14'];
+  assert.ok(mon.snidane && mon.obed && mon.vecere && mon.svacina1);
+  assert.notEqual(mon.obed.mealId, mon.vecere.mealId);
+  const list = e.householdShoppingList(plan);
+  assert.ok(list.length >= 4);
+  const all = list.flatMap((g) => g.items);
+  assert.ok(all.every((i) => i.packs >= 1 && i.uses.length >= 1));
+  // stejný seed = stejný plán
+  const again = e.planCookWeek({ weekStart: '2026-09-14', members });
+  assert.deepEqual(again.assignments, plan.assignments);
+  // minulý týden se neopakuje
+  const next = e.planCookWeek({ weekStart: '2026-09-21', members, previous: dishes.map((d) => d.recipeId) });
+  const nextIds = next.sessions.flatMap((s) => s.dishes.map((d) => d.recipeId));
+  assert.ok(nextIds.every((id) => !dishes.some((d) => d.recipeId === id)));
+});
+
+t('plán vaření: výměna jídla a AI výběr', () => {
+  const members = { niklas: { name: 'Niklas', kcal: 3600 }, matilda: { name: 'Matilda', kcal: 1700 } };
+  const plan = e.planCookWeek({ weekStart: '2026-09-14', members, pick: { A: ['kure_curry', 'hovezi_bolognese'] } });
+  assert.deepEqual(plan.sessions[0].dishes.map((d) => d.recipeId), ['kure_curry', 'hovezi_bolognese']);
+  const old = plan.sessions[1].dishes[0].recipeId;
+  e.swapDish(plan, 'B', old, 'losos_bataty_spenat', members);
+  assert.equal(plan.sessions[1].dishes[0].recipeId, 'losos_bataty_spenat');
+  assert.ok(Object.values(plan.assignments).some((d) => d.obed === 'losos_bataty_spenat' || d.vecere === 'losos_bataty_spenat'));
+});
+
 console.log(process.exitCode ? '\nNĚKTERÉ TESTY SELHALY' : '\nvšechny testy prošly');

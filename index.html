@@ -1094,6 +1094,37 @@ input.set-input {
 
 .food-today-card .progressline { margin-top: 8px; }
 
+/* ---------- vaření a recepty ---------- */
+.dish-row { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-top: 1px solid var(--line); }
+.dish-row:first-of-type { border-top: none; }
+.dish-emoji {
+  flex: none; width: 46px; height: 46px; border-radius: 13px;
+  display: inline-flex; align-items: center; justify-content: center; font-size: 26px;
+  background: color-mix(in srgb, var(--cat, var(--muted)) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--cat, var(--muted)) 35%, transparent);
+}
+.dish-emoji.small { width: 36px; height: 36px; font-size: 20px; border-radius: 10px; }
+.dish-emoji.big { width: 56px; height: 56px; font-size: 32px; border-radius: 16px; }
+.dish-name { font-weight: 700; font-size: 15.5px; line-height: 1.25; }
+.dish-boxes { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin-top: 4px; font-size: 13px; }
+.dish-boxes b { color: var(--cat, var(--text)); }
+.cook-session.cooked { opacity: 0.72; }
+.cook-session.cooked .label::after { content: " · uvařeno"; color: var(--ok); }
+.daystrip { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
+.ds-cell {
+  border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2);
+  padding: 6px 0 5px; display: flex; flex-direction: column; align-items: center; gap: 3px;
+}
+.ds-cell.today { box-shadow: 0 0 0 2px var(--accent-soft); border-color: var(--accent); }
+.ds-emoji { font-size: 18px; line-height: 1.1; }
+.recipe-head { display: flex; gap: 12px; align-items: flex-start; }
+.steps { padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+.steps li { padding-left: 4px; }
+.steps li::marker { color: var(--accent); font-weight: 700; }
+.ing-line { padding: 5px 0; border-top: 1px solid var(--line); }
+.ing-line:first-child { border-top: none; }
+.history-row.excluded { opacity: 0.45; }
+
 </style>
 </head>
 <body>
@@ -1103,7 +1134,7 @@ input.set-input {
 <script>
 (() => {
 'use strict';
-const BUILD_ID = "2026-09-13 19:38";
+const BUILD_ID = "2026-09-13 19:54";
 const VAPID_PUBLIC_KEY = "BD_ok8gw7j2oTGo4onj5L0RKeoBb8CwcRXI6kBmWMQGHidqYlHqA-Mcl8tffN3j8ZxnzX7Fzq_RmG80iWyI6X0M";
 // ===== src/engine/util.js =====
 // Sdílené utility enginu — čisté funkce, žádné závislosti.
@@ -3013,6 +3044,20 @@ const FOODS = {
   sojova_omacka: { name: 'Sójová omáčka', cat: 'ostatni', kcal: 60, p: 6, c: 6, f: 0, packG: 150, packLabel: '150 ml', match: ['sojova omacka'] },
   rajcatovy_protlak: { name: 'Rajčatový protlak / passata', cat: 'ostatni', kcal: 30, p: 1.5, c: 5, f: 0.3, packG: 500, match: ['passata', 'protlak', 'rajcata loupan', 'loupana rajcata'] },
   kakao: { name: 'Kakao (holandské)', cat: 'ostatni', kcal: 350, p: 20, c: 12, f: 20, packG: 100, match: ['kakao holand', 'kakaovy prasek'], exclude: ['granko', 'instant'] },
+
+  // ---------- doplněno pro recepty do krabiček ----------
+  kokosove_mleko: { name: 'Kokosové mléko (plechovka)', cat: 'ostatni', kcal: 180, p: 1.5, c: 3, f: 18, packG: 400, packLabel: '1 plechovka', match: ['kokosove mleko', 'kokosovy napoj'], exclude: ['sladk'] },
+  smetana_na_vareni: { name: 'Smetana na vaření 12 %', cat: 'mlecne', kcal: 125, p: 3, c: 4, f: 12, packG: 250, packLabel: '250 ml', match: ['smetana na varen', 'smetana 12'] },
+  kysane_zeli: { name: 'Kysané zelí', cat: 'zelenina', kcal: 20, p: 1, c: 3, f: 0.2, packG: 500, match: ['kysane zeli', 'zeli kysan'] },
+  citron: { name: 'Citron', cat: 'ovoce', kcal: 30, p: 0.9, c: 6, f: 0.3, pieceG: 100, packG: 500, match: ['citron'], exclude: ['stava', 'limon'], loose: true },
+  sladke_chilli: { name: 'Sweet chilli omáčka', cat: 'ostatni', kcal: 200, p: 0.5, c: 48, f: 0.2, packG: 250, packLabel: '250 ml', match: ['sweet chilli', 'sladke chilli'] },
+  pesto: { name: 'Pesto (bazalkové)', cat: 'ostatni', kcal: 450, p: 5, c: 8, f: 44, packG: 190, match: ['pesto'] },
+  mouka_hladka: { name: 'Mouka hladká', cat: 'sacharidy', kcal: 350, p: 10, c: 72, f: 1, packG: 1000, match: ['mouka hladka', 'hladka mouka'] },
+  rajcata_konzerva: { name: 'Rajčata krájená (konzerva)', cat: 'ostatni', kcal: 25, p: 1.2, c: 4, f: 0.2, packG: 400, packLabel: '1 konzerva', match: ['rajcata krajen', 'krajena rajcata', 'rajcata loupana', 'loupana rajcata'] },
+  cocka_cervena: { name: 'Čočka červená (syrová)', cat: 'lusteniny', kcal: 350, p: 25, c: 58, f: 1.5, packG: 500, match: ['cocka cerven', 'cervena cocka'] },
+  zazvor: { name: 'Zázvor', cat: 'zelenina', kcal: 80, p: 1.8, c: 18, f: 0.8, pieceG: 30, packG: 100, match: ['zazvor'], exclude: ['caj', 'sirup', 'kandov'], loose: true },
+  jarni_cibulka: { name: 'Jarní cibulka', cat: 'zelenina', kcal: 32, p: 1.8, c: 7, f: 0.2, pieceG: 15, packG: 100, packLabel: '1 svazek', match: ['jarni cibulk'] },
+  zakysana_smetana: { name: 'Zakysaná smetana', cat: 'mlecne', kcal: 190, p: 3, c: 4, f: 18, packG: 200, match: ['zakysana smetana'] },
 };
 
 const FOOD_IDS = Object.keys(FOODS);
@@ -3422,6 +3467,550 @@ function mergeHousehold(local, remote) {
   out.customRecipes = [...recipes.values()];
   out.updatedAt = [a.updatedAt, b.updatedAt].filter(Boolean).sort().at(-1) ?? null;
   return out;
+}
+
+
+// ===== src/engine/recipes.js =====
+// Recepty do krabiček. Každý recept má suroviny v gramech na JEDNU REFERENČNÍ porci
+// (syrové hmotnosti — přesně tak se nakupuje), kroky psané pro celou dávku, dobu
+// přípravy, trvanlivost v lednici a jestli se dá mrazit. Makra se počítají z FOODS,
+// takže sedí s nákupem i s tím, co appka zapisuje jako snědené.
+//   kind: hlavni (oběd i večeře, do krabiček) | snidane | svacina
+//   protein: kure | kruti | hovezi | veprove | ryba | vejce | mlecne | lusteniny — pestrost týdne
+//   pantry: co se nekupuje (sůl, pepř, koření) — jen se ukáže v receptu
+
+const R = (id, name, kind, meta, items, steps) => ({
+  id, name, kind, ...meta,
+  items: items.map(([foodId, grams]) => ({ foodId, grams })),
+  steps,
+});
+
+const RECIPES = [
+  // ---------- hlavní jídla (referenční porce ~600–750 kcal, ≥ 40 g bílkovin) ----------
+  R('kure_ryze_brokolice', 'Kuřecí prsa s rýží a brokolicí', 'hlavni',
+    { emoji: '🍗', protein: 'kure', color: 'maso', prepMin: 15, cookMin: 30, fridgeDays: 4, freezer: true, equipment: ['rýžovar', 'pánev'], tags: ['klasika', 'rychle'], pantry: ['sůl', 'pepř', 'sladká paprika', 'česnek sušený'] },
+    [['kureci_prsa', 200], ['ryze', 90], ['brokolice', 200], ['olivovy_olej', 8], ['sojova_omacka', 8]],
+    ['Rýži propláchni a dej do rýžovaru (1 díl rýže : 1,5 dílu vody).',
+     'Prsa nakrájej na 2 cm kostky, osol, opepři, posyp paprikou a česnekem.',
+     'Rozpal pánev s olejem, kuře opékej po dávkách 6–8 min dozlatova, na konci zakápni sójovkou.',
+     'Brokolici rozeber na růžičky a 4 min povař v osolené vodě (nebo 6 min v páře), sceď.',
+     'Do krabiček: rýže, kuře, brokolice. Nech vychladnout odkryté, pak zavři a do lednice.']),
+  R('kure_curry', 'Kuřecí curry s rýží', 'hlavni',
+    { emoji: '🍛', protein: 'kure', color: 'maso', prepMin: 15, cookMin: 35, fridgeDays: 4, freezer: true, equipment: ['rýžovar', 'hrnec'], tags: ['omáčka', 'oblíbené'], pantry: ['kari koření (2 lžíce na dávku)', 'sůl', 'kurkuma'] },
+    [['kureci_stehna', 160], ['ryze', 70], ['kokosove_mleko', 60], ['rajcata_konzerva', 100], ['cibule', 60], ['paprika', 80], ['repkovy_olej', 5]],
+    ['Rýži do rýžovaru. Cibuli nakrájej nadrobno, papriku na proužky, stehna na kostky.',
+     'V hrnci rozehřej olej, cibuli 4 min osmahni, přidej kari a kurkumu a 30 s restuj.',
+     'Přidej maso, opeč ze všech stran, přilij rajčata a kokosové mléko.',
+     'Vař odkryté 20 min, posledních 5 min přidej papriku. Dosol.',
+     'Do krabiček rýži a curry vedle sebe (omáčku nalij až na maso, ne na rýži — lépe se ohřívá).']),
+  R('kure_kuskus_zelenina', 'Kuřecí s kuskusem a pečenou zeleninou', 'hlavni',
+    { emoji: '🥗', protein: 'kure', color: 'maso', prepMin: 15, cookMin: 30, fridgeDays: 4, freezer: false, equipment: ['trouba', 'hrnec'], tags: ['trouba', 'lehké'], pantry: ['sůl', 'pepř', 'oregano', 'uzená paprika'] },
+    [['kureci_prsa', 200], ['kuskus', 80], ['paprika', 120], ['cuketa', 120], ['cibule', 50], ['olivovy_olej', 10], ['citron', 20]],
+    ['Troubu na 210 °C. Papriku, cuketu a cibuli nakrájej na kostky, na plech, pokapej olejem, osol, oregano.',
+     'Prsa rozřízni na plátky 1,5 cm, osol, uzená paprika, polož na druhý plech.',
+     'Peč zeleninu 25 min (v půlce promíchej), kuře 18 min.',
+     'Kuskus zalij stejným objemem vroucí osolené vody, přikryj, 5 min nech nabobtnat, načechrej vidličkou, zakápni citronem.',
+     'Do krabiček: kuskus, zelenina, nakrájené kuře.']),
+  R('kure_stehna_brambory', 'Pečená kuřecí stehna s bramborami', 'hlavni',
+    { emoji: '🍠', protein: 'kure', color: 'maso', prepMin: 10, cookMin: 45, fridgeDays: 4, freezer: true, equipment: ['trouba'], tags: ['trouba', 'nedělní'], pantry: ['sůl', 'pepř', 'sladká paprika', 'kmín', 'česnek sušený'] },
+    [['kureci_stehna', 200], ['brambory', 320], ['mrkev', 80], ['cibule', 50], ['repkovy_olej', 8]],
+    ['Troubu na 200 °C. Brambory (se slupkou) nakrájej na klínky, mrkev na kolečka, cibuli na měsíčky.',
+     'Vše na plech, olej, sůl, kmín, promíchej. Stehna osol, opepři, paprika, česnek, polož nahoru kůží nahoru.',
+     'Peč 40–45 min, v půlce promíchej brambory. Kůže má být dozlatova.',
+     'Vychladlé rozděl do krabiček: 1 stehno + brambory + zelenina. Ohřívá se nejlíp ve fritéze 6 min na 180 °C.']),
+  R('kure_tikka', 'Kuřecí tikka v jogurtu s rýží', 'hlavni',
+    { emoji: '🫕', protein: 'kure', color: 'maso', prepMin: 20, cookMin: 30, fridgeDays: 4, freezer: true, equipment: ['rýžovar', 'pánev'], tags: ['omáčka', 'indická'], pantry: ['garam masala', 'kurkuma', 'kmín mletý', 'sůl', 'chilli'] },
+    [['kureci_prsa', 200], ['ryze', 85], ['bily_jogurt', 80], ['rajcata_konzerva', 120], ['cibule', 60], ['cesnek', 6], ['zazvor', 6], ['repkovy_olej', 6]],
+    ['Kuře na kostky, zamíchej s jogurtem, půlkou koření a solí — klidně den předem.',
+     'Rýži do rýžovaru. Cibuli, česnek a zázvor nadrobno.',
+     'Na oleji osmahni cibuli 5 min, přidej česnek, zázvor a zbylé koření, 30 s.',
+     'Přidej rajčata, 5 min vař, pak kuře i s marinádou a 15 min bez pokličky.',
+     'Do krabiček s rýží. Po ohřátí zamíchej — omáčka zhoustne.']),
+  R('kure_fajitas', 'Kuřecí fajitas směs (tortilly zvlášť)', 'hlavni',
+    { emoji: '🌮', protein: 'kure', color: 'maso', prepMin: 15, cookMin: 20, fridgeDays: 4, freezer: false, equipment: ['pánev'], tags: ['rychle', 'mexické'], pantry: ['uzená paprika', 'kmín mletý', 'chilli', 'sůl'] },
+    [['kureci_prsa', 180], ['tortilla', 80], ['paprika', 150], ['cibule', 70], ['kukurice_konzerva', 60], ['eidam', 30], ['zakysana_smetana', 30], ['repkovy_olej', 6]],
+    ['Kuře na proužky, koření, sůl. Papriky a cibuli na proužky.',
+     'Na rozpálené pánvi opékej kuře po dávkách 5 min, dej stranou. Na stejné pánvi zeleninu 6 min do zlatova, vrať kuře, kukuřice.',
+     'Do krabiček jen směs. Tortilly, sýr a zakysanou smetanu skladuj zvlášť — plní se až při jídle (tortilla nezvlhne).']),
+  R('kure_teriyaki', 'Kuřecí teriyaki s rýží a hráškem', 'hlavni',
+    { emoji: '🥢', protein: 'kure', color: 'maso', prepMin: 10, cookMin: 25, fridgeDays: 4, freezer: true, equipment: ['rýžovar', 'pánev'], tags: ['rychle', 'asijské'], pantry: ['sezam', 'pepř'] },
+    [['kureci_stehna', 160], ['ryze', 75], ['hrasek_mrazeny', 100], ['mrkev', 70], ['sojova_omacka', 15], ['med', 10], ['zazvor', 5], ['cesnek', 5], ['repkovy_olej', 6]],
+    ['Rýže do rýžovaru. Omáčka: sójovka, med, nastrouhaný zázvor a česnek, 2 lžíce vody.',
+     'Stehna na kostky, opékej na oleji 8 min. Přidej mrkev na tenká kolečka, 3 min.',
+     'Přilij omáčku, vař 2 min, až zhoustne a obalí maso. Hrášek vhoď na poslední minutu.',
+     'Do krabiček s rýží, posyp sezamem.']),
+  R('hovezi_bolognese', 'Hovězí bolognese s těstovinami', 'hlavni',
+    { emoji: '🍝', protein: 'hovezi', color: 'maso', prepMin: 10, cookMin: 40, fridgeDays: 4, freezer: true, equipment: ['hrnec'], tags: ['klasika', 'mrazák'], pantry: ['oregano', 'bazalka', 'sůl', 'pepř', 'špetka cukru'] },
+    [['hovezi_mlete', 150], ['testoviny', 90], ['rajcatovy_protlak', 200], ['cibule', 60], ['mrkev', 50], ['cesnek', 5], ['olivovy_olej', 8], ['parmezan', 12]],
+    ['Cibuli, mrkev a česnek nadrobno, na oleji 6 min zesklovatět.',
+     'Přidej mleté, rozmělni a opékej, až pustí a zase vsákne šťávu (8 min).',
+     'Passata, bylinky, sůl, špetka cukru. Vař na mírném ohni 25 min, občas zamíchej.',
+     'Těstoviny uvař o minutu kratší než na obalu (v krabičce ještě dojdou), sceď, promíchej s lžící oleje.',
+     'Do krabiček těstoviny a omáčku, parmezán nahoru.']),
+  R('chilli_con_carne', 'Chilli con carne s rýží', 'hlavni',
+    { emoji: '🌶️', protein: 'hovezi', color: 'maso', prepMin: 10, cookMin: 40, fridgeDays: 5, freezer: true, equipment: ['hrnec', 'rýžovar'], tags: ['mrazák', 'vydrží'], pantry: ['kmín mletý', 'uzená paprika', 'chilli', 'kakao (špetka)', 'sůl'] },
+    [['hovezi_mlete', 130], ['fazole_konzerva', 120], ['ryze', 80], ['rajcata_konzerva', 150], ['cibule', 60], ['paprika', 80], ['kukurice_konzerva', 50], ['repkovy_olej', 6]],
+    ['Cibuli a papriku na kostky, na oleji 5 min. Přidej mleté a opékej dozlatova.',
+     'Koření, 30 s restuj, přidej rajčata a 100 ml vody. Vař 25 min.',
+     'Fazole a kukuřici scezené vmíchej na posledních 5 min. Dosol.',
+     'Rýži z rýžovaru do krabiček, chilli navrch. Chuťově je druhý den ještě lepší.']),
+  R('hovezi_kase_zelenina', 'Hovězí mleté s bramborovou kaší a hráškem', 'hlavni',
+    { emoji: '🥔', protein: 'hovezi', color: 'maso', prepMin: 15, cookMin: 30, fridgeDays: 3, freezer: true, equipment: ['hrnec', 'pánev'], tags: ['domácí'], pantry: ['sůl', 'pepř', 'muškátový oříšek', 'majoránka'] },
+    [['hovezi_mlete', 150], ['brambory', 300], ['mleko_polotucne', 50], ['maslo', 8], ['hrasek_mrazeny', 100], ['cibule', 50], ['cesnek', 5]],
+    ['Brambory oloupej, nakrájej, uvař do měkka v osolené vodě (20 min). Sceď, rozmačkej s mlékem a máslem, muškát.',
+     'Cibuli a česnek nadrobno, osmahni, přidej mleté, majoránka, sůl, pepř, opékej 10 min.',
+     'Hrášek povař 3 min. Do krabiček kaše, maso, hrášek.']),
+  R('hovezi_gulas', 'Hovězí guláš z kýty s bramborami', 'hlavni',
+    { emoji: '🥘', protein: 'hovezi', color: 'maso', prepMin: 15, cookMin: 120, fridgeDays: 5, freezer: true, equipment: ['hrnec'], tags: ['nedělní', 'vydrží', 'mrazák'], pantry: ['sladká paprika (hodně)', 'kmín', 'majoránka', 'sůl', 'pepř'] },
+    [['hovezi_zadni', 180], ['brambory', 300], ['cibule', 120], ['rajcatovy_protlak', 40], ['cesnek', 5], ['repkovy_olej', 8]],
+    ['Cibule nadrobno (stejná váha jako polovina masa), na oleji pomalu 12 min dozlatova.',
+     'Maso na 3 cm kostky, přidej, opeč. Odstav, paprika, promíchej (nesmí se spálit), protlak, kmín.',
+     'Zalij vodou tak akorát, přikryj, duš 1,5–2 h do měkka. Na konci česnek, majoránka, dosol.',
+     'Brambory uvař zvlášť ve slupce, oloupej, na kostky. Do krabiček brambory + guláš.']),
+  R('kruti_sekana_bataty', 'Krůtí sekaná s batáty a salátem', 'hlavni',
+    { emoji: '🍖', protein: 'kruti', color: 'maso', prepMin: 20, cookMin: 45, fridgeDays: 4, freezer: true, equipment: ['trouba', 'mixér'], tags: ['trouba'], pantry: ['sůl', 'pepř', 'majoránka', 'hořčice'] },
+    [['kruti_prsa', 180], ['vejce', 30], ['ovesne_vlocky', 20], ['cibule', 50], ['bataty', 250], ['ledovy_salat', 80], ['olivovy_olej', 8]],
+    ['Troubu na 190 °C. Krůtí umel v mixéru (nebo kup mleté), smíchej s vejcem, vločkami, cibulí nadrobno, kořením a lžičkou hořčice.',
+     'Vytvaruj šišku na plech s papírem (nebo do formy), peč 40 min.',
+     'Batáty na hranolky, olej, sůl, na druhý plech, peč 30 min.',
+     'Sekanou nakrájej na plátky. Do krabiček sekaná + batáty; salát přidej až při jídle.']),
+  R('panenka_bulgur', 'Vepřová panenka s bulgurem a zeleninou', 'hlavni',
+    { emoji: '🥩', protein: 'veprove', color: 'maso', prepMin: 15, cookMin: 30, fridgeDays: 4, freezer: true, equipment: ['trouba', 'pánev', 'hrnec'], tags: ['libové'], pantry: ['sůl', 'pepř', 'tymián', 'hořčice'] },
+    [['veprova_panenka', 180], ['bulgur', 80], ['paprika', 100], ['cuketa', 100], ['cibule', 40], ['olivovy_olej', 10]],
+    ['Troubu na 200 °C. Panenku osol, opepři, potři hořčicí, opeč na pánvi 2 min z každé strany, dopeč v troubě 12 min. Nech 5 min odpočinout, nakrájej.',
+     'Zeleninu na kostky, na stejné pánvi 8 min opékej, tymián, sůl.',
+     'Bulgur uvař v dvojnásobku osolené vody 12 min, nech dojít.',
+     'Do krabiček bulgur, zelenina, plátky panenky.']),
+  R('veprova_kyta_zeli', 'Vepřová kýta na česneku s bramborami a zelím', 'hlavni',
+    { emoji: '🍽️', protein: 'veprove', color: 'maso', prepMin: 15, cookMin: 75, fridgeDays: 4, freezer: true, equipment: ['trouba', 'hrnec'], tags: ['česká', 'nedělní'], pantry: ['kmín', 'sůl', 'pepř', 'cukr (špetka)'] },
+    [['veprova_kyta', 180], ['brambory', 300], ['kysane_zeli', 150], ['cibule', 60], ['cesnek', 8], ['repkovy_olej', 8]],
+    ['Kýtu prošpikuj česnekem, osol, kmín, opepři. Do pekáče s cibulí a 150 ml vody, přikryj, peč 60 min na 180 °C, pak 15 min odkryté.',
+     'Zelí sceď, s cibulí krátce podus 15 min, špetka cukru.',
+     'Brambory uvař ve slupce, oloupej.',
+     'Maso nakrájej na plátky, do krabiček s bramborami a zelím, přelij šťávou z pekáče.']),
+  R('losos_bataty_spenat', 'Losos pečený s batáty a špenátem', 'hlavni',
+    { emoji: '🐟', protein: 'ryba', color: 'ryba', prepMin: 10, cookMin: 30, fridgeDays: 3, freezer: false, equipment: ['trouba', 'pánev'], tags: ['omega-3', 'rychle'], pantry: ['sůl', 'pepř', 'citronová šťáva', 'kopr'] },
+    [['losos', 150], ['bataty', 280], ['spenat_mrazeny', 150], ['cesnek', 5], ['olivovy_olej', 8], ['citron', 20]],
+    ['Troubu na 200 °C. Batáty na kostky, olej, sůl, peč 25 min.',
+     'Lososa osol, opepři, citron, na plech s papírem; posledních 12 min pečení přidej k batátům.',
+     'Špenát rozpusť na pánvi s česnekem, osol, odpař vodu.',
+     'Do krabiček batáty, špenát, losos. Ryba v lednici 3 dny — nauvařené na sobotu dej nejdřív.']),
+  R('treska_brambory_hrasek', 'Treska v troubě s bramborami a hráškem', 'hlavni',
+    { emoji: '🐠', protein: 'ryba', color: 'ryba', prepMin: 10, cookMin: 30, fridgeDays: 3, freezer: false, equipment: ['trouba'], tags: ['lehké', 'libové'], pantry: ['sůl', 'pepř', 'sladká paprika', 'citron'] },
+    [['treska', 200], ['brambory', 300], ['hrasek_mrazeny', 120], ['maslo', 10], ['citron', 20], ['cesnek', 5]],
+    ['Troubu na 200 °C. Brambory na plátky 1 cm, uvař 8 min, sceď, na plech, sůl, paprika, kousky másla.',
+     'Tresku osol, opepři, česnek, citron; polož na brambory a peč 15 min.',
+     'Hrášek povař 3 min. Do krabiček vše dohromady, zakápni citronem.']),
+  R('tunak_testoviny', 'Těstoviny s tuňákem a rajčaty', 'hlavni',
+    { emoji: '🍅', protein: 'ryba', color: 'ryba', prepMin: 5, cookMin: 20, fridgeDays: 4, freezer: false, equipment: ['hrnec', 'pánev'], tags: ['rychle', 'levné'], pantry: ['oregano', 'chilli', 'sůl', 'pepř'] },
+    [['testoviny', 100], ['tunak_konzerva', 110], ['rajcatovy_protlak', 150], ['cibule', 50], ['cesnek', 5], ['olivovy_olej', 10], ['parmezan', 12]],
+    ['Těstoviny uvař o minutu kratší, sceď.',
+     'Cibuli a česnek na oleji 4 min, passata, oregano, chilli, 10 min vař.',
+     'Tuňáka okapaného vmíchej do omáčky, jen prohřej.',
+     'Smíchej s těstovinami, do krabiček, parmezán navrch.']),
+  R('smazena_ryze_vejce', 'Smažená rýže s kuřecím, vejci a zeleninou', 'hlavni',
+    { emoji: '🍳', protein: 'kure', color: 'maso', prepMin: 10, cookMin: 25, fridgeDays: 3, freezer: false, equipment: ['rýžovar', 'pánev'], tags: ['rychle', 'zbytky'], pantry: ['pepř', 'sezamový olej (kapka)'] },
+    [['ryze', 90], ['kureci_prsa', 130], ['vejce', 60], ['zeleninova_smes', 180], ['sojova_omacka', 15], ['jarni_cibulka', 15], ['repkovy_olej', 10]],
+    ['Rýži uvař a nech vychladnout (ideálně z předchozího dne — nelepí se).',
+     'Kuře na kostky, opékej na oleji 6 min, dej stranou. Vejce rozmíchej a na pánvi udělej míchaná, stranou.',
+     'Zeleninu z mrazáku na pánev 5 min, přidej rýži, opékej 4 min, sójovka, vrať kuře a vejce.',
+     'Jarní cibulka navrch. Do krabiček.']),
+  R('cockove_dahl', 'Čočkové dahl s rýží', 'hlavni',
+    { emoji: '🥣', protein: 'lusteniny', color: 'vege', prepMin: 10, cookMin: 30, fridgeDays: 5, freezer: true, equipment: ['hrnec', 'rýžovar'], tags: ['vege', 'levné', 'vydrží'], pantry: ['kurkuma', 'kmín', 'garam masala', 'sůl', 'chilli'] },
+    [['cocka_cervena', 75], ['ryze', 60], ['kokosove_mleko', 50], ['rajcata_konzerva', 120], ['cibule', 60], ['cesnek', 6], ['zazvor', 6], ['spenat_mrazeny', 80], ['repkovy_olej', 5], ['recky_jogurt', 100]],
+    ['Cibuli, česnek a zázvor osmahni na oleji, koření 30 s.',
+     'Čočku propláchni, přidej s rajčaty a 2,5 násobkem vody, vař 20 min do rozvaření.',
+     'Kokosové mléko a špenát, 5 min. Osol.',
+     'Do krabiček s rýží; lžíce jogurtu při jídle dodá bílkoviny.']),
+  R('cizrnove_curry', 'Cizrnové curry s rýží a tofu', 'hlavni',
+    { emoji: '🌱', protein: 'lusteniny', color: 'vege', prepMin: 10, cookMin: 30, fridgeDays: 5, freezer: true, equipment: ['hrnec', 'rýžovar', 'pánev'], tags: ['vege', 'vydrží'], pantry: ['kari', 'kurkuma', 'sůl'] },
+    [['cizrna_konzerva', 140], ['tofu', 150], ['ryze', 60], ['kokosove_mleko', 50], ['rajcata_konzerva', 120], ['cibule', 60], ['paprika', 80], ['repkovy_olej', 5]],
+    ['Tofu na kostky, osuš, opeč na pánvi dozlatova, osol.',
+     'Cibuli osmahni, kari a kurkuma, rajčata, kokosové mléko, 10 min.',
+     'Cizrnu a papriku vař 8 min, vmíchej tofu.',
+     'Do krabiček s rýží.']),
+  R('kure_pohanka_mrkev', 'Kuřecí s pohankou a pečenou mrkví', 'hlavni',
+    { emoji: '🥕', protein: 'kure', color: 'maso', prepMin: 10, cookMin: 30, fridgeDays: 4, freezer: true, equipment: ['trouba', 'hrnec'], tags: ['lehké', 'bez lepku'], pantry: ['sůl', 'pepř', 'tymián', 'med (lžička)'] },
+    [['kureci_prsa', 200], ['pohanka', 80], ['mrkev', 200], ['cibule', 40], ['olivovy_olej', 10], ['recky_jogurt', 50]],
+    ['Troubu na 200 °C. Mrkev na klínky, olej, sůl, tymián, lžička medu, peč 25 min.',
+     'Pohanku propláchni, vař v 1,5násobku osolené vody 12 min, nech dojít.',
+     'Prsa na plátky, osol, opepři, opeč na pánvi 4 min z každé strany.',
+     'Do krabiček pohanka, mrkev, kuře. Jogurt jako omáčka při jídle.']),
+  R('kruti_paprikas_testoviny', 'Krůtí na paprice s těstovinami', 'hlavni',
+    { emoji: '🧡', protein: 'kruti', color: 'maso', prepMin: 10, cookMin: 30, fridgeDays: 4, freezer: true, equipment: ['hrnec'], tags: ['česká', 'omáčka'], pantry: ['sladká paprika', 'sůl', 'pepř'] },
+    [['kruti_prsa', 180], ['testoviny', 90], ['cibule', 70], ['smetana_na_vareni', 60], ['rajcatovy_protlak', 40], ['mouka_hladka', 8], ['repkovy_olej', 8]],
+    ['Cibuli nadrobno osmahni na oleji dozlatova, odstav, paprika, protlak.',
+     'Krůtí na nudličky, přidej, opeč, zalij 200 ml vody, vař 15 min.',
+     'Smetanu rozmíchej s moukou, vmíchej, 5 min provař, dosol.',
+     'Těstoviny uvař, do krabiček, omáčka navrch.']),
+  R('masove_kulicky_rajcata', 'Hovězí kuličky v rajčatové omáčce s těstovinami', 'hlavni',
+    { emoji: '🍡', protein: 'hovezi', color: 'maso', prepMin: 20, cookMin: 35, fridgeDays: 4, freezer: true, equipment: ['trouba', 'hrnec'], tags: ['mrazák', 'děti'], pantry: ['oregano', 'sůl', 'pepř', 'česnek sušený'] },
+    [['hovezi_mlete', 150], ['vejce', 25], ['ovesne_vlocky', 15], ['testoviny', 70], ['rajcatovy_protlak', 200], ['cibule', 50], ['mozzarella', 30], ['olivovy_olej', 5]],
+    ['Mleté, vejce, vločky, sůl, pepř, česnek, promíchej, tvaruj kuličky (5 cm), na plech, peč 15 min na 200 °C.',
+     'Cibuli na oleji, passata, oregano, 15 min vař, přidej kuličky, 5 min.',
+     'Těstoviny uvař o minutu kratší. Do krabiček těstoviny, kuličky s omáčkou, kousky mozzarelly navrch.']),
+  R('kure_gyros_bulgur', 'Kuřecí gyros mísa s bulgurem a tzatziki', 'hlavni',
+    { emoji: '🥙', protein: 'kure', color: 'maso', prepMin: 15, cookMin: 25, fridgeDays: 4, freezer: false, equipment: ['pánev', 'hrnec'], tags: ['řecké', 'oblíbené'], pantry: ['gyros koření', 'sůl', 'oregano', 'česnek'] },
+    [['kureci_stehna', 190], ['bulgur', 80], ['recky_jogurt', 80], ['okurka', 100], ['rajcata', 100], ['cibule', 40], ['olivovy_olej', 10], ['citron', 15]],
+    ['Stehna na proužky, gyros koření, sůl, lžíce oleje, nech 20 min.',
+     'Bulgur uvař (12 min), zakápni citronem. Tzatziki: jogurt, polovina okurky nastrouhaná a vymačkaná, česnek, sůl.',
+     'Kuře opékej na prudké pánvi po dávkách do křupava.',
+     'Do krabiček bulgur, kuře, rajčata a okurka na kostky; tzatziki v malé krabičce zvlášť.']),
+  R('kure_quinoa_feta', 'Pečené kuřecí s quinoou, fetou a zeleninou (studená krabička)', 'hlavni',
+    { emoji: '🧀', protein: 'kure', color: 'maso', prepMin: 15, cookMin: 25, fridgeDays: 4, freezer: false, equipment: ['trouba', 'hrnec'], tags: ['studené', 'léto', 'lehké'], pantry: ['sůl', 'pepř', 'oregano'] },
+    [['kureci_prsa', 180], ['quinoa', 75], ['balkansky_syr', 40], ['cherry_rajcata', 120], ['okurka', 100], ['olivovy_olej', 10], ['citron', 15]],
+    ['Quinou propláchni, vař v dvojnásobku vody 15 min, nech vychladnout.',
+     'Prsa osol, oregano, peč 18 min na 200 °C, nakrájej.',
+     'Smíchej quinou, rajčata na půlky, okurku na kostky, olej, citron, sůl. Feta navrch.',
+     'Do krabiček; jí se studené, nic se neohřívá.']),
+  R('zapecene_testoviny_kure', 'Zapečené těstoviny s kuřecím, špenátem a mozzarellou', 'hlavni',
+    { emoji: '🧆', protein: 'kure', color: 'maso', prepMin: 15, cookMin: 35, fridgeDays: 4, freezer: true, equipment: ['trouba', 'hrnec'], tags: ['trouba', 'mrazák'], pantry: ['sůl', 'pepř', 'muškát', 'česnek'] },
+    [['testoviny', 80], ['kureci_prsa', 170], ['spenat_mrazeny', 120], ['smetana_na_vareni', 60], ['mozzarella', 50], ['cibule', 40], ['olivovy_olej', 5]],
+    ['Těstoviny uvař o 2 minuty kratší. Kuře na kostky opeč s cibulí, přidej špenát a smetanu, muškát, sůl, 5 min.',
+     'Smíchej s těstovinami, do pekáče, mozzarella navrch, peč 20 min na 200 °C.',
+     'Nakrájej na porce do krabiček. Ohřev ve fritéze nebo troubě — zůstane křupavá.']),
+  R('batatova_panev_fazole', 'Batátová pánev s fazolemi a vejci', 'hlavni',
+    { emoji: '🍳', protein: 'vejce', color: 'vege', prepMin: 10, cookMin: 25, fridgeDays: 3, freezer: false, equipment: ['pánev'], tags: ['vege', 'rychle'], pantry: ['uzená paprika', 'kmín', 'sůl', 'chilli'] },
+    [['bataty', 250], ['fazole_konzerva', 120], ['vejce', 110], ['paprika', 80], ['cibule', 50], ['eidam', 30], ['repkovy_olej', 10]],
+    ['Batáty na kostky 1,5 cm, na oleji pod pokličkou 12 min do měkka, promíchávej.',
+     'Cibuli a papriku přidej, 5 min, koření, fazole, prohřej.',
+     'Vejce rozklepni do důlků ve směsi, přikryj, 4 min. Sýr navrch.',
+     'Do krabiček. Vejce při ohřevu ztuhnou víc — ohřívej krátce.']),
+  R('veprova_sweet_chilli', 'Vepřová kýta sweet chilli s rýží a zeleninou', 'hlavni',
+    { emoji: '🍜', protein: 'veprove', color: 'maso', prepMin: 10, cookMin: 25, fridgeDays: 4, freezer: true, equipment: ['pánev', 'rýžovar'], tags: ['rychle', 'asijské'], pantry: ['pepř', 'sezam'] },
+    [['veprova_kyta', 180], ['ryze', 90], ['zeleninova_smes', 180], ['sladke_chilli', 25], ['sojova_omacka', 10], ['cesnek', 5], ['repkovy_olej', 8]],
+    ['Kýtu na tenké nudličky, opékej na prudké pánvi po dávkách 4 min.',
+     'Zeleninu z mrazáku 5 min, česnek, vrať maso, sweet chilli a sójovka, 2 min.',
+     'Do krabiček s rýží, sezam navrch.']),
+  R('losos_teriyaki', 'Losos teriyaki z fritézy s rýží', 'hlavni',
+    { emoji: '🍣', protein: 'ryba', color: 'ryba', prepMin: 5, cookMin: 20, fridgeDays: 3, freezer: false, equipment: ['horkovzdušná fritéza', 'rýžovar'], tags: ['fritéza', 'rychle'], pantry: ['sezam', 'jarní cibulka'] },
+    [['losos', 150], ['ryze', 90], ['brokolice', 180], ['sojova_omacka', 15], ['med', 8], ['zazvor', 5]],
+    ['Lososa potři směsí sójovky, medu a zázvoru, nech 10 min.',
+     'Fritéza 190 °C, 9 min. Brokolici v páře 5 min.',
+     'Do krabiček rýže, brokolice, losos, sezam.']),
+  R('kure_paprikas_kuskus', 'Kuřecí paprikáš s kuskusem', 'hlavni',
+    { emoji: '🫑', protein: 'kure', color: 'maso', prepMin: 10, cookMin: 30, fridgeDays: 4, freezer: true, equipment: ['hrnec'], tags: ['omáčka', 'rychle'], pantry: ['sladká paprika', 'uzená paprika', 'sůl'] },
+    [['kureci_stehna', 160], ['kuskus', 70], ['paprika', 120], ['cibule', 60], ['rajcata_konzerva', 120], ['zakysana_smetana', 30], ['repkovy_olej', 5]],
+    ['Cibuli osmahni, papriky na proužky přidej na 5 min, obojí koření.',
+     'Stehna na kostky, opeč, rajčata, 15 min vař. Na konci zakysaná smetana, dosol.',
+     'Kuskus zalij vroucí vodou 1:1, 5 min, načechrej. Do krabiček.']),
+
+  // ---------- snídaně (referenční porce ~450–550 kcal) ----------
+  R('ovesna_kase_tvaroh', 'Ovesná kaše s tvarohem a banánem', 'snidane',
+    { emoji: '🥣', protein: 'mlecne', color: 'snidane', prepMin: 5, cookMin: 5, fridgeDays: 2, freezer: false, equipment: ['mikrovlnka'], tags: ['rychle', 'teplé'], pantry: ['skořice', 'špetka soli'] },
+    [['ovesne_vlocky', 70], ['mleko_polotucne', 200], ['tvaroh_polotucny', 120], ['banan', 100], ['med', 10]],
+    ['Vločky s mlékem 3 min v mikrovlnce (nebo 4 min v hrnci), zamíchej.',
+     'Vmíchej tvaroh, med, skořici. Banán nakrájej navrch.']),
+  R('overnight_oats_skyr', 'Overnight oats se skyrem a borůvkami', 'snidane',
+    { emoji: '🫐', protein: 'mlecne', color: 'snidane', prepMin: 5, cookMin: 0, fridgeDays: 3, freezer: false, equipment: [], tags: ['bez vaření', 'připrav večer'], pantry: ['vanilka', 'skořice'] },
+    [['ovesne_vlocky', 60], ['skyr', 200], ['mleko_polotucne', 120], ['boruvky', 80], ['chia', 10], ['med', 8]],
+    ['Vločky, chia, mléko a polovinu skyru zamíchej ve sklenici, přes noc do lednice.',
+     'Ráno zbytek skyru, med, borůvky navrch. Připrav rovnou na 3 dny.']),
+  R('michana_vejce_chleb', 'Míchaná vejce s chlebem a rajčaty', 'snidane',
+    { emoji: '🍳', protein: 'vejce', color: 'snidane', prepMin: 5, cookMin: 8, fridgeDays: 0, freezer: false, equipment: ['pánev'], tags: ['teplé', 'čerstvě'], pantry: ['sůl', 'pepř', 'pažitka'] },
+    [['vejce', 150], ['chleb', 80], ['maslo', 8], ['rajcata', 120], ['sunka', 40]],
+    ['Vejce rozšlehej se solí, na másle míchej na mírném ohni do krémova.',
+     'Chleb, šunka, rajčata vedle. Jí se hned — nedělá se do zásoby.']),
+  R('skyr_musli_ovoce', 'Skyr s müsli a ovocem', 'snidane',
+    { emoji: '🥛', protein: 'mlecne', color: 'snidane', prepMin: 3, cookMin: 0, fridgeDays: 0, freezer: false, equipment: [], tags: ['bez vaření', 'rychle'], pantry: [] },
+    [['skyr', 250], ['musli', 60], ['jablko', 150], ['mandle', 15]],
+    ['Skyr do misky, müsli, jablko na kostky, mandle. Hotovo za 3 minuty.']),
+  R('tvarohove_pankejky', 'Tvarohové pankejky s ovocem', 'snidane',
+    { emoji: '🥞', protein: 'mlecne', color: 'snidane', prepMin: 10, cookMin: 20, fridgeDays: 3, freezer: true, equipment: ['pánev', 'mixér'], tags: ['do zásoby', 'víkend'], pantry: ['kypřicí prášek (lžička)', 'vanilka', 'špetka soli'] },
+    [['tvaroh_polotucny', 150], ['vejce', 80], ['ovesne_vlocky', 45], ['banan', 60], ['recky_jogurt', 80], ['jahody', 100], ['repkovy_olej', 5]],
+    ['Tvaroh, vejce, vločky, banán a kypřicí prášek rozmixuj na těsto.',
+     'Na lehce vymazané pánvi peč malé lívance 2 min z každé strany.',
+     'Skládej do krabičky s papírem; jogurt a ovoce přidej při jídle. Vydrží 3 dny, dají se zamrazit.']),
+  R('toast_cottage_vejce', 'Toast s cottage, vejcem a rajčaty', 'snidane',
+    { emoji: '🍞', protein: 'mlecne', color: 'snidane', prepMin: 5, cookMin: 8, fridgeDays: 0, freezer: false, equipment: ['toustovač', 'hrnec'], tags: ['rychle'], pantry: ['sůl', 'pepř'] },
+    [['celozrnny_toust', 90], ['cottage', 150], ['vejce', 110], ['rajcata', 100]],
+    ['Vejce uvař natvrdo (9 min) — klidně na celý týden dopředu.',
+     'Toust opeč, cottage, plátky vejce, rajčata, sůl, pepř.']),
+
+  // ---------- svačiny (referenční porce ~250–350 kcal) ----------
+  R('tvaroh_med_orechy', 'Tvaroh s medem a ořechy', 'svacina',
+    { emoji: '🍯', protein: 'mlecne', color: 'svacina', prepMin: 2, cookMin: 0, fridgeDays: 0, freezer: false, equipment: [], tags: ['bez vaření'], pantry: [] },
+    [['tvaroh_polotucny', 200], ['med', 15], ['vlasske_orechy', 15]],
+    ['Zamíchej. Do práce v malé krabičce.']),
+  R('protein_banan', 'Proteinový shake s banánem', 'svacina',
+    { emoji: '🥤', protein: 'mlecne', color: 'svacina', prepMin: 2, cookMin: 0, fridgeDays: 0, freezer: false, equipment: ['mixér'], tags: ['po tréninku'], pantry: [] },
+    [['protein_syrovatkovy', 30], ['mleko_polotucne', 250], ['banan', 100]],
+    ['Rozmixuj. Po tréninku nejdřív.']),
+  R('jogurt_jablko_arasidy', 'Řecký jogurt s jablkem a arašídovým máslem', 'svacina',
+    { emoji: '🍎', protein: 'mlecne', color: 'svacina', prepMin: 3, cookMin: 0, fridgeDays: 0, freezer: false, equipment: [], tags: ['bez vaření'], pantry: ['skořice'] },
+    [['recky_jogurt', 180], ['jablko', 150], ['arasidove_maslo', 15]],
+    ['Jablko na plátky, jogurt, arašídové máslo, skořice.']),
+  R('chleb_sunka_syr', 'Chléb se šunkou, sýrem a okurkou', 'svacina',
+    { emoji: '🥪', protein: 'mlecne', color: 'svacina', prepMin: 3, cookMin: 0, fridgeDays: 1, freezer: false, equipment: [], tags: ['do kabelky'], pantry: ['hořčice'] },
+    [['chleb', 80], ['sunka', 50], ['eidam', 25], ['okurka', 80]],
+    ['Klasika. Okurku zvlášť, ať chleba nezvlhne.']),
+  R('ryzove_chlebicky_cottage', 'Rýžové chlebíčky s cottage a paprikou', 'svacina',
+    { emoji: '🍘', protein: 'mlecne', color: 'svacina', prepMin: 3, cookMin: 0, fridgeDays: 0, freezer: false, equipment: [], tags: ['lehké'], pantry: ['pepř'] },
+    [['ryzove_chlebicky', 24], ['cottage', 150], ['paprika', 80]],
+    ['Cottage na chlebíčky až při jídle, paprika na proužky.']),
+  R('skyr_mandle_mandarinka', 'Skyr s mandlemi a mandarinkou', 'svacina',
+    { emoji: '🍊', protein: 'mlecne', color: 'svacina', prepMin: 2, cookMin: 0, fridgeDays: 0, freezer: false, equipment: [], tags: ['bez vaření'], pantry: [] },
+    [['skyr', 200], ['mandle', 15], ['mandarinka', 140]],
+    ['Skyr, mandle, mandarinka. Hotovo.']),
+];
+
+const RECIPE_IDS = RECIPES.map((r) => r.id);
+
+function recipeById(id, customRecipes = []) {
+  return RECIPES.find((r) => r.id === id) ?? customRecipes.find((r) => r.id === id) ?? null;
+}
+
+/** Recept jako jídlo appky (id r_<recept>) — makra a snědeno fungují beze změny. */
+function recipeToMeal(recipe) {
+  const slot = recipe.kind === 'hlavni' ? null : recipe.kind;
+  return { id: `r_${recipe.id}`, name: recipe.name, slot, items: recipe.items.map((it) => ({ ...it })), recipeId: recipe.id, starter: true };
+}
+
+/** Makra referenční porce receptu. */
+function recipeMacros(recipe, customFoods = []) {
+  return roundMacros(mealMacros({ items: recipe.items }, customFoods));
+}
+
+
+// ===== src/engine/cooking.js =====
+// Plán vaření do krabiček: dvě vaření týdně (neděle → Po–St, středa → Čt–Ne),
+// každé vaření 2 jídla, krabičky pro oba podle jejich kalorií, snídaně a svačiny
+// na každého zvlášť. Deterministické podle seedu (stejný vstup = stejný plán),
+// s pestrostí (jiná bílkovina v každém jídle, nic z minulého týdne).
+
+const BOX_SLOTS = ['obed', 'vecere'];
+const BOX_SHARE = (FOOD_SLOTS.find((s) => s.id === 'obed').share + FOOD_SLOTS.find((s) => s.id === 'vecere').share) / 2; // 0,275
+const BREAKFAST_SHARE = FOOD_SLOTS.find((s) => s.id === 'snidane').share; // 0,25
+const SNACK_SHARE = FOOD_SLOTS.find((s) => s.id === 'svacina1').share;    // 0,10
+const PORTION_STEP_BOX = 0.05;
+
+// Neděle a středa: vaření pokrývá Po–St (3 dny) a Čt–Ne (4 dny).
+function cookSessionsFor(weekStart, cookDays = [0, 3]) {
+  const days = weekDays(weekStart);
+  const [a, b] = cookDays.length === 2 ? cookDays : [0, 3];
+  // cookDays: den v týdnu (0 = Ne). Neděle před týdnem = weekStart − 1.
+  const cookDate = (dow) => (dow === 0 ? addDays(weekStart, -1) : addDays(weekStart, dow - 1));
+  const splitAt = b === 0 ? 7 : b - 1; // index prvního dne druhého vaření (St = 2 → Čt = 3)
+  return [
+    { id: 'A', cookDate: cookDate(a), coversDays: days.slice(0, Math.max(1, Math.min(7, splitAt + 1))) },
+    { id: 'B', cookDate: cookDate(b), coversDays: days.slice(Math.max(1, Math.min(7, splitAt + 1))) },
+  ].filter((s) => s.coversDays.length);
+}
+
+// Násobek referenční porce pro člověka a jídlo (kolikrát víc než referenční porce).
+function portionFactor(memberKcal, share, recipeKcal) {
+  if (!(recipeKcal > 0) || !(memberKcal > 0)) return 1;
+  const raw = (memberKcal * share) / recipeKcal;
+  return Math.round(Math.round(clamp(raw, 0.5, 2.2) / PORTION_STEP_BOX) * PORTION_STEP_BOX * 100) / 100;
+}
+
+function seededRandom(seed) {
+  let s = 0;
+  for (const ch of String(seed)) s = (s * 31 + ch.charCodeAt(0)) >>> 0;
+  return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+}
+
+/**
+ * Výběr jídel do vaření: pestrá bílkovina, vydrží do posledního dne (nebo mrazák),
+ * přednost tomu, co je v akci, nic z minulého týdne, nic vyloučeného.
+ */
+function pickDishes(candidates, count, { minFridgeDays, used, proteins, rnd, discounted, customFoods }) {
+  const scored = candidates
+    .filter((r) => !used.has(r.id))
+    .filter((r) => r.fridgeDays >= minFridgeDays || r.freezer)
+    .map((r) => {
+      const disc = mealDiscountShare({ items: r.items }, discounted);
+      const m = recipeMacros(r, customFoods);
+      const density = m.p / Math.max(m.kcal, 1);
+      const sameProtein = proteins.has(r.protein) ? -2 : 0;
+      const fits = r.fridgeDays >= minFridgeDays ? 0.4 : 0; // bez mrazení je jednodušší
+      return { r, score: disc * 2 + density * 6 + sameProtein + fits + rnd() * 0.8 };
+    })
+    .sort((a, b) => b.score - a.score);
+  const out = [];
+  for (const { r } of scored) {
+    if (out.length >= count) break;
+    if (out.some((x) => x.protein === r.protein)) continue;
+    out.push(r);
+    used.add(r.id);
+    proteins.add(r.protein);
+  }
+  // kdyby pestrost nešla dodržet, doplň bez ohledu na bílkovinu
+  for (const { r } of scored) {
+    if (out.length >= count) break;
+    if (out.includes(r) || used.has(r.id)) continue;
+    out.push(r); used.add(r.id);
+  }
+  return out;
+}
+
+/**
+ * Naplánuje týden vaření.
+ * @param members { [userId]: { name, kcal, proteinG } } — oba lidé (kdo chybí, ten se neplánuje)
+ * @param previous pole receptů z minulého týdne (pestrost mezi týdny)
+ * @param pick volitelný výběr (z AI návrhu): { A: [ids], B: [ids], breakfasts: {userId: [ids]}, snacks: {userId: [ids]} }
+ * @returns plán { weekStart, updatedAt, sessions: [{ id, cookDate, coversDays, dishes: [{ recipeId, boxes: {uid: n}, factor: {uid: f} }], cooked }], breakfasts, snacks, assignments: { iso: { obed: recipeId, vecere: recipeId } } }
+ */
+function planCookWeek({ weekStart, members, customRecipes = [], customFoods = [], discounted = {}, cookDays = [0, 3], previous = [], seed = weekStart, pick = null, exclude = [] }) {
+  const memberIds = Object.keys(members).filter((id) => members[id]?.kcal > 0);
+  if (!memberIds.length) return null;
+  const all = [...RECIPES, ...customRecipes].filter((r) => !exclude.includes(r.id));
+  const mains = all.filter((r) => r.kind === 'hlavni');
+  const rnd = seededRandom(seed);
+  const used = new Set(previous);
+  const proteins = new Set();
+  const sessions = cookSessionsFor(weekStart, cookDays).map((s) => {
+    const wanted = pick?.[s.id]?.map((id) => recipeById(id, customRecipes)).filter(Boolean) ?? [];
+    for (const r of wanted) { used.add(r.id); proteins.add(r.protein); }
+    const dishes = wanted.length >= 2 ? wanted.slice(0, 2)
+      : [...wanted, ...pickDishes(mains, 2 - wanted.length, { minFridgeDays: s.coversDays.length, used, proteins, rnd, discounted, customFoods })];
+    return { ...s, dishes, cooked: false };
+  });
+
+  // Přiřazení: den 1 oběd = jídlo 1, večeře = jídlo 2; další den prohodit — nikdy totéž dvakrát za den.
+  const assignments = {};
+  for (const s of sessions) {
+    s.coversDays.forEach((iso, i) => {
+      const [d1, d2] = s.dishes.length >= 2 ? s.dishes : [s.dishes[0], s.dishes[0]];
+      assignments[iso] = i % 2 === 0 ? { obed: d1?.id ?? null, vecere: d2?.id ?? null } : { obed: d2?.id ?? null, vecere: d1?.id ?? null };
+    });
+  }
+
+  // Krabičky a násobky porcí na člověka a jídlo.
+  const outSessions = sessions.map((s) => ({
+    id: s.id, cookDate: s.cookDate, coversDays: s.coversDays, cooked: false,
+    dishes: s.dishes.map((r) => {
+      const m = recipeMacros(r, customFoods);
+      const boxes = {}; const factor = {};
+      for (const uid of memberIds) {
+        boxes[uid] = s.coversDays.reduce((n, iso) => n + BOX_SLOTS.filter((slot) => assignments[iso][slot] === r.id).length, 0);
+        factor[uid] = portionFactor(members[uid].kcal, BOX_SHARE, m.kcal);
+      }
+      return { recipeId: r.id, boxes, factor };
+    }),
+  }));
+
+  // Snídaně a svačiny: 2 + 2 na člověka, střídají se po dnech (Po–Čt / Pá–Ne).
+  const breakfasts = {}; const snacks = {};
+  const bfAll = all.filter((r) => r.kind === 'snidane');
+  const snAll = all.filter((r) => r.kind === 'svacina');
+  const rotate = (arr, n, offset) => arr.length ? Array.from({ length: n }, (_, i) => arr[(i + offset) % arr.length]) : [];
+  memberIds.forEach((uid, idx) => {
+    const wantedB = pick?.breakfasts?.[uid]?.map((id) => recipeById(id, customRecipes)).filter(Boolean);
+    const wantedS = pick?.snacks?.[uid]?.map((id) => recipeById(id, customRecipes)).filter(Boolean);
+    const bf = wantedB?.length ? wantedB.slice(0, 2) : rotate([...bfAll].sort(() => rnd() - 0.5), 2, idx);
+    const sn = wantedS?.length ? wantedS.slice(0, 2) : rotate([...snAll].sort(() => rnd() - 0.5), 2, idx);
+    breakfasts[uid] = bf.map((r) => ({ recipeId: r.id, factor: portionFactor(members[uid].kcal, BREAKFAST_SHARE, recipeMacros(r, customFoods).kcal) }));
+    snacks[uid] = sn.map((r) => ({ recipeId: r.id, factor: portionFactor(members[uid].kcal, SNACK_SHARE, recipeMacros(r, customFoods).kcal) }));
+  });
+
+  return { weekStart, updatedAt: new Date().toISOString(), cookDays, members: memberIds, sessions: outSessions, breakfasts, snacks, assignments };
+}
+
+/** Vymění jídlo ve vaření (zachová krabičky, přepočítá násobky). */
+function swapDish(plan, sessionId, oldRecipeId, newRecipeId, members, customRecipes = [], customFoods = []) {
+  const s = plan.sessions.find((x) => x.id === sessionId);
+  const dish = s?.dishes.find((d) => d.recipeId === oldRecipeId);
+  const r = recipeById(newRecipeId, customRecipes);
+  if (!s || !dish || !r) return plan;
+  const m = recipeMacros(r, customFoods);
+  dish.recipeId = newRecipeId;
+  for (const uid of Object.keys(dish.factor)) dish.factor[uid] = portionFactor(members[uid]?.kcal, BOX_SHARE, m.kcal);
+  for (const iso of s.coversDays) for (const slot of BOX_SLOTS) if (plan.assignments[iso]?.[slot] === oldRecipeId) plan.assignments[iso][slot] = newRecipeId;
+  plan.updatedAt = new Date().toISOString();
+  return plan;
+}
+
+/** Denní rozpis jednoho člověka z plánu vaření — přesně ve tvaru, který appka používá pro „Dnes“. */
+function userDayPlans(plan, userId, customRecipes = []) {
+  if (!plan?.assignments || !plan.members?.includes(userId)) return null;
+  const days = {};
+  const dayList = weekDays(plan.weekStart);
+  const bf = plan.breakfasts?.[userId] ?? [];
+  const sn = plan.snacks?.[userId] ?? [];
+  dayList.forEach((iso, i) => {
+    const day = {};
+    const b = bf.length ? bf[i < 4 ? 0 : 1 % bf.length] : null;
+    if (b) day.snidane = { mealId: `r_${b.recipeId}`, portion: b.factor };
+    if (sn[0]) day.svacina1 = { mealId: `r_${sn[0].recipeId}`, portion: sn[0].factor };
+    if (sn[1] ?? sn[0]) day.svacina2 = { mealId: `r_${(sn[1] ?? sn[0]).recipeId}`, portion: (sn[1] ?? sn[0]).factor };
+    for (const slot of BOX_SLOTS) {
+      const rid = plan.assignments[iso]?.[slot];
+      if (!rid) continue;
+      const dish = plan.sessions.flatMap((s) => s.dishes).find((d) => d.recipeId === rid);
+      day[slot] = { mealId: `r_${rid}`, portion: dish?.factor?.[userId] ?? 1 };
+    }
+    days[iso] = day;
+  });
+  return days;
+}
+
+/** Suroviny jednoho jídla ve vaření: celkem gramů podle krabiček obou. */
+function dishIngredients(dish, recipe) {
+  const portions = Object.keys(dish.boxes).reduce((a, uid) => a + (dish.boxes[uid] ?? 0) * (dish.factor[uid] ?? 1), 0);
+  return { portions: Math.round(portions * 100) / 100, items: recipe.items.map((it) => ({ foodId: it.foodId, grams: Math.round(it.grams * portions), perPortion: it.grams })) };
+}
+
+/**
+ * Nákupní seznam domácnosti z plánu vaření: všechna vaření + snídaně a svačiny obou
+ * × dny, sečteno a zaokrouhleno na balení. Stejný tvar jako shoppingList, navíc
+ * „uses“ = ve kterých jídlech se surovina používá.
+ */
+function householdShoppingList(plan, customRecipes = [], customFoods = [], discounted = {}) {
+  const grams = {}; const uses = {};
+  const add = (foodId, g, name) => { grams[foodId] = (grams[foodId] ?? 0) + g; (uses[foodId] ??= new Set()).add(name); };
+  for (const s of plan?.sessions ?? []) {
+    for (const d of s.dishes) {
+      const r = recipeById(d.recipeId, customRecipes);
+      if (!r) continue;
+      const { items } = dishIngredients(d, r);
+      for (const it of items) add(it.foodId, it.grams, r.name);
+    }
+  }
+  const dayList = weekDays(plan.weekStart);
+  for (const uid of plan.members ?? []) {
+    const bf = plan.breakfasts?.[uid] ?? [];
+    const sn = plan.snacks?.[uid] ?? [];
+    dayList.forEach((iso, i) => {
+      const b = bf.length ? bf[i < 4 ? 0 : 1 % bf.length] : null;
+      const entries = [b, sn[0], sn[1] ?? sn[0]].filter(Boolean);
+      for (const e of entries) {
+        const r = recipeById(e.recipeId, customRecipes);
+        if (!r) continue;
+        for (const it of r.items) add(it.foodId, it.grams * e.factor, r.name);
+      }
+    });
+  }
+  const byCat = {};
+  for (const [foodId, g] of Object.entries(grams)) {
+    const food = foodById(foodId, customFoods);
+    if (!food) continue;
+    const packG = food.packG ?? 500;
+    const packs = Math.max(1, Math.ceil(g / packG - 0.05));
+    const countable = !!food.pieceG && (food.loose || /\bks\b/.test(food.packLabel ?? ''));
+    const pieces = countable ? Math.ceil(g / food.pieceG) : null;
+    const cat = food.cat ?? 'ostatni';
+    (byCat[cat] ??= []).push({
+      foodId, name: food.name, grams: Math.round(g), packs, pieces,
+      packLabel: food.packLabel ?? (packG >= 1000 ? `${packG / 1000} kg` : `${packG} g`),
+      discount: discounted[foodId] ?? null,
+      uses: [...(uses[foodId] ?? [])],
+    });
+  }
+  return Object.keys(FOOD_CATEGORIES)
+    .filter((cat) => byCat[cat])
+    .map((cat) => ({ cat, label: FOOD_CATEGORIES[cat], items: byCat[cat].sort((a, b) => b.grams - a.grams) }));
+}
+
+/** Kolik krabiček pro koho a jak velké (na kartu vaření). */
+function dishSummary(dish, recipe, members, customFoods = []) {
+  const m = recipeMacros(recipe, customFoods);
+  const total = Object.values(dish.boxes).reduce((a, n) => a + n, 0);
+  const per = Object.keys(dish.boxes).map((uid) => ({
+    userId: uid, name: members[uid]?.name ?? uid, boxes: dish.boxes[uid], factor: dish.factor[uid],
+    kcal: Math.round(m.kcal * dish.factor[uid]), p: Math.round(m.p * dish.factor[uid]),
+  }));
+  return { total, per, ref: m };
 }
 
 
@@ -7286,30 +7875,29 @@ function milestonesCard(state, summary) {
 
 
 // ===== src/app/view_food.js =====
-// Jídlo: dnes (snědeno jedním ťuknutím), týden (plán na cíle z enginu), nákup (sečteno
-// a zaokrouhleno na balení, s akcemi z Lidlu), jídla (makra při tvorbě), akce.
+// Jídlo: Dnes (snědeno jedním ťuknutím), Vaření (plán krabiček na týden pro oba,
+// recepty krok za krokem), Nákup (seznam domácnosti sečtený z vaření, zaokrouhlený
+// na balení, s akcemi z Lidlu), Recepty (knihovna + vlastní jídla), Akce.
 
-
-
-
-
-
-let sub = 'dnes'; // dnes | tyden | nakup | jidla | akce
+let sub = 'dnes'; // dnes | vareni | nakup | recepty | akce
+let cookWeekOffset = null; // null = automaticky (v neděli příští týden), 0 = tento, 1 = příští
+let replanCounter = 0;
 const SUBS = [
   { id: 'dnes', label: 'Dnes' },
-  { id: 'tyden', label: 'Týden' },
+  { id: 'vareni', label: 'Vaření' },
   { id: 'nakup', label: 'Nákup' },
-  { id: 'jidla', label: 'Jídla' },
+  { id: 'recepty', label: 'Recepty' },
   { id: 'akce', label: 'Akce' },
 ];
 
 function renderFood(root) {
   const state = Store.state;
   ensureFood(state);
+  syncRecipesAndPlan(state);
   const c = ctx(state);
   clearEl(root);
 
-  const views = { dnes: viewToday, tyden: viewWeek, nakup: viewShopping, jidla: viewMeals, akce: viewDiscounts };
+  const views = { dnes: viewToday, vareni: viewCooking, nakup: viewShopping, recepty: viewRecipes, akce: viewDiscounts };
   root.append(h('div', { class: 'screen' },
     h('div', { class: 'topbar' },
       h('h1', { class: 'display' }, 'Jídlo'),
@@ -7334,19 +7922,33 @@ function ctx(state) {
   const plan = food.plan && food.plan.weekStart === weekStart ? food.plan : null;
   const feed = food.discounts;
   const discounted = matchDiscounts({ items: validDiscountItems(feed, today) }, food.customFoods);
-  return { food, today, weekStart, plan, feed, discounted, meals: food.meals, customFoods: food.customFoods, targets: state.targets };
+  const cookWeek = activeCookWeekStart(today);
+  return {
+    food, today, weekStart, plan, feed, discounted, meals: food.meals, customFoods: food.customFoods, targets: state.targets,
+    cookWeek, cookPlan: Household.state.cook[cookWeek] ?? null, members: Household.members(state), customRecipes: Household.state.customRecipes ?? [],
+  };
 }
 
-const fmtKcal = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+// V neděli už se plánuje příští týden (vaří se večer na pondělí), jinak tento.
+function activeCookWeekStart(today) {
+  const dow = new Date(`${today}T12:00:00`).getDay();
+  const thisWeek = weekStartOf(today);
+  const offset = cookWeekOffset ?? (dow === 0 ? 1 : 0);
+  return addDays(thisWeek, offset * 7);
+}
+
+const fmtKcal = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 const fmtPortion = (p) => (p === 1 ? '1×' : `${String(Math.round(p * 100) / 100).replace('.', ',')}×`);
 const slotDef = (id) => FOOD_SLOTS.find((s) => s.id === id);
-const slotTime = (s) => `${s.hour}:${String(s.minute).padStart(2, '0')}`;
+const slotTime = (slot) => `${slot.hour}:${String(slot.minute).padStart(2, '0')}`;
 const mealById = (c, id) => c.meals.find((m) => m.id === id) ?? null;
 const SLOT_KINDS = [
   { id: 'snidane', label: 'Snídaně' }, { id: 'svacina', label: 'Svačina' },
   { id: 'obed', label: 'Oběd' }, { id: 'vecere', label: 'Večeře' }, { id: null, label: 'Kdykoli' },
 ];
 const slotKindLabel = (slot) => SLOT_KINDS.find((k) => k.id === slot)?.label ?? 'Kdykoli';
+const allRecipes = () => [...RECIPES, ...(Household.state.customRecipes ?? [])];
+const findRecipe = (id) => recipeById(id, Household.state.customRecipes ?? []);
 
 function macroText(m) {
   const r = roundMacros(m);
@@ -7360,6 +7962,36 @@ function dayBadge(totals, targets) {
   const cls = kcalOk && pOk ? 'ok' : 'warn';
   const txt = !pOk ? `${totals.p} g B — málo` : !kcalOk ? (totals.kcal > targets.kcal ? 'přes cíl' : 'pod cílem') : 'sedí';
   return h('span', { class: `badge ${cls}` }, txt);
+}
+
+// Recepty žijí i jako „jídla“ appky (id r_…): snědeno, makra a notifikace jedou beze změny.
+// A plán vaření domácnosti se promítá do denního rozpisu tohohle člověka.
+function syncRecipesAndPlan(state) {
+  let changed = false;
+  const meals = state.food.meals;
+  for (const r of allRecipes()) {
+    const meal = recipeToMeal(r);
+    const i = meals.findIndex((m) => m.id === meal.id);
+    if (i < 0) { meals.push(meal); changed = true; }
+    else if (JSON.stringify(meals[i].items) !== JSON.stringify(meal.items) || meals[i].name !== meal.name) { meals[i] = meal; changed = true; }
+  }
+  const me = currentUser();
+  const today = todayISO();
+  const weekStart = weekStartOf(today);
+  const hhPlan = Household.state.cook[weekStart];
+  if (hhPlan && hhPlan.members?.includes(me)) {
+    const current = state.food.plan;
+    if (!current || current.weekStart !== weekStart || current.sourceUpdatedAt !== hhPlan.updatedAt) {
+      const days = userDayPlans(hhPlan, me, Household.state.customRecipes ?? []);
+      if (days) {
+        const totals = {};
+        for (const iso of Object.keys(days)) totals[iso] = dayPlanMacros(days[iso], meals, state.food.customFoods);
+        state.food.plan = { weekStart, days, totals, source: 'household', sourceUpdatedAt: hhPlan.updatedAt };
+        changed = true;
+      }
+    }
+  }
+  if (changed) Store.mutate(() => {}, { rerender: false, markDirty: false });
 }
 
 // ---------- DNES ----------
@@ -7456,41 +8088,11 @@ function slotRow(c, slot, entry, eaten) {
 }
 
 function planCta(c, lead) {
-  const hasMeals = c.meals.length > 0;
   return h('div', { class: 'card stack' },
     h('div', { class: 'label' }, 'Jídelníček na týden'),
-    h('p', { class: 'small', style: 'margin:0' }, `${lead} Plán se skládá z tvých jídel tak, aby každý den seděl na ${c.targets ? `${fmtKcal(c.targets.kcal)} kcal a ${c.targets.proteinG} g bílkovin` : 'tvé cíle'} — a dává přednost tomu, co je zrovna v akci v Lidlu.`),
-    hasMeals
-      ? h('button', { class: 'btn primary big', onClick: () => doPlan(c) }, 'Naplánovat tento týden')
-      : h('div', { class: 'stack', style: 'gap:8px' },
-          h('p', { class: 'muted', style: 'font-size:12.5px;margin:0' }, 'Nemáš zatím žádná jídla. Načti si 14 základních (kuřecí s rýží, ovesná kaše, tvaroh s medem…) a hned je uprav podle sebe.'),
-          h('button', { class: 'btn primary big', onClick: () => { loadStarters(); doPlan(ctx(Store.state)); } }, 'Načíst základní jídla a naplánovat'),
-        ),
+    h('p', { class: 'small', style: 'margin:0' }, `${lead} Denní rozpis vzniká z plánu vaření domácnosti — dvě vaření týdně, krabičky pro oba podle kalorií, snídaně a svačiny každému zvlášť.`),
+    h('button', { class: 'btn primary big', onClick: () => { sub = 'vareni'; scrollTop(0); Store.onChange?.(); } }, 'Naplánovat vaření'),
   );
-}
-
-function loadStarters() {
-  Store.mutate((s) => {
-    const have = new Set(s.food.meals.map((m) => m.id));
-    for (const m of starterMeals()) if (!have.has(m.id)) s.food.meals.push(m);
-  }, { rerender: false });
-}
-
-/** Naplánuje týden; sloty, které už jsou dnes snědené, drží. */
-function doPlan(c) {
-  const state = Store.state;
-  ensureFood(state);
-  if (!state.targets) { toast('Cíle výživy ještě nejsou — dokonči onboarding.'); return; }
-  if (!state.food.meals.length) { toast('Nejdřív si ulož nějaká jídla.'); return; }
-  const keep = {};
-  const eatenToday = state.food.eaten[c.today] ?? {};
-  const oldDay = state.food.plan?.weekStart === c.weekStart ? state.food.plan.days?.[c.today] : null;
-  for (const slot of FOOD_SLOTS) if (eatenToday[slot.id] && oldDay?.[slot.id]) (keep[c.today] ??= {})[slot.id] = oldDay[slot.id];
-  const plan = planWeek({ targets: state.targets, meals: state.food.meals, customFoods: state.food.customFoods, weekStart: c.weekStart, discounted: c.discounted, keep });
-  if (!plan) { toast('Z těchhle jídel plán nejde poskládat.'); return; }
-  Store.mutate((s) => { s.food.plan = plan; }, { publish: true });
-  const inAkce = Object.keys(c.discounted).length;
-  toast(inAkce ? `Týden naplánován — ${inAkce} potravin z akce.` : 'Týden naplánován.');
 }
 
 function recomputeDay(s, iso) {
@@ -7584,76 +8186,309 @@ function openExtraModal(iso) {
   setTimeout(() => nameIn.focus(), 50);
 }
 
-// ---------- TÝDEN ----------
 
-function viewWeek(state, c) {
-  if (!c.plan) return [planCta(c, 'Tento týden ještě nemá jídelníček.')];
+// ---------- VAŘENÍ ----------
+
+const CZ_DAY_FULL = ['neděle', 'pondělí', 'úterý', 'středa', 'čtvrtek', 'pátek', 'sobota'];
+const dayName = (iso) => CZ_DAY_FULL[new Date(`${iso}T12:00:00`).getDay()];
+const dayShort = (iso) => CZ_DAYS[new Date(`${iso}T12:00:00`).getDay()];
+const RECIPE_COLOR = { maso: 'cat-maso', ryba: 'cat-mlecne', vege: 'cat-zelenina', snidane: 'cat-sacharidy', svacina: 'cat-ovoce' };
+const recipeColorClass = (r) => RECIPE_COLOR[r.color] ?? 'cat-ostatni';
+const PROTEIN_LABEL = { kure: 'kuřecí', kruti: 'krůtí', hovezi: 'hovězí', veprove: 'vepřové', ryba: 'ryba', vejce: 'vejce', mlecne: 'mléčné', lusteniny: 'luštěniny' };
+
+function viewCooking(state, c) {
   const out = [];
+  const memberIds = Object.keys(c.members);
+  const dow = new Date(`${c.today}T12:00:00`).getDay();
+  const isNext = c.cookWeek > c.weekStart;
+
+  out.push(h('div', { class: 'card stack' },
+    h('div', { class: 'row between' },
+      h('div', { class: 'label' }, `${isNext ? 'Příští týden' : 'Tento týden'} · od ${fmtDate(c.cookWeek)}`),
+      h('div', { class: 'row', style: 'gap:4px' },
+        h('button', { class: `chip plain${!isNext ? ' active' : ''}`, style: 'padding:3px 9px;font-size:12px', onClick: () => { cookWeekOffset = 0; Store.onChange?.(); } }, 'tento'),
+        h('button', { class: `chip plain${isNext ? ' active' : ''}`, style: 'padding:3px 9px;font-size:12px', onClick: () => { cookWeekOffset = 1; Store.onChange?.(); } }, 'příští'),
+      ),
+    ),
+    h('div', { class: 'row', style: 'flex-wrap:wrap;gap:6px' },
+      ...memberIds.map((id) => h('span', { class: `person-chip person-${id}` }, `${c.members[id].name} · ${fmtKcal(c.members[id].kcal)} kcal · ${c.members[id].proteinG} g B`)),
+    ),
+    memberIds.length < 2 ? h('p', { class: 'muted', style: 'font-size:12.5px;margin:0' },
+      `${USERS[otherUser()]?.name ?? 'Druhý'} zatím není v domácnosti (potřebuje projít nastavení ve své appce se stejným tokenem). Plánuje se jen pro tebe.`) : null,
+    dow === 0 && !isNext ? h('p', { class: 'muted', style: 'font-size:12.5px;margin:0' }, 'Je neděle — přepni na příští týden, ať víš, co dnes uvařit.') : null,
+  ));
+
+  if (!c.cookPlan) {
+    const proposal = Household.state.proposals?.[c.cookWeek];
+    out.push(h('div', { class: 'card stack' },
+      h('div', { class: 'label' }, 'Plán vaření'),
+      h('p', { class: 'small', style: 'margin:0' },
+        'Dvě vaření týdně: v neděli na pondělí až středu, ve středu na čtvrtek až neděli. Každé vaření dvě jídla, krabičky pro oba podle jejich kalorií, snídaně a svačiny každému zvlášť. Z toho vznikne nákup i recepty.'),
+      proposal ? h('div', { class: 'card stack', style: 'border-color:var(--accent);gap:6px' },
+        h('div', { class: 'label accent-text' }, 'Návrh od AI'),
+        h('p', { class: 'small', style: 'margin:0' }, proposal.note ?? 'AI navrhla jídla na tenhle týden podle akcí, pestrosti a vašich cílů.'),
+        h('div', { class: 'muted', style: 'font-size:12.5px' }, [...(proposal.pick?.A ?? []), ...(proposal.pick?.B ?? [])].map((id) => findRecipe(id)?.name ?? id).join(' · ')),
+        h('button', { class: 'btn primary', onClick: () => makePlan(c, { pick: proposal.pick }) }, 'Použít návrh'),
+      ) : null,
+      h('button', { class: `btn ${proposal ? '' : 'primary'} big`, onClick: () => makePlan(c) }, 'Naplánovat týden'),
+    ));
+    return out;
+  }
+
+  const plan = c.cookPlan;
+  for (const s of plan.sessions) out.push(sessionCard(c, plan, s));
+  out.push(dayStripCard(c, plan));
+  out.push(breakfastCard(c, plan));
   out.push(h('div', { class: 'row', style: 'gap:8px' },
-    h('button', { class: 'btn grow', onClick: () => doPlan(c) }, 'Přeplánovat'),
+    h('button', { class: 'btn grow', onClick: () => { replanCounter++; makePlan(c, { seed: `${c.cookWeek}#${replanCounter}` }); } }, 'Přeplánovat jinak'),
     h('button', {
       class: 'btn ghost',
       onClick: () => {
         const { close } = openModal(
-          h('h3', {}, 'Smazat plán týdne?'),
-          h('p', { class: 'small' }, 'Jídla zůstanou, zmizí jen rozvrh. Co je zapsané jako snědené, zůstane.'),
+          h('h3', {}, 'Smazat plán vaření?'),
+          h('p', { class: 'small' }, 'Zmizí rozvrh krabiček i nákup pro tenhle týden. Co je zapsané jako snědené, zůstane.'),
           h('div', { class: 'row' },
             h('button', { class: 'btn ghost grow', onClick: () => close() }, 'Zpět'),
-            h('button', { class: 'btn danger grow', onClick: () => { Store.mutate((s) => { s.food.plan = null; }); close(); } }, 'Smazat'),
+            h('button', { class: 'btn danger grow', onClick: () => { Household.mutate((hh) => { delete hh.cook[c.cookWeek]; }); close(); } }, 'Smazat'),
           ),
         );
       },
     }, 'Smazat'),
   ));
-  for (const iso of weekDays(c.weekStart)) {
-    const day = c.plan.days[iso] ?? {};
-    const totals = c.plan.totals[iso] ?? dayPlanMacros(day, c.meals, c.customFoods);
-    const isToday = iso === c.today;
-    const past = iso < c.today;
-    out.push(h('div', { class: `card stack${isToday ? ' today-outline' : ''}`, style: past ? 'opacity:0.7' : '' },
-      h('div', { class: 'row between' },
-        h('div', { class: 'label' }, `${fmtDate(iso)}${isToday ? ' · dnes' : ''}`),
-        h('div', { class: 'row', style: 'gap:8px' },
-          h('span', { class: 'num muted', style: 'font-size:12px' }, `${fmtKcal(totals.kcal)} kcal · ${totals.p} g B`),
-          dayBadge(totals, c.targets),
-        ),
+  return out;
+}
+
+function previousWeekRecipes(weekStart) {
+  const prev = Household.state.cook[addDays(weekStart, -7)];
+  return prev ? prev.sessions.flatMap((s) => s.dishes.map((d) => d.recipeId)) : [];
+}
+
+function makePlan(c, { pick = null, seed = null } = {}) {
+  const members = c.members;
+  if (!Object.keys(members).length) { toast('Nejdřív dokonči nastavení — bez cílů výživy nejde plánovat.'); return; }
+  const plan = planCookWeek({
+    weekStart: c.cookWeek, members, customRecipes: c.customRecipes, customFoods: c.customFoods, discounted: c.discounted,
+    cookDays: Household.state.prefs?.cookDays ?? [0, 3], previous: previousWeekRecipes(c.cookWeek), seed: seed ?? c.cookWeek, pick,
+    exclude: Household.state.prefs?.excludedRecipes ?? [],
+  });
+  if (!plan) { toast('Plán nejde sestavit.'); return; }
+  Household.mutate((hh) => { hh.cook[c.cookWeek] = plan; });
+  const inAkce = Object.keys(c.discounted).length;
+  toast(inAkce ? `Týden naplánován — ${inAkce} potravin z akce.` : 'Týden naplánován.');
+}
+
+function sessionCard(c, plan, s) {
+  const covers = `${dayShort(s.coversDays[0])}–${dayShort(s.coversDays.at(-1))}`;
+  const past = s.cookDate < c.today;
+  return h('div', { class: `card stack cook-session${s.cooked ? ' cooked' : ''}` },
+    h('div', { class: 'row between' },
+      h('div', {},
+        h('div', { class: 'label' }, `${dayName(s.cookDate)} ${fmtDate(s.cookDate)}`),
+        h('div', { style: 'font-weight:700;font-size:16px' }, `Uvař na ${covers} (${s.coversDays.length} ${s.coversDays.length === 1 ? 'den' : s.coversDays.length < 5 ? 'dny' : 'dní'})`),
       ),
-      h('div', { class: 'stack', style: 'gap:0' },
-        ...FOOD_SLOTS.map((slot) => {
-          const e = day[slot.id];
-          const meal = e ? mealById(c, e.mealId) : null;
-          return h('button', { class: 'history-row', onClick: () => openSlotModal(c, iso, slot.id) },
-            h('span', { class: 'muted', style: 'font-size:12px;width:78px;text-align:left;flex:none' }, (slot.id === 'svacina2' ? 'Svačina 2' : slot.label)),
-            h('span', { class: 'grow', style: 'text-align:left' }, meal ? meal.name : h('span', { class: 'faint' }, '—')),
-            meal && e.portion !== 1 ? h('span', { class: 'num muted', style: 'font-size:12px' }, fmtPortion(e.portion)) : null,
-          );
-        }),
+      h('button', {
+        class: `btn small ${s.cooked ? 'ghost' : ''}`,
+        onClick: () => Household.mutate((hh) => { const ss = hh.cook[plan.weekStart]?.sessions.find((x) => x.id === s.id); if (ss) ss.cooked = !ss.cooked; hh.cook[plan.weekStart].updatedAt = new Date().toISOString(); }),
+      }, s.cooked ? '✓ uvařeno' : 'Uvařeno'),
+    ),
+    ...s.dishes.map((d) => dishRow(c, plan, s, d)),
+    past && !s.cooked ? h('p', { class: 'warn-text', style: 'font-size:12px;margin:0' }, 'Termín vaření už byl — když jsi nevařil, vyměň nebo přeplánuj.') : null,
+  );
+}
+
+function dishRow(c, plan, s, d) {
+  const r = findRecipe(d.recipeId);
+  if (!r) return null;
+  const sum = dishSummary(d, r, c.members, c.customFoods);
+  const needsFreezer = s.coversDays.length > r.fridgeDays;
+  const freezeFrom = needsFreezer ? s.coversDays[r.fridgeDays] : null;
+  return h('div', { class: `dish-row ${recipeColorClass(r)}` },
+    h('div', { class: 'dish-emoji' }, r.emoji),
+    h('div', { class: 'grow', style: 'min-width:0' },
+      h('div', { class: 'dish-name' }, r.name),
+      h('div', { class: 'dish-boxes' },
+        h('b', {}, `${sum.total} krabiček`),
+        ...sum.per.map((p) => h('span', { class: `person-chip person-${p.userId}` }, `${p.name} ${p.boxes}×`)),
       ),
+      h('div', { class: 'muted', style: 'font-size:12px' },
+        sum.per.map((p) => `${p.name}: ${fmtPortion(p.factor)} porce ≈ ${fmtKcal(p.kcal)} kcal · ${p.p} g B`).join(' · ')),
+      h('div', { class: 'muted', style: 'font-size:12px' },
+        `${r.prepMin + r.cookMin} min · ${PROTEIN_LABEL[r.protein] ?? r.protein} · v lednici ${r.fridgeDays} ${r.fridgeDays === 1 ? 'den' : r.fridgeDays < 5 ? 'dny' : 'dní'}${r.freezer ? ' · mrazák ano' : ' · nemrazit'}`),
+      needsFreezer ? h('div', { class: 'warn-text', style: 'font-size:12px' },
+        r.freezer ? `Krabičky od ${dayShort(freezeFrom)} dej hned do mrazáku (v lednici vydrží jen ${r.fridgeDays} dny).` : `Vydrží jen ${r.fridgeDays} dny a nemrazí se — jez ho první dny, nebo vyměň.`) : null,
+      h('div', { class: 'row', style: 'gap:6px;margin-top:6px' },
+        h('button', { class: 'btn small primary', onClick: () => openRecipeModal(r, { dish: d, members: c.members }) }, 'Recept'),
+        h('button', { class: 'btn small', onClick: () => openSwapDishModal(c, plan, s, d) }, 'Vyměnit'),
+      ),
+    ),
+  );
+}
+
+function dayStripCard(c, plan) {
+  const days = weekDays(plan.weekStart);
+  return h('div', { class: 'card stack', style: 'gap:8px' },
+    h('div', { class: 'label' }, 'Co se jí který den'),
+    h('div', { class: 'daystrip' },
+      ...days.map((iso) => {
+        const a = plan.assignments[iso] ?? {};
+        const l = findRecipe(a.obed); const v = findRecipe(a.vecere);
+        const isToday = iso === c.today;
+        return h('div', { class: `ds-cell${isToday ? ' today' : ''}` },
+          h('span', { class: 'wd-day' }, dayShort(iso)),
+          h('span', { class: 'ds-emoji', title: l?.name ?? '' }, l?.emoji ?? '—'),
+          h('span', { class: 'ds-emoji', title: v?.name ?? '' }, v?.emoji ?? '—'),
+        );
+      }),
+    ),
+    h('p', { class: 'muted', style: 'font-size:12px;margin:0' }, 'Horní řádek oběd, dolní večeře. Jídla se střídají, ať není dvakrát za den totéž.'),
+  );
+}
+
+function breakfastCard(c, plan) {
+  const rows = [];
+  for (const uid of plan.members ?? []) {
+    const m = c.members[uid];
+    if (!m) continue;
+    const bf = (plan.breakfasts?.[uid] ?? []).map((b) => ({ ...b, r: findRecipe(b.recipeId) })).filter((b) => b.r);
+    const sn = (plan.snacks?.[uid] ?? []).map((b) => ({ ...b, r: findRecipe(b.recipeId) })).filter((b) => b.r);
+    rows.push(h('div', { class: 'stack', style: 'gap:6px' },
+      h('span', { class: `person-chip person-${uid}`, style: 'align-self:flex-start' }, m.name),
+      ...bf.map((b, i) => smallRecipeRow(b.r, `snídaně ${i === 0 ? 'Po–Čt' : 'Pá–Ne'}`, b.factor, c)),
+      ...sn.map((b, i) => smallRecipeRow(b.r, `svačina ${i === 0 ? 'dopoledne' : 'odpoledne'}`, b.factor, c)),
     ));
   }
-  return out;
+  return h('div', { class: 'card stack', style: 'gap:12px' },
+    h('div', { class: 'label' }, 'Snídaně a svačiny'),
+    ...rows,
+  );
+}
+
+function smallRecipeRow(r, when, factor, c) {
+  const m = recipeMacros(r, c.customFoods);
+  return h('button', { class: `history-row ${recipeColorClass(r)}`, onClick: () => openRecipeModal(r, { portions: factor }) },
+    h('span', { class: 'dish-emoji small' }, r.emoji),
+    h('span', { class: 'grow', style: 'text-align:left' },
+      h('div', { style: 'font-size:14.5px' }, r.name),
+      h('div', { class: 'muted', style: 'font-size:12px' }, `${when} · ${fmtPortion(factor)} porce · ${fmtKcal(m.kcal * factor)} kcal · ${Math.round(m.p * factor)} g B`),
+    ),
+    h('span', { class: 'muted', style: 'font-size:18px' }, '›'),
+  );
+}
+
+// Recept: suroviny na zvolený počet porcí (krabičky obou), kroky, skladování.
+function openRecipeModal(r, { dish = null, members = {}, portions = null } = {}) {
+  const custom = Store.state.food.customFoods;
+  const m = recipeMacros(r, custom);
+  const total = dish ? dishIngredients(dish, r).portions : (portions ?? 1);
+  const per = dish ? dishSummary(dish, r, members, custom).per : [];
+  const fmtG = (g) => (g >= 1000 ? `${(g / 1000).toFixed(2).replace(/\.?0+$/, '').replace('.', ',')} kg` : `${Math.round(g)} g`);
+  const ingLine = (it) => {
+    const f = foodById(it.foodId, custom);
+    const g = it.grams * total;
+    const pieces = f?.pieceG && (f.loose || /\bks\b/.test(f.packLabel ?? '')) ? ` (≈ ${Math.ceil(g / f.pieceG)} ks)` : '';
+    return h('div', { class: 'row between ing-line' },
+      h('span', { class: 'small' }, f?.name ?? it.foodId),
+      h('span', { class: 'num small', style: 'font-weight:600' }, `${fmtG(g)}${pieces}`),
+    );
+  };
+  openModal(
+    h('div', { class: `recipe-head ${recipeColorClass(r)}` },
+      h('div', { class: 'dish-emoji big' }, r.emoji),
+      h('div', { class: 'grow' },
+        h('h3', {}, r.name),
+        h('div', { class: 'muted', style: 'font-size:12.5px' }, `${r.prepMin} min příprava · ${r.cookMin} min vaření · ${(r.equipment ?? []).join(', ') || 'bez nádobí'}`),
+        h('div', { class: 'row', style: 'flex-wrap:wrap;gap:4px;margin-top:4px' }, ...(r.tags ?? []).map((t) => h('span', { class: 'badge plain' }, t))),
+      ),
+    ),
+    h('div', { class: 'row between' },
+      h('span', { class: 'label' }, `Suroviny na ${String(Math.round(total * 100) / 100).replace('.', ',')} porce${dish ? ` (${Object.values(dish.boxes).reduce((a, n) => a + n, 0)} krabiček)` : ''}`),
+      h('span', { class: 'num muted', style: 'font-size:12px' }, `1 porce = ${fmtKcal(m.kcal)} kcal · ${m.p} g B`),
+    ),
+    h('div', { class: 'stack', style: 'gap:0' }, ...r.items.map(ingLine)),
+    r.pantry?.length ? h('p', { class: 'muted', style: 'font-size:12px;margin:0' }, `Ze spíže: ${r.pantry.join(', ')}.`) : null,
+    per.length ? h('div', { class: 'stack', style: 'gap:4px' },
+      h('span', { class: 'label' }, 'Porcování do krabiček'),
+      ...per.map((p) => {
+        const main = r.items.slice(0, 2).map((it) => `${fmtG(it.grams * p.factor)} ${(foodById(it.foodId, custom)?.name ?? it.foodId).toLowerCase().split(' (')[0]}`).join(', ');
+        return h('div', { class: 'row between', style: 'align-items:flex-start' },
+          h('span', { class: `person-chip person-${p.userId}` }, `${p.name} · ${p.boxes}×`),
+          h('span', { class: 'small', style: 'text-align:right' }, `${fmtPortion(p.factor)} porce ≈ ${main} · ${fmtKcal(p.kcal)} kcal · ${p.p} g B`),
+        );
+      }),
+    ) : null,
+    h('span', { class: 'label' }, 'Postup'),
+    h('ol', { class: 'steps' }, ...r.steps.map((s) => h('li', { class: 'small' }, s))),
+    h('p', { class: 'muted', style: 'font-size:12px;margin:0' },
+      `Skladování: v lednici ${r.fridgeDays} ${r.fridgeDays === 1 ? 'den' : r.fridgeDays < 5 ? 'dny' : 'dní'}${r.freezer ? ', dá se zamrazit (rozmraz přes noc v lednici)' : ', nemrazit'}. Krabičky nech před zavřením vychladnout. Maso navíc zavakuuj a zamraz — rozmrazené vydrží 2 dny.`),
+  );
+}
+
+function openSwapDishModal(c, plan, s, d) {
+  const inPlan = new Set(plan.sessions.flatMap((x) => x.dishes.map((y) => y.recipeId)));
+  const options = allRecipes().filter((r) => r.kind === 'hlavni' && !inPlan.has(r.id))
+    .map((r) => ({ r, disc: mealDiscountShare({ items: r.items }, c.discounted), ok: r.fridgeDays >= s.coversDays.length || r.freezer }))
+    .sort((a, b) => (b.ok - a.ok) || (b.disc - a.disc) || a.r.name.localeCompare(b.r.name, 'cs'));
+  const { close } = openModal(
+    h('h3', {}, 'Vyměnit jídlo'),
+    h('p', { class: 'muted small' }, `Místo „${findRecipe(d.recipeId)?.name}“. Krabičky zůstanou, porce a nákup se přepočítají.`),
+    h('div', { class: 'stack', style: 'gap:0;max-height:52vh;overflow:auto' },
+      ...options.map(({ r, disc, ok }) => h('button', {
+        class: `history-row ${recipeColorClass(r)}`,
+        onClick: () => {
+          Household.mutate((hh) => { swapDish(hh.cook[plan.weekStart], s.id, d.recipeId, r.id, c.members, c.customRecipes, c.customFoods); });
+          close();
+          toast(`Vyměněno za ${r.name}.`);
+        },
+      },
+        h('span', { class: 'dish-emoji small' }, r.emoji),
+        h('span', { class: 'grow', style: 'text-align:left' },
+          h('div', { style: 'font-size:14.5px' }, r.name),
+          h('div', { class: 'muted', style: 'font-size:12px' }, `${PROTEIN_LABEL[r.protein] ?? r.protein} · ${r.prepMin + r.cookMin} min · lednice ${r.fridgeDays} d${r.freezer ? ' · mrazák' : ''}${ok ? '' : ' · nevydrží celé období'}`),
+        ),
+        disc >= 0.3 ? h('span', { class: 'badge accent', style: 'flex:none' }, 'v akci') : null,
+      )),
+    ),
+  );
 }
 
 // ---------- NÁKUP ----------
 
 function viewShopping(state, c) {
-  if (!c.plan) return [planCta(c, 'Nákupní seznam vzniká z jídelníčku — ten ještě nemáš.')];
-  const groups = shoppingList(c.plan, c.meals, c.customFoods, c.discounted);
+  const hhPlan = c.cookPlan;
+  const groups = hhPlan
+    ? householdShoppingList(hhPlan, c.customRecipes, c.customFoods, c.discounted)
+    : (c.plan ? shoppingList(c.plan, c.meals, c.customFoods, c.discounted) : null);
+  if (!groups) {
+    return [h('div', { class: 'card stack' },
+      h('div', { class: 'label' }, 'Nákupní seznam'),
+      h('p', { class: 'small', style: 'margin:0' }, 'Nákup vzniká z plánu vaření — ten ještě není.'),
+      h('button', { class: 'btn primary big', onClick: () => { sub = 'vareni'; Store.onChange?.(); } }, 'Naplánovat vaření'),
+    )];
+  }
+  const weekKey = hhPlan ? c.cookWeek : c.weekStart;
   const all = groups.flatMap((g) => g.items);
-  const bought = c.food.bought[c.weekStart] ?? {};
+  const bought = hhPlan ? (Household.state.bought[weekKey]?.items ?? {}) : (c.food.bought[weekKey] ?? {});
   const inAkce = all.filter((i) => i.discount).length;
   const done = all.filter((i) => bought[i.foodId]).length;
+  const toggle = (foodId) => {
+    if (hhPlan) Household.mutate((hh) => { const b = (hh.bought[weekKey] ??= { updatedAt: null, items: {} }); b.items[foodId] = !b.items[foodId]; b.updatedAt = new Date().toISOString(); });
+    else Store.mutate((s) => { const b = (s.food.bought[weekKey] ??= {}); b[foodId] = !b[foodId]; }, { markDirty: false });
+  };
+  const clearAll = () => {
+    if (hhPlan) Household.mutate((hh) => { hh.bought[weekKey] = { updatedAt: new Date().toISOString(), items: {} }; });
+    else Store.mutate((s) => { s.food.bought[weekKey] = {}; });
+  };
   const out = [];
   out.push(h('div', { class: 'card stack' },
     h('div', { class: 'row between' },
-      h('div', { class: 'label' }, `Nákup na týden od ${fmtDate(c.weekStart)}`),
+      h('div', { class: 'label' }, `Nákup na týden od ${fmtDate(weekKey)}`),
       h('span', { class: 'num muted small' }, `${done} / ${all.length}`),
     ),
     h('div', { class: 'muted', style: 'font-size:12.5px' },
-      `${all.length} položek, ${inAkce ? `${inAkce} v akci v Lidlu` : 'nic z toho teď není v akci'}. Množství je sečtené z celého týdne a zaokrouhlené na balení.`),
+      `${all.length} položek, ${inAkce ? `${inAkce} v akci v Lidlu` : 'nic z toho teď není v akci'}. ${hhPlan ? 'Sečteno z obou vaření, snídaní a svačin pro oba, zaokrouhleno na balení. Odškrtnuté se sdílí mezi telefony.' : 'Množství je sečtené z celého týdne a zaokrouhlené na balení.'}`),
     h('div', { class: 'row' },
-      h('button', { class: 'btn grow', onClick: () => copyList(groups, c) }, 'Kopírovat seznam'),
-      done ? h('button', { class: 'btn ghost', onClick: () => Store.mutate((s) => { s.food.bought[c.weekStart] = {}; }) }, 'Odškrtnout vše') : null,
+      h('button', { class: 'btn grow', onClick: () => copyList(groups, weekKey) }, 'Kopírovat seznam'),
+      done ? h('button', { class: 'btn ghost', onClick: clearAll }, 'Odškrtnout vše') : null,
     ),
   ));
   for (const g of groups) {
@@ -7661,14 +8496,12 @@ function viewShopping(state, c) {
       h('div', { class: 'label cat-label', style: 'margin-bottom:4px' }, g.label),
       ...g.items.map((it) => {
         const on = !!bought[it.foodId];
-        return h('button', {
-          class: `shop-row${on ? ' done' : ''}`,
-          onClick: () => Store.mutate((s) => { const b = (s.food.bought[c.weekStart] ??= {}); b[it.foodId] = !b[it.foodId]; }, { markDirty: false }),
-        },
+        return h('button', { class: `shop-row${on ? ' done' : ''}`, onClick: () => toggle(it.foodId) },
           h('span', { class: `shop-check${on ? ' on' : ''}` }, on ? '✓' : ''),
           h('span', { class: 'grow', style: 'text-align:left;min-width:0' },
             h('div', { class: 'shop-name' }, it.name),
             h('div', { class: 'shop-qty' }, h('b', {}, `Kup ${buyText(it)}`), h('span', { class: 'muted' }, ` · spotřeba ${fmtGrams(it.grams)}`)),
+            it.uses?.length ? h('div', { class: 'muted', style: 'font-size:11.5px' }, `do: ${it.uses.slice(0, 3).join(', ')}${it.uses.length > 3 ? '…' : ''}`) : null,
             it.discount ? h('div', { class: 'shop-deal' }, dealText(it.discount)) : null,
           ),
         );
@@ -7689,8 +8522,8 @@ function dealText(d) {
   return `Akce: ${qty}${d.validTo ? ` · do ${fmtDate(d.validTo)}` : ''}`;
 }
 
-async function copyList(groups, c) {
-  const lines = [`Nákup Fitko — týden od ${fmtDate(c.weekStart)}`];
+async function copyList(groups, weekKey) {
+  const lines = [`Nákup Fitko — týden od ${fmtDate(weekKey)}`];
   for (const g of groups) {
     lines.push('', g.label.toUpperCase());
     for (const it of g.items) lines.push(`- ${it.name}: ${buyText(it)} (spotřeba ${fmtGrams(it.grams)})${it.discount ? ` — ${dealText(it.discount)}` : ''}`);
@@ -7698,41 +8531,77 @@ async function copyList(groups, c) {
   try { await navigator.clipboard.writeText(lines.join('\n')); toast('Seznam zkopírován.'); } catch { toast('Kopírování nejde — otevři seznam v appce.'); }
 }
 
-// ---------- JÍDLA ----------
+// ---------- RECEPTY ----------
 
-function viewMeals(state, c) {
+const KIND_LABELS = { hlavni: 'Hlavní jídla do krabiček', snidane: 'Snídaně', svacina: 'Svačiny' };
+
+function viewRecipes(state, c) {
   const out = [];
-  out.push(h('div', { class: 'row', style: 'gap:8px' },
-    h('button', { class: 'btn primary grow', onClick: () => openMealEditor(c, null) }, '+ Nové jídlo'),
-    h('button', { class: 'btn ghost', onClick: () => { loadStarters(); toast('Základní jídla načtena.'); Store.onChange?.(); } }, c.meals.length ? 'Doplnit základní' : 'Načíst základní'),
-  ));
-  if (!c.meals.length) {
-    out.push(h('div', { class: 'card stack' },
-      h('div', { class: 'label' }, 'Zatím žádná jídla'),
-      h('p', { class: 'small muted', style: 'margin:0' }, 'Jídlo = potraviny v gramech. Makra se spočítají jednou při tvorbě; potom už jen ťukáš „snědeno“.'),
-    ));
-    return out;
-  }
-  const byKind = {};
-  for (const m of c.meals) (byKind[m.slot ?? 'any'] ??= []).push(m);
-  for (const k of ['snidane', 'svacina', 'obed', 'vecere', 'any']) {
-    if (!byKind[k]) continue;
+  const excluded = new Set(Household.state.prefs?.excludedRecipes ?? []);
+  const recipes = allRecipes();
+  out.push(h('p', { class: 'muted', style: 'font-size:12.5px;margin:0' },
+    `${recipes.length} receptů. Ťukni pro postup a suroviny; dlouhým podržením nic — vyřadit z plánování jde tlačítkem v receptu. Vyřazené: ${excluded.size}.`));
+  for (const kind of ['hlavni', 'snidane', 'svacina']) {
+    const list = recipes.filter((r) => r.kind === kind).sort((a, b) => a.name.localeCompare(b.name, 'cs'));
+    if (!list.length) continue;
     out.push(h('div', { class: 'card stack', style: 'gap:0' },
-      h('div', { class: 'label', style: 'margin-bottom:6px' }, k === 'any' ? 'Kdykoli' : slotKindLabel(k)),
-      ...byKind[k].sort((a, b) => a.name.localeCompare(b.name, 'cs')).map((m) => {
-        const mm = roundMacros(mealMacros(m, c.customFoods));
-        const share = m.items.reduce((a, it) => a + (c.discounted[it.foodId] ? it.grams : 0), 0) / Math.max(1, m.items.reduce((a, it) => a + it.grams, 0));
-        return h('button', { class: 'history-row', onClick: () => openMealEditor(c, m) },
+      h('div', { class: 'label', style: 'margin-bottom:6px' }, KIND_LABELS[kind]),
+      ...list.map((r) => {
+        const m = recipeMacros(r, c.customFoods);
+        const disc = mealDiscountShare({ items: r.items }, c.discounted);
+        return h('button', { class: `history-row ${recipeColorClass(r)}${excluded.has(r.id) ? ' excluded' : ''}`, onClick: () => openRecipeLibraryModal(r, c) },
+          h('span', { class: 'dish-emoji small' }, r.emoji),
           h('span', { class: 'grow', style: 'text-align:left' },
-            h('div', {}, m.name),
-            h('div', { class: 'muted', style: 'font-size:12px' }, `${m.items.length} položek · ${fmtKcal(mm.kcal)} kcal · ${mm.p} g B · ${mm.c} g S · ${mm.f} g T`),
+            h('div', { style: 'font-size:14.5px' }, r.name),
+            h('div', { class: 'muted', style: 'font-size:12px' }, `${fmtKcal(m.kcal)} kcal · ${m.p} g B · ${r.prepMin + r.cookMin} min · lednice ${r.fridgeDays} d${r.freezer ? ' · mrazák' : ''}${r.custom ? ' · vlastní' : ''}`),
           ),
-          share >= 0.3 ? h('span', { class: 'badge accent', style: 'flex:none' }, 'v akci') : null,
+          disc >= 0.3 ? h('span', { class: 'badge accent', style: 'flex:none' }, 'v akci') : null,
         );
       }),
     ));
   }
+  // vlastní jídla (bez receptu) — starý editor
+  const custom = c.meals.filter((m) => !m.recipeId);
+  out.push(h('div', { class: 'card stack' },
+    h('div', { class: 'row between' },
+      h('div', { class: 'label' }, 'Vlastní jídla'),
+      h('button', { class: 'btn small', onClick: () => openMealEditor(c, null) }, '+ Nové'),
+    ),
+    custom.length
+      ? h('div', { class: 'stack', style: 'gap:0' }, ...custom.sort((a, b) => a.name.localeCompare(b.name, 'cs')).map((m) => {
+          const mm = roundMacros(mealMacros(m, c.customFoods));
+          return h('button', { class: 'history-row', onClick: () => openMealEditor(c, m) },
+            h('span', { class: 'grow', style: 'text-align:left' },
+              h('div', {}, m.name),
+              h('div', { class: 'muted', style: 'font-size:12px' }, `${slotKindLabel(m.slot)} · ${fmtKcal(mm.kcal)} kcal · ${mm.p} g B`),
+            ),
+          );
+        }))
+      : h('p', { class: 'muted', style: 'font-size:12.5px;margin:0' }, 'Jídlo bez receptu (jen potraviny v gramech) — hodí se na věci, které jíš mimo plán a chceš je mít v Dnes.'),
+  ));
   return out;
+}
+
+function openRecipeLibraryModal(r, c) {
+  const excluded = new Set(Household.state.prefs?.excludedRecipes ?? []);
+  const isEx = excluded.has(r.id);
+  openRecipeModal(r, { portions: 1 });
+  const modal = document.querySelector('.modal-backdrop:last-of-type .modal');
+  if (!modal) return;
+  modal.append(h('button', {
+    class: `btn ${isEx ? 'primary' : 'ghost'}`,
+    onClick: () => {
+      Household.mutate((hh) => {
+        hh.prefs ??= {};
+        const list = new Set(hh.prefs.excludedRecipes ?? []);
+        if (isEx) list.delete(r.id); else list.add(r.id);
+        hh.prefs.excludedRecipes = [...list];
+        hh.prefs.updatedAt = new Date().toISOString();
+      });
+      document.querySelector('.modal-backdrop:last-of-type')?.remove();
+      toast(isEx ? 'Recept se zase plánuje.' : 'Recept se nebude plánovat.');
+    },
+  }, isEx ? 'Zase plánovat' : 'Neplánovat tenhle recept'));
 }
 
 function openMealEditor(c, existing) {
@@ -7920,7 +8789,7 @@ function viewDiscounts(state, c) {
     ),
     h('p', { class: 'muted', style: 'font-size:12.5px;margin:0' },
       `${matched.length} z nich odpovídá potravinám v tvých jídlech. Plánovač je při skládání týdne upřednostní.`),
-    c.meals.length ? h('button', { class: 'btn primary', onClick: () => doPlan(c) }, 'Naplánovat týden z akcí') : null,
+    h('button', { class: 'btn primary', onClick: () => { makePlan(c); sub = 'vareni'; scrollTop(0); Store.onChange?.(); } }, 'Naplánovat vaření z akcí'),
   ));
   if (matched.length) {
     out.push(h('div', { class: 'card stack', style: 'gap:0' },

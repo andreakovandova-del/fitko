@@ -172,8 +172,8 @@ Aktualizuje se po každém commitu.
 - [x] R4 výživa
 - [x] R5 projekce a texty
 - [x] R6 program z profilu + nové cviky
-- [ ] R9 barvy
+- [x] R9 barvy
 - [x] R7 dva uživatelé
-- [ ] R8 recepty a krabičky
+- [x] R8 recepty a krabičky
 - [ ] R10 AI návrh týdne
 - [ ] R11 fotky
